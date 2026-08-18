@@ -552,6 +552,8 @@ const ICONS = {
   'sliders': '<path d="M5 6h14M5 12h14M5 18h14"/><circle cx="9" cy="6" r="2" fill="var(--bg-0,#0B0E1A)"/><circle cx="15" cy="12" r="2" fill="var(--bg-0,#0B0E1A)"/><circle cx="7" cy="18" r="2" fill="var(--bg-0,#0B0E1A)"/>',
   'flame': '<path d="M12 3c1 3-3 4-3 7a3 3 0 0 0 6 0c1 1 1.5 2.5 1.5 4a4.5 4.5 0 0 1-9 0C7.5 9 9 6 12 3Z"/>',
   'chart-bar': '<path d="M4 20V10M10 20V4M16 20v-7M4 20h16"/>',
+  'trash': '<path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 13h10l1-13"/><path d="M9 7V4h6v3"/>',
+  'bell': '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9Z"/><path d="M10 21h4"/>',
   'question-mark': '<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.7 2.2c-.8.5-1.2 1-1.2 1.8v.3"/><path d="M12 17h.01"/>',
   'send': '<path d="m3 12 18-8-6.5 18-3-7.5L3 12Z" stroke-linejoin="round"/>',
   'x': '<path d="m6 6 12 12M18 6 6 18"/>',
@@ -653,6 +655,24 @@ const DEFAULT_PERMISSIONS = {
   admin:  { manageMembers:true,  manageRoles:false, editGroupSettings:true,  pinNotes:true, startActivities:true },
   member: { manageMembers:false, manageRoles:false, editGroupSettings:false, pinNotes:true, startActivities:true },
 };
+function normalizeSquadData(sq){
+  if(!sq) return sq;
+  const ownerId = (sq.members||[]).find(m=>m.id && ((sq.roles||{})[m.id]==='owner'))?.id || sq.ownerId || sq.members?.[0]?.id;
+  if(!sq.maxMembers) sq.maxMembers=6;
+  if(!sq.roles) sq.roles={};
+  if(!sq.permissions) sq.permissions={};
+  if(ownerId){
+    sq.roles[ownerId]='owner';
+    sq.permissions[ownerId]={...DEFAULT_PERMISSIONS.owner};
+  }
+  (sq.members||[]).forEach(m=>{
+    if(!sq.roles[m.id]) sq.roles[m.id]='member';
+    if(!sq.permissions[m.id]) sq.permissions[m.id]={...DEFAULT_PERMISSIONS[sq.roles[m.id]]};
+  });
+  if(!Array.isArray(sq.joinRequests)) sq.joinRequests=[];
+  if(!sq.groupStyle) sq.groupStyle={tagline:'',description:'',logo:'✦',logoUrl:'',bannerUrl:'',accent:'#7C9CFF',accent2:'#9B7CFF',background:'#0B0E1A',mode:'liquid',radius:18,motion:'ambient',showMemberCount:true,showStatusGlow:true};
+  return sq;
+}
 function roleOf(uid){ return (SQUAD && SQUAD.roles && SQUAD.roles[uid]) || 'member'; }
 function permsOf(uid){
   const role = roleOf(uid);
@@ -664,7 +684,7 @@ function can(uid, permId){ return !!(permsOf(uid) || {})[permId]; }
 let ME = null;
 let SQUAD = null;
 let SQUAD_ID = null;
-let LOCAL = { links:{}, layout:'grid', theme:'indigo', accentHex:'', density:'comfortable', reduceMotion:false, lastNudge:{} };
+let LOCAL = { links:{}, layout:'grid', theme:'indigo', accentHex:'', density:'comfortable', reduceMotion:false, lastNudge:{}, notifications:false, homescreenWidget:true, parallax:true };
 let currentScreen = 'loading';
 let navDirection = 'fwd';
 let history_stack = [];
@@ -723,11 +743,11 @@ async function saveMySquadId(){
 async function loadSquad(id){
   try {
     const data = await window.fbGet('squads/' + id);
-    if (data) return data;
+    if (data) return normalizeSquadData(data);
   } catch(e){ console.warn('Firebase fetch error:', e); }
   try {
     const local = localStorage.getItem('squadsync:squad_cache:' + id);
-    if (local) return JSON.parse(local);
+    if (local) return normalizeSquadData(JSON.parse(local));
   } catch(e){}
   return null;
 }
@@ -761,7 +781,7 @@ function attachSquadListener(){
       // Ignore stale nudges from before this session started, and don't
       // toast our own nudges reflected back.
       if (data.from !== ME.id && data.ts > sessionStartTs) {
-        showToast(`${(data.fromName||'Someone').split(' ')[0]} nudged you 👋`, 'ti-hand-click');
+        showToast(`${(data.fromName||'Someone').split(' ')[0]} nudged you 👋`, 'ti-hand-click'); notifyUser('SquadZync nudge', `${(data.fromName||'Someone').split(' ')[0]} nudged you`);
       }
     }
   });
@@ -773,7 +793,7 @@ function attachSquadListener(){
     CHAT = fresh;
     if (currentScreen === 'messages') renderAll(false);
     else if (lastMsg && lastMsg.authorId !== ME.id && lastMsg.ts > sessionStartTs) {
-      showToast(`${(lastMsg.authorName||'Someone').split(' ')[0]}: ${lastMsg.text.slice(0,40)}`, 'ti-message');
+      showToast(`${(lastMsg.authorName||'Someone').split(' ')[0]}: ${lastMsg.text.slice(0,40)}`, 'ti-message'); notifyUser(`New message from ${(lastMsg.authorName||'Someone').split(' ')[0]}`, lastMsg.text.slice(0,120));
     }
   });
   if (callUnsub) callUnsub();
@@ -785,6 +805,25 @@ function attachSquadListener(){
   });
 }
 
+async function enableNotifications(){
+  if(!('Notification' in window)) return showToast('Notifications are not supported here','ti-bell');
+  try{
+    const permission = Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission();
+    if(permission==='granted'){
+      LOCAL.notifications = true; await saveLocal(); showToast('Desktop/mobile notifications enabled','ti-bell');
+      try{ navigator.setAppBadge?.(1); }catch(e){}
+      return true;
+    }
+    showToast('Notification permission was not granted','ti-alert-triangle');
+  }catch(e){ showToast('Could not enable notifications','ti-alert-triangle'); }
+  return false;
+}
+function notifyUser(title, body){
+  if(!LOCAL.notifications || !('Notification' in window) || Notification.permission!=='granted') return;
+  try{
+    new Notification(title,{body,icon:document.querySelector('link[rel="icon"]')?.href||''});
+  }catch(e){}
+}
 function showToast(msg, iconName='ti-check'){
   const t = document.getElementById('toast');
   const ic = document.getElementById('toast-icon');
@@ -827,6 +866,12 @@ async function resolveJoinRequest(uid, approve){
   softUpdate();
 }
 
+function renderAvatarMarkup(m, size=38){
+  const avatar = m || {};
+  const inner = avatar.emoji ? `<span style="font-size:${Math.round(size*.46)}px;line-height:1;">${escapeHtml(avatar.emoji)}</span>` :
+    avatar.photo ? `<img src="${escapeHtml(avatar.photo)}" alt="">` : getInitials(avatar.name || '');
+  return `<div class="avatar" style="width:${size}px;height:${size}px;font-size:${Math.max(10,Math.round(size*.34))}px;">${inner}</div>`;
+}
 function getInitials(name){
   if(!name) return '?';
   const p = name.trim().split(/\s+/);
@@ -1495,6 +1540,19 @@ async function sendNudge(friendId, friendName){
   showToast(`Nudged ${friendName.split(' ')[0]}`, 'ti-hand-click');
 }
 
+async function removeSquadMember(uid){
+  if(!can(ME.id,'manageMembers')) return showToast('You cannot remove members','ti-ban');
+  if(uid===ME.id) return showToast('Use Leave Squad for yourself','ti-alert-circle');
+  const target=SQUAD.members.find(m=>m.id===uid); if(!target) return;
+  if(roleOf(uid)==='owner') return showToast('The owner cannot be removed','ti-ban');
+  SQUAD.members=SQUAD.members.filter(m=>m.id!==uid);
+  if(SQUAD.status) delete SQUAD.status[uid];
+  if(SQUAD.roles) delete SQUAD.roles[uid];
+  if(SQUAD.permissions) delete SQUAD.permissions[uid];
+  if(SQUAD.joinRequests) SQUAD.joinRequests=SQUAD.joinRequests.filter(r=>r.id!==uid);
+  SQUAD.updatedAt=Date.now();
+  await saveSquad(); softUpdate(); showToast(`${target.name.split(' ')[0]} removed`,'ti-user-minus');
+}
 function renderSquadManage(){
   const cap = SQUAD.maxMembers || 6;
   const reqCount = (SQUAD.joinRequests || []).length;
@@ -1941,8 +1999,9 @@ function renderMessages(){
     <div style="display:flex; ${mine?'justify-content:flex-end;':''} margin-bottom:10px;">
       <div style="max-width:78%;">
         ${!mine ? `<div style="font-size:11px; color:var(--text-faint); margin:0 0 3px 4px;">${escapeHtml(m.authorName.split(' ')[0])}</div>` : ''}
-        <div class="glass" style="padding:10px 13px; border-radius:16px; ${mine?'background:rgba(124,156,255,0.18); border-color:var(--accent);':''}">
-          <div style="font-size:13.5px; line-height:1.4; overflow-wrap:break-word;">${escapeHtml(m.text)}</div>
+        <div class="glass" style="padding:10px 13px; border-radius:16px; position:relative; ${mine?'background:rgba(124,156,255,0.18); border-color:var(--accent);':''}">
+          <div style="font-size:13.5px; line-height:1.4; overflow-wrap:break-word; padding-right:${(mine||can(ME.id,'manageMembers'))?'22px':'0'}">${escapeHtml(m.text)}</div>
+          ${(mine||can(ME.id,'manageMembers'))?`<button class="icon-btn" data-delete-chat="${escapeHtml(m.id)}" title="Remove message" style="position:absolute;right:5px;top:5px;width:22px;height:22px;color:var(--red);border:none;background:transparent;">${icon('ti-trash')}</button>`:''}
         </div>
         <div style="font-size:10px; color:var(--text-faint); margin:3px 4px 0; text-align:${mine?'right':'left'};">${timeAgo(m.ts)}</div>
       </div>
@@ -1965,6 +2024,13 @@ function renderMessages(){
   `;
 }
 
+async function deleteChatMessage(id){
+  const msg=(CHAT||[]).find(m=>m.id===id);
+  if(!msg || !SQUAD) return;
+  if(msg.authorId!==ME.id && !can(ME.id,'manageMembers')) return showToast('You cannot remove this message','ti-ban');
+  try{ await window.fbSet('chats/' + SQUAD.id + '/' + id, null); showToast('Message removed','ti-trash'); }
+  catch(e){ showToast('Could not remove message','ti-alert-triangle'); }
+}
 async function sendChatMessage(text){
   if(!text || !text.trim() || !SQUAD) return;
   const id = 'msg_' + Date.now() + '_' + Math.floor(Math.random()*1000);
@@ -2018,8 +2084,9 @@ function renderBoard(){
       return `<div class="reaction-chip ${mine?'mine':''}" data-note="${n.id}" data-emoji="${emoji}">${emoji} ${uids.length}</div>`;
     }).join('');
     return `
-    <div class="board-note glass">
-      <div class="board-note-text">${escapeHtml(n.text)}</div>
+    <div class="board-note glass" data-board-note="${escapeHtml(n.id)}">
+      ${((n.authorId===ME.id)||can(ME.id,'pinNotes')) ? `<button class="icon-btn" data-delete-board-note="${escapeHtml(n.id)}" title="${can(ME.id,'pinNotes')?'Remove note':'Remove your note'}" style="position:absolute;right:8px;top:8px;width:30px;height:30px;color:var(--red);">${icon('ti-trash')}</button>` : ''}
+      <div class="board-note-text" style="padding-right:28px;">${escapeHtml(n.text)}</div>
       <div class="board-note-meta">
         <div class="avatar">${author && author.photo ? `<img src="${author.photo}" alt="">` : getInitials(n.authorName)}</div>
         <span>${n.authorName.split(' ')[0]} · ${timeAgo(n.ts)}</span>
@@ -2049,6 +2116,16 @@ function escapeHtml(s){
 
 // Reactions are stored per-note as { [userId]: emoji } — one reaction per
 // person per note, tapping the same emoji again clears it.
+async function deleteBoardNote(noteId){
+  const note = (BOARD||[]).find(n=>n.id===noteId);
+  if(!note || !SQUAD) return;
+  const allowed = note.authorId === ME.id || can(ME.id,'pinNotes');
+  if(!allowed) return showToast('You cannot remove this note','ti-ban');
+  try{
+    await window.fbSet('boards/' + SQUAD.id + '/' + noteId, null);
+    showToast('Board note removed','ti-trash');
+  }catch(e){ showToast('Could not remove note','ti-alert-triangle'); }
+}
 async function toggleReaction(noteId, emoji){
   const note = (BOARD || []).find(n => n.id === noteId);
   if(!note) return;
@@ -2269,7 +2346,7 @@ function bindEvents(){
       const cap = Math.min(15, Math.max(2, window.__pendingCap || 6));
       const locked = !!window.__pendingLocked;
       const id = 'sq_' + genCode() + Date.now().toString(36);
-      SQUAD = {
+      SQUAD = normalizeSquadData({
         id, name, code: genCode(),
         maxMembers: cap,
         locked: locked,
@@ -2288,7 +2365,7 @@ function bindEvents(){
         permissions: { [ME.id]: { ...DEFAULT_PERMISSIONS.owner } },
         joinRequests: [],
         updatedAt: Date.now()
-      };
+      });
       SQUAD_ID = id;
       window.__pendingCap = null;
       window.__pendingLocked = false;
@@ -2391,6 +2468,10 @@ function bindEvents(){
   if(byId('nav-me')) byId('nav-me').onclick = () => goTo('me', {replace:true});
 
   if(byId('add-board-note')) byId('add-board-note').onclick = openAddNote;
+  if(byId('enable-notifications-btn')) byId('enable-notifications-btn').onclick = enableNotifications;
+  document.querySelectorAll('[data-delete-board-note]').forEach(btn=>btn.onclick=(e)=>{e.stopPropagation();deleteBoardNote(btn.dataset.deleteBoardNote);});
+  document.querySelectorAll('[data-delete-chat]').forEach(btn=>btn.onclick=(e)=>{e.stopPropagation();deleteChatMessage(btn.dataset.deleteChat);});
+
 
   document.querySelectorAll('.reaction-chip').forEach(chip => {
     chip.onclick = () => toggleReaction(chip.dataset.note, chip.dataset.emoji);
@@ -2399,6 +2480,7 @@ function bindEvents(){
     btn.onclick = (e) => { e.stopPropagation(); openReactionPicker(btn.dataset.notePicker, btn); };
   });
 
+    document.querySelectorAll('[data-remove-member]').forEach(btn=>btn.onclick=async(e)=>{e.stopPropagation(); if(confirm('Remove this member from the squad?')) await removeSquadMember(btn.dataset.removeMember);});
   document.querySelectorAll('[data-manage-member]').forEach(el=>{
     el.onclick = () => { if(el.dataset.manageMember !== ME.id) openFriendNotes(el.dataset.manageMember); };
   });
