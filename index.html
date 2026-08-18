@@ -132,6 +132,9 @@
   --text-faint:#6B7086;
   --accent:#7C9CFF;
   --accent-2:#9B7CFF;
+  --accent-rgb:124,156,255;
+  --accent-soft:rgba(var(--accent-rgb),.14);
+  --accent-glow:rgba(var(--accent-rgb),.28);
   --green:#4ADE80;
   --amber:#FBBF24;
   --red:#F87171;
@@ -146,11 +149,11 @@
   --ease-out-ios:cubic-bezier(0.22, 1, 0.36, 1);
   --ease-sheet:cubic-bezier(0.32, 0.72, 0, 1);
 }
-body.theme-violet{ --accent:#9B7CFF; --accent-2:#C58CFF; }
-body.theme-blue{ --accent:#5B9CFF; --accent-2:#7CC4FF; }
-body.theme-green{ --accent:#4ADE80; --accent-2:#7CFFB2; }
-body.theme-rose{ --accent:#FF7CA3; --accent-2:#FF9B7C; }
-body.theme-amber{ --accent:#FBBF24; --accent-2:#FF9B4A; }
+body.theme-violet{ --accent:#9B7CFF; --accent-2:#C58CFF; --accent-rgb:155,124,255; }
+body.theme-blue{ --accent:#5B9CFF; --accent-2:#7CC4FF; --accent-rgb:91,156,255; }
+body.theme-green{ --accent:#4ADE80; --accent-2:#7CFFB2; --accent-rgb:74,222,128; }
+body.theme-rose{ --accent:#FF7CA3; --accent-2:#FF9B7C; --accent-rgb:255,124,163; }
+body.theme-amber{ --accent:#FBBF24; --accent-2:#FF9B4A; --accent-rgb:251,191,36; }
 
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
 html{-webkit-text-size-adjust:100%;}
@@ -162,9 +165,9 @@ body{
   font-family:var(--font-body);
   color:var(--text-hi);
   background:
-    radial-gradient(circle at 15% 0%, #1a2140 0%, transparent 45%),
-    radial-gradient(circle at 90% 20%, #241634 0%, transparent 40%),
-    radial-gradient(circle at 50% 100%, #0d1830 0%, transparent 50%),
+    radial-gradient(circle at 15% 0%, rgba(var(--accent-rgb),.18) 0%, transparent 45%),
+    radial-gradient(circle at 90% 20%, color-mix(in srgb, var(--accent-2) 16%, transparent) 0%, transparent 40%),
+    radial-gradient(circle at 50% 100%, rgba(var(--accent-rgb),.10) 0%, transparent 50%),
     var(--bg-0);
   background-attachment:fixed;
   min-height:100vh; min-height:100dvh;
@@ -177,8 +180,8 @@ body::before{
   content:'';
   position:fixed; inset:-20%;
   background:
-    radial-gradient(circle at 30% 20%, rgba(124,156,255,0.10), transparent 55%),
-    radial-gradient(circle at 75% 75%, rgba(155,124,255,0.08), transparent 50%);
+    radial-gradient(circle at 30% 20%, rgba(var(--accent-rgb),.12), transparent 55%),
+    radial-gradient(circle at 75% 75%, rgba(var(--accent-rgb),.08), transparent 50%);
   animation:ambient-drift 18s ease-in-out infinite alternate;
   pointer-events:none;
   z-index:0;
@@ -195,7 +198,7 @@ body::before{
 .ti .icon,.icon{width:1em;height:1em;display:block;flex:0 0 auto;overflow:visible;}
 
 /* Liquid glass: transparent, glossy and low-blur rather than frosted. */
-:root{--group-accent:var(--accent);--group-accent-2:var(--accent-2);--liquid-alpha:.075;--liquid-blur:10px;--card-radius:18px;}
+:root{--group-accent:var(--accent);--group-accent-2:var(--accent-2);--group-accent-rgb:124,156,255;--liquid-alpha:.075;--liquid-blur:10px;--card-radius:18px;}
 body.liquid-mode{--glass:rgba(255,255,255,var(--liquid-alpha));--glass-strong:rgba(255,255,255,.105);}
 .glass,.glass-strong{border-radius:var(--card-radius);position:relative;overflow:hidden;}
 .glass::before,.glass-strong::before{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(135deg,rgba(255,255,255,.19),transparent 22%,transparent 68%,rgba(255,255,255,.05));opacity:.8;}
@@ -241,7 +244,7 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;back
 .btn-primary{
   background:linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
   border:none; color:#0B0E1A;
-  box-shadow:0 10px 28px -10px rgba(124,156,255,0.55), 0 1px 0 rgba(255,255,255,0.35) inset;
+  box-shadow:0 10px 28px -10px var(--accent-glow), 0 1px 0 rgba(255,255,255,0.35) inset;
   transition:transform .42s var(--ease-spring), filter .18s ease, box-shadow .3s ease, background .4s ease;
 }
 .btn-primary:active{transform:scale(0.945); filter:brightness(1.08); transition:transform .1s var(--ease-out-ios), filter .08s ease;}
@@ -268,8 +271,8 @@ input[type=text], input[type=tel], input[type=url], input[type=search], select, 
 input::placeholder, textarea::placeholder{color:var(--text-faint);}
 input:focus, select:focus, textarea:focus{
   border-color:var(--accent);
-  background:rgba(124,156,255,0.06);
-  box-shadow:0 0 0 4px rgba(124,156,255,0.15);
+  background:rgba(var(--accent-rgb),.09);
+  box-shadow:0 0 0 4px rgba(var(--accent-rgb),.18);
 }
 label.field-label{font-size:12px; font-weight:600; color:var(--text-lo); text-transform:uppercase; letter-spacing:0.06em; margin:0 0 6px 4px; display:block;}
 .field{margin-bottom:16px;}
@@ -305,7 +308,7 @@ p{margin:0;}
 .stack .onb-card:nth-child(2){animation-delay:.26s;}
 .stack .onb-card:nth-child(3){animation-delay:.34s;}
 @keyframes rise-in{from{opacity:0; transform:translateY(14px);} to{opacity:1; transform:translateY(0);}}
-.onb-card-icon{width:42px;height:42px;border-radius:13px;background:rgba(124,156,255,0.15);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:12px; transition:color .3s ease;}
+.onb-card-icon{width:42px;height:42px;border-radius:13px;background:var(--accent-soft);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:12px; transition:color .3s ease;}
 .onb-card h3{font-size:15px;margin-bottom:4px;}
 .onb-card p{font-size:13px;color:var(--text-lo);line-height:1.5;}
 .stack{display:flex;flex-direction:column;gap:12px;}
@@ -371,7 +374,7 @@ p{margin:0;}
 .wheel-node .avatar{width:52px;height:52px;font-size:18px;}
 .wheel-node-name{font-size:11px; font-weight:700; text-align:center; max-width:70px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
 
-.bottom-nav{position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:100%; max-width:480px; padding:12px 20px calc(14px + env(safe-area-inset-bottom)); background:rgba(11,14,26,0.85); backdrop-filter:blur(30px); -webkit-backdrop-filter:blur(30px); border-top:1px solid var(--glass-border); display:flex; justify-content:space-around; align-items:center; z-index:90; animation:nav-in .5s var(--ease-out-ios) .05s backwards;}
+.bottom-nav{position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:100%; max-width:480px; padding:12px 20px calc(14px + env(safe-area-inset-bottom)); background:rgba(11,14,26,0.72); backdrop-filter:blur(30px); -webkit-backdrop-filter:blur(30px); border-top:1px solid var(--glass-border); display:flex; justify-content:space-around; align-items:center; z-index:90; animation:nav-in .5s var(--ease-out-ios) .05s backwards;}
 @keyframes nav-in{from{opacity:0; transform:translate(-50%, 16px);} to{opacity:1; transform:translate(-50%, 0);}}
 .nav-item{display:flex; flex-direction:column; align-items:center; gap:4px; color:var(--text-faint); font-size:10px; font-weight:600; cursor:pointer; transition:color .2s ease, transform .3s var(--ease-spring); -webkit-user-select:none; user-select:none;}
 .nav-item i{font-size:22px; transition:transform .3s var(--ease-spring);}
@@ -392,7 +395,7 @@ p{margin:0;}
 
 .presets{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px;}
 .preset-pill{display:flex; align-items:center; gap:6px; padding:8px 12px; border-radius:12px; background:rgba(255,255,255,0.06); border:1px solid var(--glass-border); font-size:12px; font-weight:600; cursor:pointer; transition:transform .25s var(--ease-spring), background .2s ease, border-color .2s ease;}
-.preset-pill.active{background:rgba(124,156,255,0.18); border-color:var(--accent);}
+.preset-pill.active{background:var(--accent-soft); border-color:var(--accent);}
 .preset-pill:active{transform:scale(0.93); background:rgba(255,255,255,0.15);}
 .preset-pill i{font-size:14px; color:var(--accent);}
 
@@ -411,7 +414,7 @@ p{margin:0;}
 @keyframes spin{to{transform:rotate(360deg);}}
 
 .login-wrap{min-height:100vh; min-height:100dvh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:32px 24px; text-align:center; position:relative; z-index:1;}
-.login-logo{width:76px;height:76px;border-radius:24px;background:linear-gradient(135deg,var(--accent),var(--accent-2)); display:flex;align-items:center;justify-content:center; margin-bottom:24px; box-shadow:0 20px 50px -18px rgba(124,156,255,0.6); animation:rise-in .6s var(--ease-out-ios) both;}
+.login-logo{width:76px;height:76px;border-radius:24px;background:linear-gradient(135deg,var(--accent),var(--accent-2)); display:flex;align-items:center;justify-content:center; margin-bottom:24px; box-shadow:0 20px 50px -18px var(--accent-glow); animation:rise-in .6s var(--ease-out-ios) both;}
 .login-logo i{font-size:34px; color:#0B0E1A;}
 
 .board-grid{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
@@ -419,7 +422,7 @@ p{margin:0;}
 .board-note-text{font-size:13px; line-height:1.5; flex:1; overflow-wrap:break-word;}
 .board-note-meta{display:flex; align-items:center; gap:6px; margin-top:10px; font-size:10.5px; color:var(--text-faint);}
 .board-note-meta .avatar{width:18px;height:18px;font-size:8px;}
-.fab{position:fixed; bottom:calc(96px + env(safe-area-inset-bottom)); right:calc(50% - 240px + 20px); width:54px;height:54px;border-radius:50%; background:linear-gradient(135deg,var(--accent),var(--accent-2)); display:flex;align-items:center;justify-content:center; box-shadow:0 14px 30px -10px rgba(124,156,255,0.6); cursor:pointer; z-index:80; transition:transform .35s var(--ease-spring);}
+.fab{position:fixed; bottom:calc(96px + env(safe-area-inset-bottom)); right:calc(50% - 240px + 20px); width:54px;height:54px;border-radius:50%; background:linear-gradient(135deg,var(--accent),var(--accent-2)); display:flex;align-items:center;justify-content:center; box-shadow:0 14px 30px -10px var(--accent-glow); cursor:pointer; z-index:80; transition:transform .35s var(--ease-spring);}
 .fab:active{transform:scale(0.9);}
 .fab i{font-size:24px; color:#0B0E1A;}
 @media (max-width:520px){ .fab{right:20px;} }
@@ -466,11 +469,32 @@ body.reduce-motion-pref *, body.reduce-motion-pref *::before, body.reduce-motion
 .reaction-row{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px;}
 .reaction-chip{display:flex;align-items:center;gap:3px;font-size:11.5px;padding:3px 8px;border-radius:10px;background:rgba(255,255,255,0.07);border:1px solid var(--glass-border);cursor:pointer;transition:transform .25s var(--ease-spring), background .2s ease, border-color .2s ease;}
 .reaction-chip:active{transform:scale(0.9);}
-.reaction-chip.mine{background:rgba(124,156,255,0.18);border-color:var(--accent);}
+.reaction-chip.mine{background:var(--accent-soft);border-color:var(--accent);}
 .reaction-add{font-size:11.5px;padding:3px 7px;border-radius:10px;background:transparent;border:1px dashed var(--glass-border);color:var(--text-faint);cursor:pointer;}
 .reaction-picker{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid var(--glass-border);}
 .reaction-pick-opt{font-size:19px;cursor:pointer;padding:4px 7px;border-radius:10px;transition:transform .25s var(--ease-spring), background .2s ease;}
 .reaction-pick-opt:active{transform:scale(0.85); background:rgba(255,255,255,0.1);}
+
+/* ── XP / group identity layer ───────────────────────────────────────── */
+.xp-badge{display:inline-flex;align-items:center;gap:5px;padding:5px 9px;border-radius:999px;background:var(--accent-soft);border:1px solid rgba(var(--accent-rgb),.28);color:var(--accent);font-size:11px;font-weight:800;}
+.xp-hero{padding:18px;overflow:hidden;background:linear-gradient(135deg,rgba(var(--accent-rgb),.24),rgba(var(--accent-rgb),.06) 48%,rgba(255,255,255,.035));border-color:rgba(var(--accent-rgb),.28);}
+.xp-number{font-family:var(--font-display);font-size:42px;line-height:1;font-weight:800;letter-spacing:-.04em;}
+.xp-rule{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 15px;}
+.xp-reward{font-weight:800;color:var(--accent);}
+.xp-negative{color:#FF8A9E;}
+.xp-group-row{display:flex;align-items:center;gap:10px;padding:10px 12px;}
+.group-mark{display:flex;align-items:center;justify-content:center;flex:0 0 auto;border-radius:18px;overflow:hidden;background:linear-gradient(135deg,var(--group-accent),var(--group-accent-2));color:#0B0E1A;box-shadow:0 10px 24px -12px rgba(var(--group-accent-rgb),.65);}
+.group-mark img{width:100%;height:100%;object-fit:cover;}
+.group-theme-card{--accent:var(--group-accent);--accent-2:var(--group-accent-2);--accent-rgb:var(--group-accent-rgb);}
+.group-identity{border-color:rgba(var(--group-accent-rgb),.28) !important;background:linear-gradient(135deg,rgba(var(--group-accent-rgb),.18),rgba(255,255,255,.035));}
+.wheel-center .group-mark{box-shadow:0 0 0 5px rgba(var(--group-accent-rgb),.12),0 14px 28px -14px rgba(var(--group-accent-rgb),.7);}
+.wheel-center-time{font-size:12px!important;margin-top:7px;}
+.spin-wheel{display:flex;align-items:center;justify-content:center;width:132px;height:132px;border-radius:50%;margin:6px auto 16px;border:1px solid rgba(var(--accent-rgb),.28);background:radial-gradient(circle at 35% 25%,rgba(255,255,255,.10),rgba(var(--accent-rgb),.07) 45%,rgba(0,0,0,.12));box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 20px 50px -24px var(--accent-glow);}
+.spin-wheel.spinning{animation:spin-pop .8s var(--ease-spring);}
+@keyframes spin-pop{0%{transform:rotate(0) scale(1)}45%{transform:rotate(190deg) scale(1.08)}100%{transform:rotate(360deg) scale(1)}}
+.shop-card{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;}
+.shop-price{font-size:12px;font-weight:800;color:var(--accent);}
+
 </style>
 </head>
 <body>
@@ -718,6 +742,127 @@ async function saveMe(){
   if (typeof window.fbSet !== 'function') { console.warn('profile sync skipped — Firebase bridge not ready'); return; }
   try { await window.fbSet('users/' + ME.id, ME); } catch(e){ console.warn('profile sync failed', e); }
 }
+
+
+const XP_CONFIG = {
+  daily:10, monthly:50, nudge:1, createGroup:70, extraGroup:20, maxGroups:5,
+  spinCost:15,
+  spins:[{xp:0,weight:28},{xp:5,weight:22},{xp:10,weight:15},{xp:0,weight:12},{xp:1,weight:10},{xp:15,weight:7},{xp:20,weight:5},{xp:50,weight:1}]
+};
+function localDateKey(d=new Date()){
+  const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), day=String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+function monthKey(d=new Date()){ return localDateKey(d).slice(0,7); }
+function ensureAccountState(){
+  if(!ME) return;
+  ME.xp = Math.max(0, Number(ME.xp)||0);
+  if(!ME.xpState) ME.xpState = {};
+  if(!ME.xpState.groupBonuses) ME.xpState.groupBonuses = {};
+  ME.groupIds = Array.isArray(ME.groupIds) ? ME.groupIds.filter(Boolean) : (ME.squadId ? [ME.squadId] : []);
+  ME.groupIds = [...new Set(ME.groupIds)];
+}
+function getGroupIds(){ ensureAccountState(); return ME.groupIds || []; }
+async function grantXp(amount, reason='XP'){
+  ensureAccountState();
+  amount=Math.max(0,Math.floor(Number(amount)||0));
+  if(!amount) return false;
+  ME.xp += amount;
+  ME.xpState.lastReason = reason;
+  ME.xpState.lastEarnedAt = Date.now();
+  await saveMe();
+  return true;
+}
+async function spendXp(amount, reason='Purchase'){
+  ensureAccountState();
+  amount=Math.max(0,Math.floor(Number(amount)||0));
+  if(ME.xp < amount){ showToast(`Need ${amount} XP — you have ${ME.xp}`, 'ti-alert-triangle'); return false; }
+  ME.xp -= amount;
+  ME.xpState.lastSpentAt = Date.now();
+  ME.xpState.lastSpentReason = reason;
+  await saveMe();
+  return true;
+}
+async function awardDailyXp(){
+  ensureAccountState();
+  const today=localDateKey(), month=monthKey();
+  let changed=false;
+  if(ME.xpState.dailyClaim !== today){
+    ME.xp += XP_CONFIG.daily; ME.xpState.dailyClaim=today; changed=true;
+  }
+  if(ME.xpState.monthlyClaim !== month){
+    ME.xp += XP_CONFIG.monthly; ME.xpState.monthlyClaim=month; changed=true;
+  }
+  if(changed){
+    ME.xpState.lastReason='Daily/monthly bonus';
+    ME.xpState.lastEarnedAt=Date.now();
+    await saveMe();
+  }
+}
+async function awardGroupRoleXp(groupId, role){
+  ensureAccountState();
+  const key=`${groupId}:${role}`;
+  if(ME.xpState.groupBonuses[key]) return;
+  const amount=role==='owner'?30:role==='admin'?10:5;
+  ME.xp += amount;
+  ME.xpState.groupBonuses[key]=Date.now();
+  ME.xpState.lastReason=`${role} group bonus`;
+  ME.xpState.lastEarnedAt=Date.now();
+  await saveMe();
+}
+function groupMarkHtml(g,size=54, extraClass=''){
+  const gs=Object.assign({logo:'✦',logoUrl:'',accent:'#7C9CFF',accent2:'#9B7CFF'},g||{});
+  const inner=gs.logoUrl ? `<img src="${escapeHtml(gs.logoUrl)}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='block';">` : '';
+  const fallback=gs.logo ? `<span style="font-size:${Math.round(size*.44)}px;display:${gs.logoUrl?'none':'block'};">${escapeHtml(gs.logo)}</span>` : `<span style="font-size:${Math.round(size*.44)}px;">✦</span>`;
+  const rgb=hexToRgb(gs.accent)||'124,156,255';
+  return `<div class="group-mark ${extraClass}" style="width:${size}px;height:${size}px;--group-accent:${escapeHtml(gs.accent)};--group-accent-2:${escapeHtml(gs.accent2)};--group-accent-rgb:${rgb};">${inner}${fallback}</div>`;
+}
+function hexToRgb(hex){
+  try{
+    let h=String(hex||'').replace('#','').trim();
+    if(h.length===3) h=h.split('').map(c=>c+c).join('');
+    if(!/^[0-9a-fA-F]{6}$/.test(h)) return null;
+    const n=parseInt(h,16);
+    return `${n>>16},${(n>>8)&255},${n&255}`;
+  }catch(e){ return null; }
+}
+async function switchSquad(id){
+  if(!id || id===SQUAD_ID) return;
+  const s=await loadSquad(id);
+  if(!s || !s.members?.some(m=>m.id===ME.id)){ showToast('That group is no longer available','ti-alert-triangle'); return; }
+  SQUAD=s; SQUAD_ID=id;
+  ensureAccountState();
+  if(!ME.groupIds.includes(id)){ ME.groupIds.push(id); await saveMe(); }
+  await saveMySquadId();
+  attachSquadListener();
+  applyTheme(); renderAll();
+}
+async function initXpOnBoot(){
+  if(!ME) return;
+  ensureAccountState();
+  await awardDailyXp();
+  if(SQUAD_ID && ME.groupIds.indexOf(SQUAD_ID)<0){
+    ME.groupIds.push(SQUAD_ID); await saveMe();
+  }
+  if(SQUAD_ID && SQUAD && SQUAD.members?.some(m=>m.id===ME.id)){
+    await awardGroupRoleXp(SQUAD_ID, roleOf(ME.id));
+  }
+}
+async function performDailySpin(){
+  ensureAccountState();
+  const today=localDateKey();
+  if(ME.xpState.lastSpin===today){ showToast('Daily spin already used','ti-clock'); return; }
+  if(!(await spendXp(XP_CONFIG.spinCost,'Daily spin'))) return;
+  const total=XP_CONFIG.spins.reduce((a,b)=>a+b.weight,0);
+  let r=Math.random()*total, reward=0;
+  for(const opt of XP_CONFIG.spins){ r-=opt.weight; if(r<=0){ reward=opt.xp; break; } }
+  ME.xpState.lastSpin=today;
+  if(reward) ME.xp += reward;
+  ME.xpState.lastSpinReward=reward;
+  ME.xpState.lastReason='Daily spin';
+  await saveMe();
+  return reward;
+}
 async function loadLocal(){
   const defaults = { links:{}, layout:'grid', theme:'indigo', accentHex:'', density:'comfortable', reduceMotion:false, lastNudge:{} };
   try { LOCAL = Object.assign({}, defaults, JSON.parse(localStorage.getItem(lsKey('local')) || '{}')); } catch(e){ LOCAL = defaults; }
@@ -735,9 +880,13 @@ async function loadMySquadId(){
   SQUAD_ID = localStorage.getItem(lsKey('squad_id'));
 }
 async function saveMySquadId(){
-  if (SQUAD_ID) localStorage.setItem(lsKey('squad_id'), SQUAD_ID);
-  else localStorage.removeItem(lsKey('squad_id'));
-  if (ME) { ME.squadId = SQUAD_ID || null; try { await window.fbUpdate('users/' + ME.id, { squadId: SQUAD_ID || null }); } catch(e){} }
+  ensureAccountState();
+  if (SQUAD_ID) {
+    localStorage.setItem(lsKey('squad_id'), SQUAD_ID);
+    ME.squadId = SQUAD_ID;
+    if(!ME.groupIds.includes(SQUAD_ID)) ME.groupIds.push(SQUAD_ID);
+  } else localStorage.removeItem(lsKey('squad_id'));
+  if (ME) { try { await window.fbUpdate('users/' + ME.id, { squadId: SQUAD_ID || null, groupIds: ME.groupIds || [] }); } catch(e){} }
 }
 
 async function loadSquad(id){
@@ -843,27 +992,72 @@ async function resolveJoinRequest(uid, approve){
   if(!SQUAD || !can(ME.id, 'manageMembers')){ showToast('You cannot manage members', 'ti-ban'); return; }
   const req = (SQUAD.joinRequests || []).find(r => r.id === uid);
   if(!req) return;
-  SQUAD.joinRequests = (SQUAD.joinRequests || []).filter(r => r.id !== uid);
-  if(approve){
-    const cap = SQUAD.maxMembers || 6;
-    if(SQUAD.members.length >= cap){
-      showToast('Squad is full — cannot approve', 'ti-alert-triangle');
-    } else if(!SQUAD.members.some(m => m.id === uid)){
-      SQUAD.members.push({ id: req.id, name: req.name, tz: req.tz, photo: req.photo || '', emoji: '' });
-      if(!SQUAD.status) SQUAD.status = {};
-      SQUAD.status[uid] = { avail:'free', icon:'ti-hand-wave', text:'Just joined' };
-      if(!SQUAD.roles) SQUAD.roles = {};
-      SQUAD.roles[uid] = 'member';
-      if(!SQUAD.permissions) SQUAD.permissions = {};
-      SQUAD.permissions[uid] = { ...DEFAULT_PERMISSIONS.member };
-      showToast(`${req.name.split(' ')[0]} added to squad`, 'ti-check');
-    }
-  } else {
+
+  if(!approve){
+    SQUAD.joinRequests = (SQUAD.joinRequests || []).filter(r => r.id !== uid);
+    SQUAD.updatedAt = Date.now();
+    await saveSquad();
+    softUpdate();
     showToast(`Denied ${req.name.split(' ')[0]}'s request`, 'ti-x');
+    return;
   }
+
+  const cap = SQUAD.maxMembers || 6;
+  if(SQUAD.members.length >= cap){
+    showToast('Squad is full — cannot approve', 'ti-alert-triangle');
+    return;
+  }
+  if(SQUAD.members.some(m => m.id === uid)){
+    SQUAD.joinRequests = (SQUAD.joinRequests || []).filter(r => r.id !== uid);
+    SQUAD.updatedAt = Date.now();
+    await saveSquad();
+    softUpdate();
+    return;
+  }
+
+  let requester = null;
+  try{ requester = await window.fbGet('users/' + uid); }catch(e){}
+  const requesterGroups = Array.isArray(requester?.groupIds) ? requester.groupIds : (requester?.squadId?[requester.squadId]:[]);
+  if(requesterGroups.length >= XP_CONFIG.maxGroups){
+    showToast(`${req.name.split(' ')[0]} is already in 5 groups`,'ti-alert-triangle');
+    return;
+  }
+  const joinCost = requesterGroups.length >= 2 ? XP_CONFIG.extraGroup : 0;
+  if(requester && joinCost>0 && (Number(requester.xp)||0) < joinCost){
+    showToast(`${req.name.split(' ')[0]} needs ${joinCost} XP to join another group`,'ti-alert-triangle');
+    return;
+  }
+
+  if(requester){
+    requester.xp = Math.max(0,(Number(requester.xp)||0)-joinCost);
+    requester.groupIds = [...new Set([...(requester.groupIds || requester.squadId ? [requester.squadId].filter(Boolean) : []), SQUAD.id])];
+    requester.xpState = requester.xpState || {};
+    requester.xpState.groupBonuses = requester.xpState.groupBonuses || {};
+    const bonusKey = `${SQUAD.id}:member`;
+    if(!requester.xpState.groupBonuses[bonusKey]){
+      requester.xp += 5;
+      requester.xpState.groupBonuses[bonusKey] = Date.now();
+    }
+    try{
+      await window.fbSet('users/' + uid, requester);
+    }catch(e){
+      showToast('Could not finalize the join — no XP was charged','ti-alert-triangle');
+      return;
+    }
+  }
+
+  SQUAD.joinRequests = (SQUAD.joinRequests || []).filter(r => r.id !== uid);
+  SQUAD.members.push({ id: req.id, name: req.name, tz: req.tz, photo: req.photo || '', emoji: '' });
+  if(!SQUAD.status) SQUAD.status = {};
+  SQUAD.status[uid] = { avail:'free', icon:'ti-hand-wave', text:'Just joined' };
+  if(!SQUAD.roles) SQUAD.roles = {};
+  SQUAD.roles[uid] = 'member';
+  if(!SQUAD.permissions) SQUAD.permissions = {};
+  SQUAD.permissions[uid] = { ...DEFAULT_PERMISSIONS.member };
   SQUAD.updatedAt = Date.now();
   await saveSquad();
   softUpdate();
+  showToast(`${req.name.split(' ')[0]} added to squad`, 'ti-check');
 }
 
 function renderAvatarMarkup(m, size=38){
@@ -956,10 +1150,11 @@ function timeAgo(ts){
 function applyGroupStyle(){
   const g = (SQUAD && SQUAD.groupStyle) || {};
   const root = document.documentElement;
-  root.style.setProperty('--group-accent', g.accent || '');
-  root.style.setProperty('--group-accent-2', g.accent2 || '');
+  root.style.setProperty('--group-accent', g.accent || '#7C9CFF');
+  root.style.setProperty('--group-accent-2', g.accent2 || '#9B7CFF');
+  root.style.setProperty('--group-accent-rgb', hexToRgb(g.accent || '#7C9CFF') || '124,156,255');
   root.style.setProperty('--card-radius', Math.max(10, Math.min(34, Number(g.radius)||18)) + 'px');
-  if(g.background) root.style.setProperty('--bg-0', g.background);
+  if(g.background) root.style.setProperty('--group-bg', g.background);
   document.body.classList.toggle('liquid-mode', (g.mode||'liquid') === 'liquid');
   document.body.dataset.groupMotion = g.motion || 'ambient';
 }
@@ -976,9 +1171,11 @@ function applyTheme(){
     const hex = LOCAL.accentHex;
     document.documentElement.style.setProperty('--accent', hex);
     document.documentElement.style.setProperty('--accent-2', shiftHex(hex, 24));
+    document.documentElement.style.setProperty('--accent-rgb', hexToRgb(hex) || '124,156,255');
   } else {
     document.documentElement.style.removeProperty('--accent');
     document.documentElement.style.removeProperty('--accent-2');
+    document.documentElement.style.removeProperty('--accent-rgb');
   }
 }
 // Nudges a hex color lighter/darker by `amt` per channel — used to derive
@@ -1083,6 +1280,8 @@ function currentScreenHtml(){
   if(currentScreen === 'group-settings') return renderGroupSettings();
   if(currentScreen === 'roles') return renderRoles();
   if(currentScreen === 'join-requests') return renderJoinRequests();
+  if(currentScreen === 'xp') return renderXp();
+  if(currentScreen === 'shop') return renderShop();
   return renderHome();
 }
 
@@ -1274,18 +1473,28 @@ function renderHome(){
 
   const online = window.__fbReady;
 
+  const g=SQUAD.groupStyle||{};
   return `
-    <div class="screen">
+    <div class="screen group-theme-card">
       <div class="top-row">
         <div class="brand">
-          <div class="brand-mark"><span class="ti" style="color:#0B0E1A;font-size:16px;">${icon('ti-users-group')}</span></div>
+          ${groupMarkHtml(g,42)}
           <div>
-            <div class="brand-name">${SQUAD.name}</div>
+            <div class="brand-name">${escapeHtml(SQUAD.name)}</div>
             <div class="sync-badge ${online?'':'offline'}"><span class="ti">${icon(online?'ti-refresh':'ti-cloud-off')}</span> ${online?'Connected live':'Offline — cached view'}</div>
           </div>
         </div>
         <div class="icon-btn" id="my-status-btn"><span class="ti">${icon('ti-mood-smile')}</span></div>
         <div class="icon-btn" id="go-messages-btn" style="margin-left:8px;"><span class="ti">${icon('ti-message')}</span></div>
+      </div>
+      <div class="xp-hero glass liquid-sheen" id="open-xp" style="margin-bottom:14px;cursor:pointer;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+          <div>
+            <div style="font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-lo);font-weight:800;">Your XP</div>
+            <div class="xp-number">${Math.floor(ME.xp||0)} <span style="font-size:14px;color:var(--text-lo);font-weight:700;">XP</span></div>
+          </div>
+          <div style="text-align:right;"><div class="xp-badge">${icon('ti-flame')} Daily +10</div><div style="font-size:10.5px;color:var(--text-faint);margin-top:6px;">Tap for XP &amp; shop</div></div>
+        </div>
       </div>
       <div class="layout-switch" id="layout-switch">
         <div class="layout-pill" id="layout-pill"></div>
@@ -1363,11 +1572,13 @@ function renderWheel(members){
     `;
   }).join('');
 
+  const g=SQUAD.groupStyle||{};
   return `
     <div class="wheel-wrap">
       <div class="wheel-center glass-strong">
+        ${groupMarkHtml(g,64)}
         <div class="wheel-center-time">${getTimeInTz(ME.tz)}</div>
-        <div class="wheel-center-sub">My time</div>
+        <div class="wheel-center-sub">${escapeHtml(SQUAD.name||'Group')}</div>
       </div>
       ${nodes}
     </div>
@@ -1481,7 +1692,7 @@ function openEmojiPicker(){
       <div class="sheet-title">Choose your avatar</div>
       <div class="sheet-sub">Pick an emoji, or clear it to use your initials.</div>
       <div style="display:grid; grid-template-columns:repeat(6,1fr); gap:8px; margin:16px 0 20px;">
-        ${AVATAR_EMOJIS.map(e => `<div class="glass" data-emoji-choice="${e}" style="aspect-ratio:1; display:flex; align-items:center; justify-content:center; font-size:24px; cursor:pointer; border-radius:14px; ${ME.emoji===e?'border-color:var(--accent); background:rgba(124,156,255,0.18);':''}">${e}</div>`).join('')}
+        ${AVATAR_EMOJIS.map(e => `<div class="glass" data-emoji-choice="${e}" style="aspect-ratio:1; display:flex; align-items:center; justify-content:center; font-size:24px; cursor:pointer; border-radius:14px; ${ME.emoji===e?'border-color:var(--accent); background:var(--accent-soft);':''}">${e}</div>`).join('')}
       </div>
       ${ME.emoji ? `<button class="btn btn-ghost btn-block" id="emoji-clear-btn" style="padding:13px;"><span class="ti">${icon('ti-x')}</span> Clear emoji avatar</button>` : ''}
     </div>
@@ -1529,15 +1740,20 @@ async function sendNudge(friendId, friendName){
     showToast('Already nudged recently', 'ti-clock');
     return;
   }
+  if(!(await spendXp(XP_CONFIG.nudge,'Nudge'))) return;
   if(!LOCAL.lastNudge) LOCAL.lastNudge = {};
   LOCAL.lastNudge[friendId] = Date.now();
   await saveLocal();
   if(typeof window.fbSet === 'function' && SQUAD){
     try{
       await window.fbSet('nudges/' + SQUAD.id + '/' + friendId, { from: ME.id, fromName: ME.name, ts: Date.now() });
-    }catch(e){ /* best-effort — local cooldown still applies */ }
+    }catch(e){
+      await grantXp(1,'Nudge refund');
+      showToast('Could not send nudge — 1 XP refunded','ti-alert-triangle');
+      return;
+    }
   }
-  showToast(`Nudged ${friendName.split(' ')[0]}`, 'ti-hand-click');
+  showToast(`Nudged ${friendName.split(' ')[0]} · −1 XP`, 'ti-hand-click');
 }
 
 async function removeSquadMember(uid){
@@ -1623,8 +1839,8 @@ function renderJoinRequests(){
 function renderGroupSettings(){
   const cap=SQUAD.maxMembers||6; const g=Object.assign({tagline:'',description:'',logo:'',logoUrl:'',bannerUrl:'',accent:'#7C9CFF',accent2:'#9B7CFF',background:'#0B0E1A',mode:'liquid',radius:18,motion:'ambient',density:'comfortable',showMemberCount:true,showStatusGlow:true},SQUAD.groupStyle||{});
   const sw=(label,id,value,type='text',extra='')=>`<div class="field"><label class="field-label">${label}</label><input type="${type}" id="${id}" value="${escapeHtml(String(value||''))}" ${extra}></div>`;
-  return `<div class="screen"><div class="page-title-row">${backBtn('group-settings-back')}<h2>Group studio</h2></div><p class="small-note" style="margin:8px 0 20px 48px;">Group-level identity and visual settings sync to everyone.</p>
-  <div class="glass liquid-sheen" style="padding:16px;margin-bottom:14px;background:${g.bannerUrl?`linear-gradient(180deg,rgba(8,10,18,.1),rgba(8,10,18,.8)),url('${escapeHtml(g.bannerUrl)}') center/cover`:'linear-gradient(135deg,rgba(124,156,255,.18),rgba(155,124,255,.10))'};"><div style="display:flex;align-items:center;gap:12px;"><div class="avatar" style="width:58px;height:58px;font-size:23px;background:linear-gradient(135deg,${g.accent},${g.accent2});">${g.logoUrl?`<img src="${escapeHtml(g.logoUrl)}" alt="">`:escapeHtml(g.logo||'✦')}</div><div style="min-width:0;"><div style="font-size:19px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(SQUAD.name)}</div><div style="color:var(--text-lo);font-size:12px;margin-top:3px;">${escapeHtml(g.tagline||'Your squad, your space')}</div></div></div></div>
+  return `<div class="screen group-theme-card"><div class="page-title-row">${backBtn('group-settings-back')}<h2>Group studio</h2></div><p class="small-note" style="margin:8px 0 20px 48px;">Group-level identity and visual settings sync to everyone.</p>
+  <div class="glass liquid-sheen group-identity" style="padding:16px;margin-bottom:14px;background:${g.bannerUrl?`linear-gradient(180deg,rgba(8,10,18,.1),rgba(8,10,18,.8)),url('${escapeHtml(g.bannerUrl)}') center/cover`:'linear-gradient(135deg,rgba(124,156,255,.18),rgba(155,124,255,.10))'};"><div style="display:flex;align-items:center;gap:12px;"><div class="avatar" style="width:58px;height:58px;font-size:23px;background:linear-gradient(135deg,${g.accent},${g.accent2});">${g.logoUrl?`<img src="${escapeHtml(g.logoUrl)}" alt="">`:escapeHtml(g.logo||'✦')}</div><div style="min-width:0;"><div style="font-size:19px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(SQUAD.name)}</div><div style="color:var(--text-lo);font-size:12px;margin-top:3px;">${escapeHtml(g.tagline||'Your squad, your space')}</div></div></div></div>
   <div class="section-label">Identity</div>${sw('Squad name','gs-name',SQUAD.name,'text','maxlength="28"')}${sw('Tagline','gs-tagline',g.tagline,'text','maxlength="60"')}
   <div class="field"><label class="field-label">Description</label><textarea id="gs-description" maxlength="220" rows="3" placeholder="What is this squad about?">${escapeHtml(g.description||'')}</textarea></div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">${sw('Logo emoji','gs-logo',g.logo,'text','maxlength="4" placeholder="✦"')}${sw('Logo image URL','gs-logo-url',g.logoUrl,'url','placeholder="https://..."')}</div>${sw('Banner image URL','gs-banner-url',g.bannerUrl,'url','placeholder="https://..."')}
@@ -1999,7 +2215,7 @@ function renderMessages(){
     <div style="display:flex; ${mine?'justify-content:flex-end;':''} margin-bottom:10px;">
       <div style="max-width:78%;">
         ${!mine ? `<div style="font-size:11px; color:var(--text-faint); margin:0 0 3px 4px;">${escapeHtml(m.authorName.split(' ')[0])}</div>` : ''}
-        <div class="glass" style="padding:10px 13px; border-radius:16px; position:relative; ${mine?'background:rgba(124,156,255,0.18); border-color:var(--accent);':''}">
+        <div class="glass" style="padding:10px 13px; border-radius:16px; position:relative; ${mine?'background:var(--accent-soft); border-color:var(--accent);':''}">
           <div style="font-size:13.5px; line-height:1.4; overflow-wrap:break-word; padding-right:${(mine||can(ME.id,'manageMembers'))?'22px':'0'}">${escapeHtml(m.text)}</div>
           ${(mine||can(ME.id,'manageMembers'))?`<button class="icon-btn" data-delete-chat="${escapeHtml(m.id)}" title="Remove message" style="position:absolute;right:5px;top:5px;width:22px;height:22px;color:var(--red);border:none;background:transparent;">${icon('ti-trash')}</button>`:''}
         </div>
@@ -2201,6 +2417,89 @@ function renderFriendNotes(friendId){
   `;
 }
 
+
+function renderXp(){
+  ensureAccountState();
+  const role=roleOf(ME.id), ids=getGroupIds();
+  const today=localDateKey(), month=monthKey();
+  const spinUsed=ME.xpState.lastSpin===today;
+  const dailyClaim=ME.xpState.dailyClaim===today;
+  const monthlyClaim=ME.xpState.monthlyClaim===month;
+  const spinRows=XP_CONFIG.spins.map((o,i)=>`<div class="glass xp-rule"><span>${o.xp?`Win ${o.xp} XP`:'Nothing'}</span><span style="font-size:11px;color:var(--text-faint);">${(o.weight/XP_CONFIG.spins.reduce((a,b)=>a+b.weight,0)*100).toFixed(1)}%</span></div>`).join('');
+  const groups=ids.map(id=>id===SQUAD_ID?SQUAD:null).filter(Boolean);
+  return `<div class="screen">
+    <div class="page-title-row">${backBtn()}<h2>XP &amp; Rewards</h2></div>
+    <div class="xp-hero glass liquid-sheen">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
+        <div><div class="small-note" style="margin:0 0 5px;">Current balance</div><div class="xp-number">${Math.floor(ME.xp||0)} <span style="font-size:14px;color:var(--text-lo);">XP</span></div></div>
+        <div class="xp-badge">${icon('ti-crown')} ${role}</div>
+      </div>
+      <div style="font-size:11px;color:var(--text-lo);margin-top:12px;">XP is shared across your account and follows you between groups.</div>
+    </div>
+
+    <div class="section-label">Earn</div>
+    <div class="stack">
+      <div class="glass xp-rule"><div><div style="font-weight:700;">Daily</div><div class="small-note">Once per calendar day</div></div><div class="xp-reward">+10 XP ${dailyClaim?'✓':''}</div></div>
+      <div class="glass xp-rule"><div><div style="font-weight:700;">Monthly</div><div class="small-note">Additional monthly bonus</div></div><div class="xp-reward">+50 XP ${monthlyClaim?'✓':''}</div></div>
+      <div class="glass xp-rule"><div><div style="font-weight:700;">Group membership</div><div class="small-note">One-time bonus for each group role</div></div><div class="xp-reward">+${role==='owner'?30:role==='admin'?10:5} XP</div></div>
+    </div>
+
+    <div class="section-label">Daily spin</div>
+    <div class="glass" style="padding:18px;text-align:center;">
+      <div class="spin-wheel" id="daily-spin-wheel">${icon('ti-dice')}</div>
+      <div style="font-weight:800;font-size:16px;">Spend 15 XP to spin</div>
+      <div class="small-note" style="margin:6px 0 14px;">Rare rewards are exponentially harder to hit. Two slots are “Nothing”.</div>
+      <button class="btn btn-primary btn-block" id="daily-spin-btn" ${spinUsed?'disabled':''} style="padding:14px;">${spinUsed?'Spin used today':`Spin for 15 XP`}</button>
+    </div>
+    <div class="section-label">Spin table</div>
+    <div class="stack">${spinRows}</div>
+
+    <div class="section-label">Groups</div>
+    <div class="glass" style="padding:14px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><span style="font-size:12px;color:var(--text-lo);">Groups joined</span><strong>${ids.length}/${XP_CONFIG.maxGroups}</strong></div>
+      ${ids.length?ids.map(id=>{
+        const active=id===SQUAD_ID, fallback=active&&SQUAD?SQUAD:{name:'Saved group',id};
+        return `<div class="xp-group-row glass ${active?'group-identity':''}" data-switch-group="${escapeHtml(id)}" style="cursor:pointer;margin-bottom:6px;">
+          ${active?groupMarkHtml(fallback.groupStyle||{},38):`<div class="group-mark" style="width:38px;height:38px;"><span style="font-size:16px;">✦</span></div>`}
+          <div style="min-width:0;flex:1;"><div style="font-size:13px;font-weight:700;">${escapeHtml(fallback.name||'Group')}</div><div style="font-size:10.5px;color:var(--text-faint);">${active?'Active group':'Tap to switch'}</div></div>
+          ${active?`<span class="xp-badge">Active</span>`:`<span class="ti" style="color:var(--text-faint);">${icon('ti-chevron-right')}</span>`}
+        </div>`;
+      }).join(''):'<div class="small-note">No groups yet.</div>'}
+      <button class="btn btn-ghost btn-block" id="xp-shop-btn" style="padding:12px;margin-top:10px;">${icon('ti-trophy')} Open XP shop</button>
+    </div>
+
+    <div class="section-label">Costs</div>
+    <div class="stack">
+      <div class="glass xp-rule"><span>Nudge a member</span><span class="xp-reward xp-negative">−1 XP</span></div>
+      <div class="glass xp-rule"><span>Create a group after your first</span><span class="xp-reward xp-negative">−70 XP</span></div>
+      <div class="glass xp-rule"><span>Join group #3–#5</span><span class="xp-reward xp-negative">−20 XP</span></div>
+    </div>
+    <div style="margin:16px 0 4px;font-size:11px;color:var(--text-faint);line-height:1.5;">Limits: first group free, first two groups join free, maximum five groups. XP is checked before the action is committed.</div>
+  </div>${renderNav('me')}`;
+}
+
+function renderShop(){
+  ensureAccountState();
+  return `<div class="screen">
+    <div class="page-title-row">${backBtn('shop-back')}<h2>XP Shop</h2></div>
+    <div class="xp-hero glass">
+      <div class="small-note" style="margin:0;">Your balance</div>
+      <div class="xp-number" style="margin-top:4px;">${Math.floor(ME.xp||0)} <span style="font-size:13px;color:var(--text-lo);">XP</span></div>
+    </div>
+    <div class="section-label">Coming into the economy</div>
+    <div class="stack">
+      <div class="glass shop-card"><div><div style="font-weight:700;">Daily spin</div><div class="small-note">8 weighted outcomes, up to 50 XP</div></div><div class="shop-price">15 XP</div></div>
+      <div class="glass shop-card"><div><div style="font-weight:700;">Nudge</div><div class="small-note">Send a live nudge to a member</div></div><div class="shop-price">1 XP</div></div>
+      <div class="glass shop-card"><div><div style="font-weight:700;">Additional group</div><div class="small-note">Create or join beyond the free allowance</div></div><div class="shop-price">70 / 20 XP</div></div>
+    </div>
+    <div class="section-label">Account color</div>
+    <div class="glass" style="padding:14px 16px;display:flex;align-items:center;justify-content:space-between;">
+      <div><div style="font-weight:700;">Your personal accent</div><div class="small-note">Used across XP, shop, profile and controls.</div></div>
+      <div style="width:34px;height:34px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 5px var(--accent-soft),0 8px 16px var(--accent-glow);"></div>
+    </div>
+  </div>`;
+}
+
 function renderMe(){
   return `
     <div class="screen">
@@ -2211,7 +2510,15 @@ function renderMe(){
         </div>
         <h2>${ME.name}</h2>
         <p style="color:var(--text-lo); font-size:13px; margin-top:4px;">${(ME.tz||'').replace(/_/g,' ')}</p>
+        <div style="display:flex;justify-content:center;gap:8px;margin-top:10px;flex-wrap:wrap;">
+          <span class="xp-badge">${icon('ti-flame')} ${Math.floor(ME.xp||0)} XP</span>
+          <span class="xp-badge" style="background:var(--accent-soft);">${icon('ti-palette')} Accent</span>
+        </div>
         ${ME.email ? `<p style="color:var(--text-faint); font-size:11.5px; margin-top:2px;">${ME.email}</p>` : ''}
+      </div>
+      <div class="section-label">Your account</div>
+      <div class="glass" style="padding:14px 16px; margin-bottom:10px; display:flex; align-items:center; justify-content:space-between; cursor:pointer;" id="go-xp">
+        <div style="display:flex;align-items:center;gap:10px;"><span class="ti" style="color:var(--accent);">${icon('ti-trophy')}</span><div><div style="font-size:14px;font-weight:700;">XP &amp; Rewards</div><div style="font-size:11px;color:var(--text-lo);">${Math.floor(ME.xp||0)} XP · daily spin &amp; groups</div></div></div><span class="ti" style="color:var(--text-faint);">${icon('ti-chevron-right')}</span>
       </div>
       <div class="section-label">Settings</div>
       <div class="glass" style="padding:14px 16px; margin-bottom:10px; display:flex; align-items:center; justify-content:space-between; cursor:pointer;" id="go-customize">
@@ -2288,6 +2595,25 @@ function renderCustomize(){
 function bindEvents(){
   const byId = (id) => document.getElementById(id);
 
+  if(byId('open-xp')) byId('open-xp').onclick = () => goTo('xp');
+  if(byId('go-xp')) byId('go-xp').onclick = () => goTo('xp');
+  if(byId('xp-shop-btn')) byId('xp-shop-btn').onclick = () => goTo('shop');
+  if(byId('shop-back')) byId('shop-back').onclick = () => goBack('xp');
+  document.querySelectorAll('[data-switch-group]').forEach(el=>{
+    el.onclick = async ()=>{ await switchSquad(el.dataset.switchGroup); if(currentScreen!=='home') goTo('home',{replace:true}); };
+  });
+  if(byId('daily-spin-btn')) byId('daily-spin-btn').onclick = async ()=>{
+    const btn=byId('daily-spin-btn'), wheel=byId('daily-spin-wheel');
+    btn.setAttribute('disabled','true'); if(wheel) wheel.classList.add('spinning');
+    const reward=await performDailySpin();
+    if(reward===undefined){
+      if(ME.xpState.lastSpin===localDateKey()){} else btn.removeAttribute('disabled');
+      return;
+    }
+    if(wheel) setTimeout(()=>{ wheel.innerHTML=reward?`<div style="font-size:28px;font-weight:800;">+${reward}</div>`:`<div style="font-size:18px;font-weight:800;">Nothing</div>`; },380);
+    setTimeout(()=>{ showToast(reward?`You won ${reward} XP`:'No XP this time', reward?'ti-trophy':'ti-dice'); renderAll(); },850);
+  };
+
   if(byId('google-signin-btn')){
     byId('google-signin-btn').onclick = async () => {
       const btn = byId('google-signin-btn');
@@ -2312,7 +2638,7 @@ function bindEvents(){
         tz: byId('ob-tz').value,
         photo: window.__authUser.photo || '',
         email: window.__authUser.email || '',
-        theme: 'indigo'
+        theme: 'indigo', xp:0, groupIds:[], xpState:{groupBonuses:{}}
       };
       await saveMe();
       goTo('squad-choice', {replace:true});
@@ -2345,6 +2671,10 @@ function bindEvents(){
       if(!name) return showToast('Enter squad name', 'ti-alert-circle');
       const cap = Math.min(15, Math.max(2, window.__pendingCap || 6));
       const locked = !!window.__pendingLocked;
+      ensureAccountState();
+      const groupCount=getGroupIds().length;
+      if(groupCount>=XP_CONFIG.maxGroups) return showToast('Maximum 5 groups reached','ti-alert-triangle');
+      if(groupCount>=1 && !(await spendXp(XP_CONFIG.createGroup,'Create group'))) return;
       const id = 'sq_' + genCode() + Date.now().toString(36);
       SQUAD = normalizeSquadData({
         id, name, code: genCode(),
@@ -2371,6 +2701,10 @@ function bindEvents(){
       window.__pendingLocked = false;
       await saveSquad();
       await saveMySquadId();
+      ensureAccountState();
+      if(!ME.groupIds.includes(id)) ME.groupIds.push(id);
+      await saveMe();
+      await awardGroupRoleXp(id,'owner');
       attachSquadListener();
       goTo('squad-created', {replace:true});
     };
@@ -2413,6 +2747,11 @@ function bindEvents(){
         return;
       }
       if(!alreadyMember){
+        ensureAccountState();
+        const joinedCount=getGroupIds().length;
+        if(joinedCount>=XP_CONFIG.maxGroups){ errEl.textContent='You can belong to a maximum of 5 groups.'; errEl.style.display='block'; return; }
+        const joinCost=joinedCount>=2?XP_CONFIG.extraGroup:0;
+        if(joinCost>0 && !(await spendXp(joinCost,'Join additional group'))){ errEl.textContent=`You need ${joinCost} XP to join another group.`; errEl.style.display='block'; return; }
         sq.members.push({ id: ME.id, name: ME.name, tz: ME.tz, photo: ME.photo || '', emoji: ME.emoji || '' });
         if(!sq.status) sq.status = {};
         sq.status[ME.id] = { avail:'free', icon:'ti-hand-wave', text:'Just joined' };
@@ -2426,6 +2765,10 @@ function bindEvents(){
       SQUAD_ID = sq.id;
       await saveSquad();
       await saveMySquadId();
+      ensureAccountState();
+      if(!ME.groupIds.includes(sq.id)) ME.groupIds.push(sq.id);
+      await saveMe();
+      await awardGroupRoleXp(sq.id,'member');
       attachSquadListener();
       showToast(`Joined ${sq.name}`, 'ti-users-group');
       goTo('home', {replace:true});
@@ -2674,6 +3017,8 @@ function bindEvents(){
     byId('custom-accent-input').addEventListener('input', (e) => {
       document.documentElement.style.setProperty('--accent', e.target.value);
       document.documentElement.style.setProperty('--accent-2', shiftHex(e.target.value, 24));
+      document.documentElement.style.setProperty('--accent-rgb', hexToRgb(e.target.value) || '124,156,255');
+      const sw=document.getElementById('custom-accent-swatch'); if(sw) sw.style.background=e.target.value;
     });
     byId('custom-accent-input').addEventListener('change', async (e) => {
       LOCAL.accentHex = e.target.value;
@@ -2759,6 +3104,7 @@ async function bootForUser(user){
   SQUAD = s;
   if(!SQUAD.groupStyle) SQUAD.groupStyle={tagline:'',description:'',logo:'',logoUrl:'',bannerUrl:'',accent:'#7C9CFF',accent2:'#9B7CFF',background:'#0B0E1A',mode:'liquid',radius:18,motion:'ambient',density:'comfortable',showMemberCount:true,showStatusGlow:true};
   currentScreen = 'home';
+  await initXpOnBoot();
   renderAll();
   attachSquadListener();
   initBatteryTracking();
