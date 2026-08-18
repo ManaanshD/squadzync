@@ -182,6 +182,19 @@ body.theme-amber{ --accent:#FBBF24; --accent-2:#FF9B4A; --accent-rgb:251,191,36;
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
 html{-webkit-text-size-adjust:100%;}
 html,body{margin:0;padding:0;height:100%;overscroll-behavior-y:none;}
+/* UI copy protection: normal text is not selectable. Explicit exceptions remain selectable. */
+body, body *{
+  -webkit-user-select:none;
+  user-select:none;
+}
+input, textarea, select, [contenteditable=\"true\"], .selectable-code, .selectable-code *{
+  -webkit-user-select:text;
+  user-select:text;
+}
+.selectable-code{
+  cursor:text;
+  -webkit-touch-callout:text;
+}
 @media (prefers-reduced-motion: reduce){
   *, *::before, *::after{animation-duration:0.001ms !important; animation-iteration-count:1 !important; transition-duration:0.001ms !important;}
 }
@@ -1008,19 +1021,44 @@ function icon(name, cls){
   return `<svg class="icon ${cls||''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><g>${body}</g></svg>`;
 }
 
+const COMMON_TIMEZONE_LABELS = {
+  'Europe/London':'London (GMT / BST)',
+  'America/New_York':'New York (EST / EDT)',
+  'America/Chicago':'Chicago (CST / CDT)',
+  'America/Denver':'Denver (MST / MDT)',
+  'America/Los_Angeles':'Los Angeles (PST / PDT)',
+  'Asia/Tokyo':'Tokyo (JST)',
+  'Asia/Singapore':'Singapore / HK (SGT / HKT)',
+  'Asia/Kolkata':'India (IST)',
+  'Asia/Dubai':'Dubai (GST)',
+  'Australia/Sydney':'Sydney (AEST)',
+  'Pacific/Auckland':'Auckland (NZST)'
+};
+
+// Full IANA timezone list where supported, with stable fallback coverage.
+const FALLBACK_TIMEZONES = [
+  'Africa/Abidjan','Africa/Accra','Africa/Addis_Ababa','Africa/Algiers','Africa/Cairo','Africa/Casablanca','Africa/Johannesburg','Africa/Lagos','Africa/Nairobi','Africa/Tunis',
+  'America/Anchorage','America/Argentina/Buenos_Aires','America/Bogota','America/Caracas','America/Chicago','America/Denver','America/Halifax','America/La_Paz','America/Lima','America/Los_Angeles','America/Mexico_City','America/New_York','America/Phoenix','America/Santiago','America/Sao_Paulo','America/St_Johns','America/Toronto','America/Vancouver',
+  'Antarctica/Troll','Asia/Almaty','Asia/Amman','Asia/Baghdad','Asia/Baku','Asia/Bangkok','Asia/Beirut','Asia/Brunei','Asia/Colombo','Asia/Damascus','Asia/Dhaka','Asia/Dubai','Asia/Ho_Chi_Minh','Asia/Hong_Kong','Asia/Jakarta','Asia/Jerusalem','Asia/Kabul','Asia/Karachi','Asia/Kathmandu','Asia/Kolkata','Asia/Kuala_Lumpur','Asia/Manila','Asia/Muscat','Asia/Riyadh','Asia/Seoul','Asia/Shanghai','Asia/Singapore','Asia/Taipei','Asia/Tehran','Asia/Tokyo','Asia/Ulaanbaatar','Asia/Vladivostok','Asia/Yangon',
+  'Atlantic/Azores','Atlantic/Cape_Verde','Australia/Adelaide','Australia/Brisbane','Australia/Darwin','Australia/Hobart','Australia/Perth','Australia/Sydney','Europe/Amsterdam','Europe/Athens','Europe/Berlin','Europe/Brussels','Europe/Bucharest','Europe/Budapest','Europe/Copenhagen','Europe/Dublin','Europe/Helsinki','Europe/Istanbul','Europe/Kyiv','Europe/Lisbon','Europe/London','Europe/Madrid','Europe/Moscow','Europe/Oslo','Europe/Paris','Europe/Prague','Europe/Riga','Europe/Rome','Europe/Stockholm','Europe/Vienna','Europe/Warsaw','Europe/Zurich',
+  'Indian/Maldives','Indian/Mauritius','Pacific/Auckland','Pacific/Fiji','Pacific/Guam','Pacific/Honolulu','Pacific/Noumea','Pacific/Pago_Pago','Pacific/Port_Moresby','Pacific/Tahiti','UTC'
+];
+
+const ALL_TIMEZONE_IDS = (() => {
+  try {
+    if (typeof Intl !== 'undefined' && typeof Intl.supportedValuesOf === 'function') {
+      return [...new Set(Intl.supportedValuesOf('timeZone').concat('UTC'))].sort();
+    }
+  } catch (e) {}
+  return [...new Set(FALLBACK_TIMEZONES)].sort();
+})();
+
 const TIMEZONES = [
   { label: 'Auto (Detected)', value: Intl.DateTimeFormat().resolvedOptions().timeZone },
-  { label: 'London (GMT / BST)', value: 'Europe/London' },
-  { label: 'New York (EST / EDT)', value: 'America/New_York' },
-  { label: 'Chicago (CST / CDT)', value: 'America/Chicago' },
-  { label: 'Denver (MST / MDT)', value: 'America/Denver' },
-  { label: 'Los Angeles (PST / PDT)', value: 'America/Los_Angeles' },
-  { label: 'Tokyo (JST)', value: 'Asia/Tokyo' },
-  { label: 'Singapore / HK (SGT / HKT)', value: 'Asia/Singapore' },
-  { label: 'India (IST)', value: 'Asia/Kolkata' },
-  { label: 'Dubai (GST)', value: 'Asia/Dubai' },
-  { label: 'Sydney (AEST)', value: 'Australia/Sydney' },
-  { label: 'Auckland (NZST)', value: 'Pacific/Auckland' }
+  ...ALL_TIMEZONE_IDS.filter(tz => tz !== Intl.DateTimeFormat().resolvedOptions().timeZone).map(tz => ({
+    label: COMMON_TIMEZONE_LABELS[tz] || tz.replace(/^Etc\//, '').replace(/_/g, ' '),
+    value: tz
+  }))
 ];
 
 const STATUS_PRESETS = [
@@ -1166,19 +1204,44 @@ async function loadMe(){
   } catch(e){}
   try { ME = JSON.parse(localStorage.getItem(lsKey('me')) || 'null'); } catch(e){}
 }
+async function reconcileUserXpBalance(){
+  if(!ME || isViewerMode() || typeof window.fbGet !== 'function') return;
+  const localXp=Math.max(0,Math.floor(Number(ME.xp)||0));
+  try{
+    const remoteRaw=await window.fbGet('users/'+ME.id+'/xp');
+    const remoteXp=remoteRaw==null ? null : Math.max(0,Math.floor(Number(remoteRaw)||0));
+    if(remoteXp===null){
+      if(localXp>0) await window.fbSet('users/'+ME.id+'/xp',localXp);
+      return;
+    }
+    // XP is monotonic for reconciliation: never let a stale client snapshot
+    // erase a newer balance. If this device has a higher locally-held balance
+    // (including older accounts whose XP field was never initialized), promote
+    // Firebase to that balance. If Firebase is higher, adopt the authoritative
+    // remote value locally.
+    if(localXp>remoteXp){
+      const r=await window.fbTxn('users/'+ME.id+'/xp',current=>Math.max(0,Math.max(Number(current)||0,localXp)));
+      ME.xp=Math.max(localXp,Math.floor(Number(r.snapshot?.val?.()??localXp)||0));
+    }else if(remoteXp>localXp){
+      ME.xp=remoteXp;
+    }
+    localStorage.setItem(lsKey('me'),JSON.stringify(ME));
+  }catch(e){ console.warn('XP balance reconciliation skipped',e); }
+}
+
 async function saveMe(){
   if (!ME) return false;
   if (isViewerMode()) { showToast('Viewer Mode is read-only — sign in to save changes','ti-lock'); return false; }
+  if (typeof window.fbUpdate !== 'function') {
+    localStorage.setItem(lsKey('me'), JSON.stringify(ME));
+    console.warn('profile sync skipped — Firebase bridge not ready');
+    return false;
+  }
+  // Reconcile XP before saving the profile so an older/stale client cannot
+  // overwrite the live balance with 0 (or another stale value).
+  await reconcileUserXpBalance();
   localStorage.setItem(lsKey('me'), JSON.stringify(ME));
-  if (typeof window.fbUpdate !== 'function') { console.warn('profile sync skipped — Firebase bridge not ready'); return; }
-  // IMPORTANT: this must be a merge (fbUpdate), never a full overwrite (fbSet).
-  // ME is a client-side snapshot that can go stale mid-session (e.g. another
-  // tab/device changed xp or groupIds via a transaction or a targeted update
-  // while this client was idle). Overwriting the whole user record with a
-  // stale snapshot silently reverts those changes — this was the cause of
-  // "XP shows 0 even though I have more", and of groupIds losing older
-  // groups after switching/joining elsewhere.
-  try { await window.fbUpdate('users/' + ME.id, ME); } catch(e){ console.warn('profile sync failed', e); }
+  try { await window.fbUpdate('users/' + ME.id, ME); return true; } catch(e){ console.warn('profile sync failed', e); return false; }
 }
 
 
@@ -1290,7 +1353,38 @@ function recordXpMetaOnly(delta,reason,type){ensureXpMeta();const entry={id:'xp_
 async function saveMeFields(fields){if(!ME||isViewerMode())return false;try{await window.fbUpdate('users/'+ME.id,fields);return true}catch(e){return false}}
 async function atomicUserXpDelta(uid,delta){const result=await window.fbTxn('users/'+uid+'/xp',current=>{const cur=Math.max(0,Number(current)||0);const next=cur+Number(delta||0);if(next<0)return;return next});const currentXp=Number(result.snapshot?.val?.()??0);return {ok:!!result.committed,xp:currentXp,available:currentXp}}
 async function grantXp(amount,reason='XP'){if(viewerBlocked('Sign in to earn XP'))return false;ensureXpMeta();amount=Math.max(0,Math.floor(Number(amount)||0));if(!amount)return false;const mult=activeXpMultiplier(),effective=mult?Math.round(amount*Number(mult.multiplier||1)):amount;try{const r=await atomicUserXpDelta(ME.id,effective);if(!r.ok)return false;ME.xp=r.xp;recordXpMetaOnly(effective,reason,'earn');await saveMeFields({xpState:ME.xpState});return true}catch(e){showToast('Couldn’t add XP — try again','ti-alert-triangle');return false}}
-async function spendXp(amount,reason='Purchase'){if(viewerBlocked('Sign in to spend XP'))return false;ensureXpMeta();amount=Math.max(0,Math.floor(Number(amount)||0));try{const r=await atomicUserXpDelta(ME.id,-amount);ME.xp=r.xp;if(!r.ok){showToast(`Need ${amount} XP — you have ${r.xp}`,'ti-alert-triangle');return false}recordXpMetaOnly(-amount,reason,'spend');await saveMeFields({xp:ME.xp,xpState:ME.xpState});return true}catch(e){showToast('Couldn’t spend XP — try again','ti-alert-triangle');return false}}
+async function spendXp(amount,reason='Purchase'){
+  if(viewerBlocked('Sign in to spend XP'))return false;
+  ensureXpMeta();
+  amount=Math.max(0,Math.floor(Number(amount)||0));
+  if(!amount)return true;
+  try{
+    // Reconcile first so the transaction sees the same balance the UI shows.
+    await reconcileUserXpBalance();
+    const available=Math.max(0,Math.floor(Number(ME.xp)||0));
+    if(available<amount){
+      showToast(`Need ${amount} XP — you have ${available}`,'ti-alert-triangle');
+      return false;
+    }
+    const r=await atomicUserXpDelta(ME.id,-amount);
+    if(!r.ok){
+      // Do not copy the failed transaction snapshot (often 0) into ME.xp.
+      // That was the bug causing the shop to suddenly claim the user had 0 XP.
+      await reconcileUserXpBalance();
+      const stillAvailable=Math.max(0,Math.floor(Number(ME.xp)||0));
+      showToast(`Couldn’t spend ${amount} XP — you have ${stillAvailable}`,'ti-alert-triangle');
+      return false;
+    }
+    ME.xp=Math.max(0,Math.floor(Number(r.xp)||0));
+    recordXpMetaOnly(-amount,reason,'spend');
+    await saveMeFields({xp:ME.xp,xpState:ME.xpState});
+    localStorage.setItem(lsKey('me'),JSON.stringify(ME));
+    return true;
+  }catch(e){
+    showToast('Couldn’t spend XP — try again','ti-alert-triangle');
+    return false;
+  }
+}
 async function awardDailyXp(){
   if(viewerBlocked('Sign in to claim XP rewards')) return false;
   ensureXpMeta(); cleanXpMultipliers(); recordCheckin();
@@ -1346,6 +1440,7 @@ async function switchSquad(id){
 async function initXpOnBoot(){
   if(!ME) return;
   ensureAccountState();
+  await reconcileUserXpBalance();
   await awardDailyXp();
   if(SQUAD_ID && ME.groupIds.indexOf(SQUAD_ID)<0){
     ME.groupIds.push(SQUAD_ID); await saveMe();
@@ -2363,7 +2458,7 @@ function renderSquadCreated(){
       <div class="brand-mark" style="width:56px;height:56px;border-radius:18px;margin:0 auto 20px;"><span class="ti" style="font-size:26px;color:#0B0E1A;">${icon('ti-confetti')}</span></div>
       <h2 style="font-size:26px; margin-bottom:8px;">${SQUAD.name} created</h2>
       <p style="color:var(--text-lo); font-size:14px; margin-bottom:24px;">Share this code with up to ${(SQUAD.maxMembers||6)-1} friends to invite them:</p>
-      <div class="glass-strong invite-code" style="padding:20px; font-weight:800; letter-spacing:6px; color:var(--accent); margin-bottom:28px;">${SQUAD.code}</div>
+      <div class="glass-strong invite-code selectable-code" style="padding:20px; font-weight:800; letter-spacing:6px; color:var(--accent); margin-bottom:28px;">${SQUAD.code}</div>
       <button class="btn btn-ghost btn-block" id="copy-invite-code" style="padding:14px; margin-bottom:12px;"><span class="ti">${icon('ti-copy')}</span> Copy code</button>
       <button class="btn btn-primary btn-block" id="sq-created-done" style="padding:16px;">Go to Dashboard</button>
     </div>
@@ -2827,7 +2922,7 @@ function renderSquadManage(){
   return `
     <div class="screen">
       <div class="page-title-row"><h2>${SQUAD.name}</h2></div>
-      <p style="color:var(--text-lo); font-size:13px; margin-bottom:20px;">Invite code: <b style="color:var(--accent);">${SQUAD.code}</b> · ${SQUAD.members.length}/${cap} members ${SQUAD.locked?`· <span class="ti" style="font-size:11px;">${icon('ti-lock')}</span> Locked`:''}</p>
+      <p style="color:var(--text-lo); font-size:13px; margin-bottom:20px;">Invite code: <b class="selectable-code" style="color:var(--accent);">${SQUAD.code}</b> · ${SQUAD.members.length}/${cap} members ${SQUAD.locked?`· <span class="ti" style="font-size:11px;">${icon('ti-lock')}</span> Locked`:''}</p>
       <button class="btn btn-ghost btn-block" id="copy-invite-manage" style="margin-bottom:12px; padding:13px;"><span class="ti">${icon('ti-copy')}</span> Copy invite code</button>
       ${iManageMembers ? `
       <button class="btn btn-ghost btn-block" id="go-join-requests" style="margin-bottom:12px; padding:13px; display:flex; align-items:center; justify-content:center; gap:8px;">
