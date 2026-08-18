@@ -495,6 +495,65 @@ body.reduce-motion-pref *, body.reduce-motion-pref *::before, body.reduce-motion
 .shop-card{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;}
 .shop-price{font-size:12px;font-weight:800;color:var(--accent);}
 
+
+
+/* ── Liquid interaction layer ────────────────────────────────────────────
+   Directional deformation driven by Pointer Events + a small spring solver.
+   It intentionally does not move cards out of their layout; the gesture is
+   viscous/stretchy and settles back to rest after release. */
+.liquid-interactive{
+  --liq-x:0px;
+  --liq-y:0px;
+  --liq-rot:0deg;
+  --liq-skew-x:0deg;
+  --liq-skew-y:0deg;
+  --liq-scale-x:1;
+  --liq-scale-y:1;
+  --liq-press:1;
+  --liq-light-x:50%;
+  --liq-light-y:50%;
+  transform:translate3d(var(--liq-x),var(--liq-y),0)
+    rotate(var(--liq-rot))
+    skew(var(--liq-skew-x),var(--liq-skew-y))
+    scale3d(calc(var(--liq-scale-x) * var(--liq-press)),calc(var(--liq-scale-y) * var(--liq-press)),1);
+  transform-origin:center center;
+  will-change:transform;
+  backface-visibility:hidden;
+  -webkit-backface-visibility:hidden;
+  touch-action:manipulation;
+  transition:box-shadow .24s ease, filter .24s ease, background .24s ease;
+}
+.liquid-interactive::after{
+  background:
+    radial-gradient(circle at var(--liq-light-x) var(--liq-light-y),
+      rgba(255,255,255,.24) 0%, rgba(255,255,255,.10) 13%, transparent 34%);
+  opacity:.58;
+  transition:opacity .22s ease;
+}
+.liquid-interactive::before{
+  background:
+    linear-gradient(135deg,rgba(255,255,255,.24),transparent 24%,transparent 62%,rgba(255,255,255,.06));
+}
+.liquid-interactive.liquid-active{
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.10) inset,
+    0 16px 38px -18px rgba(0,0,0,.66),
+    0 0 34px -22px rgba(var(--accent-rgb),.72);
+  filter:brightness(1.035) saturate(1.08);
+}
+.liquid-interactive.liquid-release{
+  transition:box-shadow .42s var(--ease-out-ios), filter .42s ease;
+}
+
+@media (pointer:fine){
+  .liquid-interactive:not(.liquid-dragging):hover::after{opacity:.82;}
+  .liquid-interactive:not(.liquid-dragging):hover{filter:brightness(1.02) saturate(1.04);}
+}
+@media (prefers-reduced-motion: reduce){
+  .liquid-interactive{transform:none !important; transition:none !important;}
+  .liquid-interactive::after{transition:none !important;}
+}
+
 </style>
 </head>
 <body>
@@ -1325,6 +1384,169 @@ function initParallax(){
   window.addEventListener('pointermove',(e)=>{const x=(e.clientX/window.innerWidth)*100,y=(e.clientY/window.innerHeight)*100;root.style.setProperty('--pointer-x',x+'%');root.style.setProperty('--pointer-y',y+'%');document.querySelectorAll('.parallax-target').forEach((el,i)=>{const r=el.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;const dx=Math.max(-10,Math.min(10,(e.clientX-cx)/35)),dy=Math.max(-8,Math.min(8,(e.clientY-cy)/35));el.style.setProperty('--px',dx+'px');el.style.setProperty('--py',dy+'px');el.style.setProperty('--ry',(-dx*.18)+'deg');el.style.setProperty('--rx',(dy*.18)+'deg');});},{passive:true});
 }
 initParallax();
+
+
+// ── Liquid glass gesture physics ─────────────────────────────────────────
+// Applies to visible glass cards and controls after every render/softUpdate.
+// This is deliberately dependency-free so the standalone HTML keeps working
+// without adding a React/Framer Motion runtime.
+function initLiquidInteractions(){
+  if(!window.__liquidInteractionCleanup) window.__liquidInteractionCleanup = new WeakMap();
+
+  const selector = [
+    '.friend-tile', '.list-item', '.xp-hero', '.glass-strong',
+    '.shop-card', '.board-note', '.xp-rule', '[data-activity]',
+    '[data-watch-service]', '.icon-btn', '.btn', '.layout-switch',
+    '.preset-pill', '.avail-chip', '.reaction-chip', '.theme-swatch',
+    '.color-swatch-custom', '.nudge-btn', '.wheel-center', '.spin-wheel'
+  ].join(',');
+
+  document.querySelectorAll(selector).forEach(el=>{
+    if(el.classList.contains('parallax-target')) return;
+    if(el.closest('.bottom-nav')) return;
+    if(el.dataset.liquidBound === '1') return;
+    if(getComputedStyle(el).display === 'none') return;
+
+    el.dataset.liquidBound='1';
+    el.classList.add('liquid-interactive');
+
+    const state={
+      active:false, pointerId:null,
+      startX:0,startY:0,x:0,y:0,vx:0,vy:0,lastX:0,lastY:0,lastT:0,
+      targetX:0,targetY:0,animating:false,raf:0
+    };
+    el.__liquidState=state;
+
+    const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
+
+    function render(x,y,active){
+      const max=68;
+      x=clamp(x,-max,max); y=clamp(y,-max,max);
+      const ax=Math.abs(x), ay=Math.abs(y);
+      // Stretch in the direction of travel and subtly compress perpendicular
+      // to it. The skew/rotation is intentionally small so the card remains
+      // recognizably anchored to its layout.
+      const stretchX=1 + Math.min(.19, ax*.00255) + Math.min(.025, ay*.00018);
+      const stretchY=1 + Math.min(.19, ay*.00255) + Math.min(.025, ax*.00018);
+      const squeezeX=1 - Math.min(.045, ay*.00058);
+      const squeezeY=1 - Math.min(.045, ax*.00058);
+      const press=active ? .975 : 1;
+      el.style.setProperty('--liq-x',(x*.34).toFixed(2)+'px');
+      el.style.setProperty('--liq-y',(y*.34).toFixed(2)+'px');
+      el.style.setProperty('--liq-rot',clamp(x*.045 + y*-.018,-3.5,3.5).toFixed(2)+'deg');
+      el.style.setProperty('--liq-skew-x',clamp(x*.075,-4.5,4.5).toFixed(2)+'deg');
+      el.style.setProperty('--liq-skew-y',clamp(y*.055,-3.8,3.8).toFixed(2)+'deg');
+      el.style.setProperty('--liq-scale-x',(stretchX*squeezeX).toFixed(4));
+      el.style.setProperty('--liq-scale-y',(stretchY*squeezeY).toFixed(4));
+      el.style.setProperty('--liq-press',press.toFixed(4));
+      el.style.setProperty('--liq-light-x',clamp(50+x*.52,10,90).toFixed(1)+'%');
+      el.style.setProperty('--liq-light-y',clamp(50+y*.45,12,88).toFixed(1)+'%');
+      if(active) el.classList.add('liquid-active','liquid-dragging');
+      else el.classList.remove('liquid-dragging');
+    }
+
+    function stopSpring(){
+      if(state.raf){cancelAnimationFrame(state.raf); state.raf=0;}
+      state.animating=false;
+    }
+
+    function springBack(){
+      stopSpring();
+      state.active=false;
+      state.targetX=0; state.targetY=0;
+      state.animating=true;
+      el.classList.remove('liquid-dragging');
+      el.classList.add('liquid-release');
+      let last=performance.now();
+      const stiffness=245, damping=25;
+      function frame(now){
+        const dt=Math.min(.032,Math.max(.008,(now-last)/1000));
+        last=now;
+        const ax=-stiffness*(state.x-state.targetX)-damping*state.vx;
+        const ay=-stiffness*(state.y-state.targetY)-damping*state.vy;
+        state.vx += ax*dt; state.vy += ay*dt;
+        state.x += state.vx*dt; state.y += state.vy*dt;
+        render(state.x,state.y,false);
+        if(Math.abs(state.x)<.08 && Math.abs(state.y)<.08 && Math.abs(state.vx)<.08 && Math.abs(state.vy)<.08){
+          state.x=state.y=state.vx=state.vy=0;
+          render(0,0,false);
+          state.animating=false; state.raf=0;
+          el.classList.remove('liquid-active','liquid-release');
+          return;
+        }
+        state.raf=requestAnimationFrame(frame);
+      }
+      state.raf=requestAnimationFrame(frame);
+    }
+
+    function onDown(e){
+      if(document.body.classList.contains('reduce-motion-pref')) return;
+      if(e.button!==undefined && e.button!==0) return;
+      stopSpring();
+      state.active=true;
+      state.pointerId=e.pointerId;
+      state.startX=e.clientX; state.startY=e.clientY;
+      state.x=0; state.y=0; state.vx=0; state.vy=0;
+      state.lastX=e.clientX; state.lastY=e.clientY; state.lastT=performance.now();
+      el.classList.remove('liquid-release');
+      render(0,0,true);
+      try{el.setPointerCapture(e.pointerId);}catch(_){ }
+    }
+
+    function onMove(e){
+      if(!state.active || e.pointerId!==state.pointerId) return;
+      const now=performance.now(), dt=Math.max(8,now-state.lastT);
+      const rawX=e.clientX-state.startX, rawY=e.clientY-state.startY;
+      // Rubber-band the further part of the gesture instead of allowing the
+      // card to feel detached from its original position.
+      const damp=v=>Math.sign(v)*Math.pow(Math.min(Math.abs(v),120),.82)*.92;
+      state.x=clamp(damp(rawX),-68,68);
+      state.y=clamp(damp(rawY),-68,68);
+      state.vx=(e.clientX-state.lastX)/(dt/1000);
+      state.vy=(e.clientY-state.lastY)/(dt/1000);
+      state.vx=clamp(state.vx,-1200,1200); state.vy=clamp(state.vy,-1200,1200);
+      state.lastX=e.clientX; state.lastY=e.clientY; state.lastT=now;
+      render(state.x,state.y,true);
+    }
+
+    function onUp(e){
+      if(!state.active || (e.pointerId!==undefined && e.pointerId!==state.pointerId)) return;
+      try{el.releasePointerCapture(e.pointerId);}catch(_){ }
+      // Preserve a fraction of release velocity so the snap-back has a little
+      // personality rather than merely easing from a static offset.
+      state.vx=clamp(state.vx*.12,-155,155);
+      state.vy=clamp(state.vy*.12,-155,155);
+      springBack();
+    }
+
+    function onCancel(){
+      if(state.active) springBack();
+    }
+
+    function onEnter(e){
+      if(document.body.classList.contains('reduce-motion-pref')) return;
+      const r=el.getBoundingClientRect();
+      el.style.setProperty('--liq-light-x',clamp(((e.clientX-r.left)/r.width)*100,5,95).toFixed(1)+'%');
+      el.style.setProperty('--liq-light-y',clamp(((e.clientY-r.top)/r.height)*100,5,95).toFixed(1)+'%');
+    }
+
+    el.addEventListener('pointerdown',onDown,{passive:true});
+    el.addEventListener('pointermove',onMove,{passive:true});
+    el.addEventListener('pointerup',onUp,{passive:true});
+    el.addEventListener('pointercancel',onCancel,{passive:true});
+    el.addEventListener('pointerenter',onEnter,{passive:true});
+
+    window.__liquidInteractionCleanup.set(el,()=>{
+      stopSpring();
+      el.removeEventListener('pointerdown',onDown);
+      el.removeEventListener('pointermove',onMove);
+      el.removeEventListener('pointerup',onUp);
+      el.removeEventListener('pointercancel',onCancel);
+      el.removeEventListener('pointerenter',onEnter);
+    });
+  });
+}
+
 
 function openFriendNotes(friendId){
   currentParams = { friendId };
@@ -2594,6 +2816,7 @@ function renderCustomize(){
 
 function bindEvents(){
   const byId = (id) => document.getElementById(id);
+  initLiquidInteractions();
 
   if(byId('open-xp')) byId('open-xp').onclick = () => goTo('xp');
   if(byId('go-xp')) byId('go-xp').onclick = () => goTo('xp');
