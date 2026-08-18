@@ -17,11 +17,11 @@
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
   import {
-    getDatabase, ref, set, get, update, onValue, off
+    getDatabase, ref, set, get, update, onValue, off, runTransaction
   } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-database.js";
   import {
     getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect,
-    getRedirectResult, onAuthStateChanged, signOut
+    getRedirectResult, onAuthStateChanged, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword
   } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 
   const firebaseConfig = {
@@ -46,14 +46,30 @@
   window.__fbReady = !!db;
   const listeners = {};
 
-  window.fbSet = async (path, value) => {
+  window.fbSetRaw = async (path, value) => {
     if (!db) throw new Error('Firebase not connected');
     await set(ref(db, path), value);
   };
-  window.fbUpdate = async (path, value) => {
+  window.fbUpdateRaw = async (path, value) => {
     if (!db) throw new Error('Firebase not connected');
     await update(ref(db, path), value);
   };
+  window.fbTxnRaw = async (path, updater) => {
+    if (!db) throw new Error('Firebase not connected');
+    return await runTransaction(ref(db, path), updater);
+  };
+  const MUTATION_QUEUE_KEY='squadzync:pending-firebase-mutations';
+  const readMutationQueue=()=>{try{return JSON.parse(localStorage.getItem(MUTATION_QUEUE_KEY)||'[]')}catch(e){return[]}};
+  const writeMutationQueue=q=>{try{localStorage.setItem(MUTATION_QUEUE_KEY,JSON.stringify(q.slice(-150)))}catch(e){}};
+  const emitFirebaseError=(error,path,op)=>{try{window.dispatchEvent(new CustomEvent('squadzync:firebase-error',{detail:{error,path,op}}))}catch(e){}};
+  const enqueueMutation=(op,path,value)=>{const q=readMutationQueue();q.push({id:Date.now()+'_'+Math.random().toString(36).slice(2,7),op,path,value,ts:Date.now()});writeMutationQueue(q);try{window.dispatchEvent(new CustomEvent('squadzync:sync-state',{detail:{state:'queued',count:q.length}}))}catch(e){}};
+  window.__pendingMutationCount=()=>readMutationQueue().length;
+  window.__flushFirebaseQueue=async()=>{if(!db||!navigator.onLine)return;let q=readMutationQueue();if(!q.length)return;try{window.dispatchEvent(new CustomEvent('squadzync:sync-state',{detail:{state:'syncing',count:q.length}}))}catch(e){}const remaining=[];for(const item of q){try{if(item.op==='set')await window.fbSetRaw(item.path,item.value);else await window.fbUpdateRaw(item.path,item.value)}catch(e){remaining.push(item);emitFirebaseError(e,item.path,item.op)}}writeMutationQueue(remaining);try{window.dispatchEvent(new CustomEvent('squadzync:sync-state',{detail:{state:remaining.length?'error':'live',count:remaining.length}}))}catch(e){}};
+  window.fbSet=async(path,value)=>{if(!db)throw new Error('Firebase not connected');if(!navigator.onLine){enqueueMutation('set',path,value);return;}try{return await window.fbSetRaw(path,value)}catch(e){emitFirebaseError(e,path,'set');throw e}};
+  window.fbUpdate=async(path,value)=>{if(!db)throw new Error('Firebase not connected');if(!navigator.onLine){enqueueMutation('update',path,value);return;}try{return await window.fbUpdateRaw(path,value)}catch(e){emitFirebaseError(e,path,'update');throw e}};
+  window.fbTxn=async(path,updater)=>{if(!db||!navigator.onLine)throw new Error('Firebase transaction unavailable offline');try{return await window.fbTxnRaw(path,updater)}catch(e){emitFirebaseError(e,path,'transaction');throw e}};
+  window.addEventListener('online',()=>window.__flushFirebaseQueue?.());
+  window.addEventListener('offline',()=>{try{window.dispatchEvent(new CustomEvent('squadzync:sync-state',{detail:{state:'offline',count:window.__pendingMutationCount()}}))}catch(e){}});
   window.fbGet = async (path) => {
     if (!db) throw new Error('Firebase not connected');
     const snap = await get(ref(db, path));
@@ -590,6 +606,38 @@ option{background:#171b2e;color:#f5f6fa;}
 body.parallax-off .parallax-target{transform:none!important;}
 @media (prefers-reduced-motion: reduce){.page-wipe{display:none!important}.motion-card{transform:none!important;transition:none!important}.stagger-in>*{animation:none!important;opacity:1!important;transform:none!important}}
 
+/* ── Group identity layer ─────────────────────────────────────────────── */
+.group-hero{position:relative;overflow:hidden;border-radius:28px;padding:0;min-height:330px;background:var(--group-background);border-color:rgba(var(--group-accent-rgb),.28);box-shadow:0 30px 60px -38px rgba(var(--group-accent-rgb),.55),inset 0 1px 0 rgba(255,255,255,.10);}
+.group-hero-media{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.42;filter:saturate(1.05) contrast(1.02);}
+.group-hero-overlay{position:absolute;inset:0;background:linear-gradient(180deg,rgba(7,10,18,.08),rgba(7,10,18,.34) 45%,rgba(7,10,18,.9) 100%);pointer-events:none;}
+.group-hero-content{position:relative;z-index:2;padding:20px;}
+.group-hero-top{display:flex;align-items:center;gap:12px;}
+.group-hero-top h1{font-size:26px;margin:2px 0 2px;line-height:1.06;}
+.group-kicker{font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:rgba(255,255,255,.72);font-weight:800;}
+.group-meta{font-size:11px;color:rgba(255,255,255,.68);}
+.group-description{font-size:12.5px;color:rgba(255,255,255,.72);line-height:1.5;margin:16px 0 12px;max-width:640px;}
+.group-stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:16px;}
+.group-stat{padding:11px 10px;border:1px solid rgba(255,255,255,.10);border-radius:14px;background:rgba(255,255,255,.045);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);}
+.group-stat strong{display:block;font-size:14px;font-family:var(--font-display);}
+.group-stat span{display:block;margin-top:3px;font-size:10px;color:rgba(255,255,255,.56);}
+.group-level-bar{height:5px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden;margin-top:10px;}
+.group-level-bar span{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--group-accent),var(--group-accent-2));box-shadow:0 0 16px rgba(var(--group-accent-rgb),.55);}
+.group-achievements{display:flex;gap:6px;flex-wrap:wrap;margin-top:11px;}
+.group-achievement{display:inline-flex;align-items:center;gap:4px;padding:6px 8px;border-radius:999px;background:rgba(var(--group-accent-rgb),.12);border:1px solid rgba(var(--group-accent-rgb),.2);font-size:10px;font-weight:700;}
+.group-particle-field{position:absolute;inset:0;overflow:hidden;opacity:.55;pointer-events:none;}
+.group-particle-field::before,.group-particle-field::after{content:"";position:absolute;width:12px;height:12px;border-radius:50%;background:rgba(255,255,255,.30);box-shadow:0 0 24px rgba(var(--group-accent-rgb),.55);animation:group-orb-a 8s ease-in-out infinite;}
+.group-particle-field::before{left:18%;top:30%;}.group-particle-field::after{left:72%;top:18%;width:8px;height:8px;animation-delay:-3s;animation-duration:11s;}
+@keyframes group-orb-a{0%,100%{transform:translate3d(0,0,0) scale(.8);opacity:.35}50%{transform:translate3d(24px,30px,0) scale(1.3);opacity:.75}}
+.group-hero-actions{display:flex;gap:8px;margin-top:15px}.group-hero-actions .btn{min-height:42px;padding:11px 14px}
+body[data-group-motion="minimal"] .group-particle-field,body.group-particles-off .group-particle-field{display:none;}
+@media (max-width:520px){.group-hero{min-height:360px}.group-hero-top h1{font-size:23px}.group-hero-content{padding:16px}}
+.dialog-backdrop{position:fixed;inset:0;z-index:500;background:rgba(3,5,12,.58);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:center;padding:16px;animation:dialog-bg-in .24s ease both}
+.dialog{border:1px solid var(--glass-border);box-shadow:0 28px 70px -34px rgba(0,0,0,.85);animation:dialog-in .42s var(--ease-spring) both}
+.dialog-header{display:flex;align-items:center;justify-content:space-between;gap:12px}.dialog-header h3{font-size:19px;margin-top:2px}
+.qr-shell{display:flex;align-items:center;justify-content:center;margin-top:14px;padding:16px;min-height:250px;border-radius:20px;background:rgba(255,255,255,.93)}.qr-shell img{display:block;width:220px;height:220px}
+@keyframes dialog-bg-in{from{opacity:0}to{opacity:1}}@keyframes dialog-in{from{opacity:0;transform:translateY(18px) scale(.95) rotateX(-3deg)}to{opacity:1;transform:translateY(0) scale(1) rotateX(0)}}
+@media (prefers-reduced-motion: reduce){.dialog-backdrop,.dialog{animation:none!important}}
+
 /* ── Unified surface system ─────────────────────────────────────────────── */
 .liquid-interactive.motion-card{
   transform:translate3d(
@@ -740,11 +788,51 @@ input[type=email]::placeholder,input[type=password]::placeholder{color:rgba(155,
 @keyframes radial-pulse{0%,100%{transform:scale(1);opacity:.65}50%{transform:scale(1.025);opacity:1}}
 @keyframes radial-spin{to{transform:rotate(348deg)}}
 @media (prefers-reduced-motion:reduce){.avatar-group:hover .ag-avatar,.avatar-group .ag-avatar:hover{transform:none}.motion-dialog-backdrop,.motion-dialog,.motion-popover,.motion-tab-indicator{transition:none}.radial-stage::before,.radial-stage::after,.radial-node,.radial-center{animation:none!important}.motion-tab-panel.active{animation:none}.motion-dialog{transform:none!important}}
+
+.social-tabs{display:flex;gap:5px;padding:4px;background:var(--glass);border:1px solid var(--glass-border);border-radius:15px;margin-bottom:14px;position:relative}.social-tab{flex:1;border:0;background:transparent;color:var(--text-lo);font:700 12px var(--font-display);padding:9px 6px;border-radius:11px;cursor:pointer;position:relative;z-index:1}.social-tab.active{color:var(--text-hi)}.social-tab-pill{position:absolute;top:4px;bottom:4px;left:4px;width:calc((100% - 8px)/3);border-radius:11px;background:var(--glass-strong);transition:left .42s var(--ease-spring)}
+.mention{color:var(--accent);font-weight:800;background:var(--accent-soft);padding:1px 4px;border-radius:6px}.mention-picker{position:absolute;left:0;right:0;bottom:calc(100% + 8px);z-index:120;max-height:190px;overflow:auto;border:1px solid var(--glass-border);background:rgba(18,22,39,.94);backdrop-filter:blur(24px) saturate(170%);border-radius:16px;padding:5px}.mention-option{display:flex;align-items:center;gap:9px;padding:8px 9px;border-radius:11px;cursor:pointer;font-size:12px;font-weight:700}.mention-option:hover{background:rgba(255,255,255,.06)}
+.message-actions{display:flex;gap:5px;margin-top:6px;justify-content:flex-end}.message-action{border:1px solid var(--glass-border);background:rgba(255,255,255,.045);color:var(--text-lo);border-radius:9px;padding:4px 7px;font-size:10px;cursor:pointer;transition:transform .25s var(--ease-spring),background .2s ease,color .2s ease}.message-action:hover{transform:translateY(-1px);background:rgba(255,255,255,.075);color:var(--text-hi)}.reply-preview{margin-top:7px;padding:7px 9px;border-left:2px solid var(--accent);background:rgba(255,255,255,.04);border-radius:0 9px 9px 0;color:var(--text-lo);font-size:10.5px}.pin-mark{position:absolute;right:9px;top:9px;color:var(--amber);font-size:12px}
+.poll-card,.task-card{padding:15px 16px;margin-bottom:10px}.poll-option{position:relative;overflow:hidden;padding:10px 12px;border-radius:12px;border:1px solid var(--glass-border);background:rgba(255,255,255,.035);margin-top:7px;cursor:pointer}.poll-option-fill{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,rgba(var(--accent-rgb),.18),rgba(var(--accent-rgb),.05));pointer-events:none}.poll-option-inner{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:700}.poll-count{font-size:10px;color:var(--text-faint)}.task-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.055)}.task-check{width:22px;height:22px;border-radius:8px;border:1px solid var(--glass-border);display:flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 auto;color:transparent;background:rgba(255,255,255,.035)}.task-check.done{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}.task-title{flex:1;font-size:12.5px;font-weight:700;line-height:1.35}.task-meta{font-size:10px;color:var(--text-faint)}.social-compose-tools{display:flex;gap:6px;margin-top:7px}.social-mini-btn{border:1px solid var(--glass-border);background:rgba(255,255,255,.04);color:var(--text-lo);border-radius:10px;padding:6px 8px;font-size:10.5px;font-weight:800;cursor:pointer}.reaction-burst{position:fixed;z-index:400;pointer-events:none;font-size:28px;animation:reaction-burst .72s var(--ease-out-ios) both}@keyframes reaction-burst{0%{opacity:0;transform:translate(-50%,-20%) scale(.35)}28%{opacity:1;transform:translate(-50%,-65%) scale(1.25)}100%{opacity:0;transform:translate(-50%,-150%) scale(.9)}}
+
+
+/* ── XP progression / Part 3 ───────────────────────────────────────────── */
+.xp-level-card{padding:18px;background:linear-gradient(145deg,rgba(var(--accent-rgb),.18),rgba(255,255,255,.035));border:1px solid rgba(var(--accent-rgb),.25);}
+.xp-level-row{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;}
+.xp-level-badge{font-family:var(--font-display);font-size:34px;font-weight:800;letter-spacing:-.04em;}
+.xp-progress{height:9px;margin-top:12px;border-radius:99px;overflow:hidden;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.06);}
+.xp-progress>span{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--accent),var(--accent-2));box-shadow:0 0 20px rgba(var(--accent-rgb),.35);transition:width .75s var(--ease-spring);}
+.xp-history-row{display:flex;align-items:center;gap:10px;padding:11px 13px;}
+.xp-history-dot{width:30px;height:30px;border-radius:11px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);flex:0 0 auto;}
+.xp-history-amt{font-family:var(--font-display);font-weight:800;margin-left:auto;}
+.xp-history-amt.negative{color:#FF8A9E;}
+.xp-mission{padding:14px 15px;}
+.xp-mission-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;}
+.xp-mini-progress{height:6px;border-radius:99px;background:rgba(255,255,255,.07);overflow:hidden;margin-top:10px;}
+.xp-mini-progress span{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-2));border-radius:inherit;transition:width .55s var(--ease-spring);}
+.xp-achievement-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
+.xp-achievement{padding:13px;border-radius:16px;border:1px solid var(--glass-border);background:rgba(255,255,255,.04);display:flex;gap:10px;align-items:center;}
+.xp-achievement.locked{opacity:.42;filter:saturate(.35);}
+.xp-achievement-icon{width:34px;height:34px;border-radius:12px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);flex:0 0 auto;}
+.xp-multiplier{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border-radius:15px;background:linear-gradient(135deg,rgba(251,191,36,.12),rgba(255,255,255,.035));border:1px solid rgba(251,191,36,.22);}
+.xp-rank{display:flex;align-items:center;gap:10px;padding:11px 13px;}
+.xp-rank-pos{width:26px;text-align:center;font-weight:800;color:var(--text-faint);}
+.xp-rank-name{font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.xp-rank-value{font-family:var(--font-display);font-weight:800;}
+.xp-tabs{display:flex;gap:5px;padding:4px;border:1px solid var(--glass-border);border-radius:15px;background:rgba(255,255,255,.035);margin-bottom:14px;position:relative;overflow:auto;}
+.xp-tab{position:relative;z-index:1;border:0;background:transparent;color:var(--text-lo);padding:9px 11px;border-radius:11px;font:700 11.5px var(--font-body);cursor:pointer;white-space:nowrap;transition:color .25s ease,transform .3s var(--ease-spring);}
+.xp-tab.active{color:var(--text-hi);}
+.xp-tab-pill{position:absolute;top:4px;bottom:4px;border-radius:11px;background:var(--glass-strong);box-shadow:0 2px 10px rgba(0,0,0,.24);transition:left .38s var(--ease-spring),width .38s var(--ease-spring);}
+.xp-level-flash{position:fixed;inset:0;pointer-events:none;z-index:260;background:radial-gradient(circle at 50% 42%,rgba(var(--accent-rgb),.32),transparent 32%);opacity:0;}
+.xp-level-flash.active{animation:xp-level-flash .9s var(--ease-out-ios) both;}
+@keyframes xp-level-flash{0%{opacity:0;transform:scale(.7)}35%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1.35)}}
+@media(max-width:380px){.xp-achievement-grid{grid-template-columns:1fr;}.xp-tab{padding-inline:9px;}}
+.global-sync-state{position:absolute;left:10px;top:-9px;padding:3px 7px;border-radius:999px;background:rgba(20,25,45,.82);border:1px solid rgba(255,255,255,.1);font-size:8px;font-weight:800;letter-spacing:.08em;color:var(--green);backdrop-filter:blur(12px);pointer-events:none}.global-sync-state.offline{color:var(--amber)}html.ios-safari .liquid-interactive{-webkit-touch-callout:none;-webkit-user-select:none;touch-action:manipulation}button,input,select,textarea,.nav-item,.layout-opt{-webkit-tap-highlight-color:transparent}
 </style>
 </head>
 <body>
 <div id="page-wipe" class="page-wipe"></div>
 <div id="app"></div>
+<div id="xp-level-flash" class="xp-level-flash"></div>
 <div id="toast" class="toast"><span class="ti" id="toast-icon"></span> <span id="toast-msg">Updated</span></div>
 
 <script>
@@ -940,7 +1028,8 @@ function normalizeSquadData(sq){
     if(!sq.permissions[m.id]) sq.permissions[m.id]={...DEFAULT_PERMISSIONS[sq.roles[m.id]]};
   });
   if(!Array.isArray(sq.joinRequests)) sq.joinRequests=[];
-  if(!sq.groupStyle) sq.groupStyle={tagline:'',description:'',logo:'✦',logoUrl:'',bannerUrl:'',accent:'#7C9CFF',accent2:'#9B7CFF',background:'#0B0E1A',mode:'liquid',radius:18,motion:'ambient',showMemberCount:true,showStatusGlow:true};
+  if(!sq.groupStyle) sq.groupStyle=defaultGroupStyle(); else sq.groupStyle={...defaultGroupStyle(),...sq.groupStyle};
+  ensureGroupMetaRaw(sq);
   return sq;
 }
 function roleOf(uid){ return (SQUAD && SQUAD.roles && SQUAD.roles[uid]) || 'member'; }
@@ -972,6 +1061,9 @@ let currentParams = {};
 let CHAT = [];
 let chatUnsub = null;
 let callUnsub = null;
+let POLLS=[]; let pollUnsub=null;
+let TASKS=[]; let taskUnsub=null;
+let CHAT_THREADS={}; let threadUnsub=null;
 let activeCallToast = null;
 // Shared-watch runtime: the Firebase record is authoritative, the local player is merely the renderer.
 let watchPlayer = { type:null, instance:null, roomId:null, applying:false, lastCommandTs:0, timer:null };
@@ -987,7 +1079,7 @@ function createDemoSquad(){
     {id:'demo-4',name:'Sofia',tz:'America/New_York',photo:'',emoji:'🌸'},
     {id:'demo-viewer',name:'You',tz:'Asia/Singapore',photo:'',emoji:'✦'}
   ];
-  const sq={id:DEMO_SQUAD_ID,name:'SquadZync Demo',code:'DEMO42',ownerId:'demo-1',maxMembers:6,members,roles:{'demo-1':'owner','demo-2':'admin','demo-3':'member','demo-4':'member','demo-viewer':'member'},permissions:{},status:{},updatedAt:Date.now(),groupStyle:{tagline:'Try the interface before signing in',description:'A safe demo squad for exploring SquadZync.',logo:'✦',logoUrl:'',bannerUrl:'',accent:'#7C9CFF',accent2:'#9B7CFF',background:'#0B0E1A',mode:'liquid',radius:18,motion:'ambient',showMemberCount:true,showStatusGlow:true}};
+  const sq={id:DEMO_SQUAD_ID,name:'SquadZync Demo',code:'DEMO42',ownerId:'demo-1',maxMembers:6,members,roles:{'demo-1':'owner','demo-2':'admin','demo-3':'member','demo-4':'member','demo-viewer':'member'},permissions:{},status:{},updatedAt:Date.now(),createdAt:Date.now()-8*86400000,groupXp:780,groupStreak:8,achievements:['squad-created'],inviteExpiresAt:null,inviteAdminOnly:false,groupStyle:{tagline:'Try the interface before signing in',description:'A safe demo squad for exploring SquadZync.',logo:'✦',logoUrl:'',bannerUrl:'',bannerVideoUrl:'',accent:'#7C9CFF',accent2:'#9B7CFF',background:'#0B0E1A',backgroundPreset:'aurora',mode:'liquid',radius:18,motion:'ambient',showMemberCount:true,showStatusGlow:true,notificationStyle:'glass',soundPack:'subtle',ambientParticles:true}};
   members.forEach((m,i)=>{sq.permissions[m.id]={...DEFAULT_PERMISSIONS[sq.roles[m.id]]};sq.status[m.id]={avail:i===1?'soon':'free',icon:i===1?'ti-clock-hour-4':'ti-hand-wave',text:i===1?'Back in a bit':'Around',freeAt:null};});
   return normalizeSquadData(sq);
 }
@@ -1010,7 +1102,8 @@ async function loadMe(){
   try { ME = JSON.parse(localStorage.getItem(lsKey('me')) || 'null'); } catch(e){}
 }
 async function saveMe(){
-  if (!ME || isViewerMode()) return;
+  if (!ME) return false;
+  if (isViewerMode()) { showToast('Viewer Mode is read-only — sign in to save changes','ti-lock'); return false; }
   localStorage.setItem(lsKey('me'), JSON.stringify(ME));
   if (typeof window.fbSet !== 'function') { console.warn('profile sync skipped — Firebase bridge not ready'); return; }
   try { await window.fbSet('users/' + ME.id, ME); } catch(e){ console.warn('profile sync failed', e); }
@@ -1022,6 +1115,71 @@ const XP_CONFIG = {
   spinCost:15,
   spins:[{xp:0,weight:28},{xp:5,weight:22},{xp:10,weight:15},{xp:0,weight:12},{xp:1,weight:10},{xp:15,weight:7},{xp:20,weight:5},{xp:50,weight:1}]
 };
+const XP_LEVEL_STEP = 250;
+const XP_MISSIONS = [
+  {id:'checkin-5',title:'Squad Regular',desc:'Check in on 5 different days',goal:5,reward:50,kind:'checkins'},
+  {id:'messages-3',title:'Stay Connected',desc:'Send 3 squad messages',goal:3,reward:15,kind:'messages'},
+  {id:'activities-2',title:'Join In',desc:'Participate in 2 activities',goal:2,reward:30,kind:'activities'},
+  {id:'challenge-1',title:'Squad Challenge',desc:'Complete a squad challenge',goal:1,reward:100,kind:'challenge'}
+];
+function xpLevel(xp){ return Math.max(1, Math.floor((Math.max(0,Number(xp)||0))/XP_LEVEL_STEP)+1); }
+function xpLevelStart(level){ return Math.max(0,(Math.max(1,level)-1)*XP_LEVEL_STEP); }
+function xpLevelNext(level){ return Math.max(XP_LEVEL_STEP,Math.max(1,level)*XP_LEVEL_STEP); }
+function xpProgress(xp){ const l=xpLevel(xp), start=xpLevelStart(l), next=xpLevelNext(l); return Math.max(0,Math.min(1,(xp-start)/Math.max(1,next-start))); }
+function ensureXpMeta(){
+  ensureAccountState();
+  if(!ME.xpState.history) ME.xpState.history=[];
+  if(!ME.xpState.missions) ME.xpState.missions={};
+  if(!ME.xpState.multipliers) ME.xpState.multipliers=[];
+  if(!ME.xpState.lastKnownLevel) ME.xpState.lastKnownLevel=xpLevel(ME.xp);
+  if(!ME.xpState.checkinDays) ME.xpState.checkinDays=[];
+}
+function recordXp(amount, reason, type='adjustment'){
+  ensureXpMeta();
+  const before=Math.max(0,Number(ME.xp)||0), oldLevel=xpLevel(before);
+  ME.xp=Math.max(0,before+amount);
+  const newLevel=xpLevel(ME.xp);
+  ME.xpState.history.unshift({id:'xp_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),amount,reason,type,ts:Date.now()});
+  ME.xpState.history=ME.xpState.history.slice(0,100);
+  ME.xpState.lastReason=reason;
+  ME.xpState.lastEarnedAt=amount>0?Date.now():ME.xpState.lastEarnedAt;
+  ME.xpState.lastSpentAt=amount<0?Date.now():ME.xpState.lastSpentAt;
+  if(newLevel>oldLevel){ ME.xpState.lastKnownLevel=newLevel; window.setTimeout(()=>{showToast(`Level ${newLevel} reached`, 'ti-sparkles'); const f=document.getElementById('xp-level-flash'); if(f){f.classList.remove('active');void f.offsetWidth;f.classList.add('active');}},40); }
+  return true;
+}
+function missionProgress(m){ ensureXpMeta(); const c=Number(ME.xpState.missions[m.kind]||0); return {count:Math.min(m.goal,c),goal:m.goal,complete:c>=m.goal}; }
+function incrementMission(kind,amount=1){ ensureXpMeta(); ME.xpState.missions[kind]=Number(ME.xpState.missions[kind]||0)+amount; }
+function hasXpMultiplier(){ ensureXpMeta(); return ME.xpState.multipliers.some(x=>x && x.expiresAt>Date.now() && Number(x.multiplier)>1); }
+function activeXpMultiplier(){ ensureXpMeta(); const x=ME.xpState.multipliers.filter(x=>x && x.expiresAt>Date.now()).sort((a,b)=>b.multiplier-a.multiplier)[0]; return x||null; }
+function cleanXpMultipliers(){ ensureXpMeta(); ME.xpState.multipliers=ME.xpState.multipliers.filter(x=>x && x.expiresAt>Date.now()); }
+function xpAchievements(){
+  ensureXpMeta();
+  const out=[]; const hist=ME.xpState.history||[];
+  const messages=Number(ME.xpState.missions.messages||0);
+  if(hist.some(x=>x.type==='spin')) out.push({id:'first-spin',icon:'ti-dice',label:'First Spin'});
+  if((ME.xpState.checkinDays||[]).length>=7) out.push({id:'7-day',icon:'ti-calendar-check',label:'7-Day Streak'});
+  if(getGroupIds().length>=2) out.push({id:'builder',icon:'ti-users-group',label:'Squad Builder'});
+  const h=new Date().getHours(); if(h<7) out.push({id:'early',icon:'ti-sunrise',label:'Early Bird'});
+  if(h>=23) out.push({id:'night',icon:'ti-moon',label:'Night Owl'});
+  if(messages>=100) out.push({id:'messages-100',icon:'ti-message',label:'100 Messages'});
+  if(hist.some(x=>x.reason==='Watch party')) out.push({id:'watch-party',icon:'ti-device-tv',label:'Watch Party'});
+  return out;
+}
+function recordCheckin(){ ensureXpMeta(); const d=localDateKey(); if(!ME.xpState.checkinDays.includes(d)){ME.xpState.checkinDays.unshift(d);ME.xpState.checkinDays=ME.xpState.checkinDays.slice(0,30); incrementMission('checkins',1);} }
+function completeMission(m){
+  if(isViewerMode()) return false;
+  const prog=missionProgress(m); if(prog.complete && !ME.xpState.missions[m.id+'Rewarded']){
+    ME.xpState.missions[m.id+'Rewarded']=true; recordXp(m.reward,`Mission: ${m.title}`,'mission');
+    if(m.id==='messages-3') ME.xpState.multipliers.push({id:'boost_'+Date.now(),multiplier:2,expiresAt:Date.now()+2*60*60*1000,source:'Weekly mission'});
+    return true;
+  }
+  return false;
+}
+function syncCompletedMissions(){
+  if(isViewerMode()) return false;
+  let changed=false; XP_MISSIONS.forEach(m=>{ if(completeMission(m)) changed=true; });
+  return changed;
+}
 function localDateKey(d=new Date()){
   const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), day=String(d.getDate()).padStart(2,'0');
   return `${y}-${m}-${day}`;
@@ -1036,51 +1194,34 @@ function ensureAccountState(){
   ME.groupIds = [...new Set(ME.groupIds)];
 }
 function getGroupIds(){ ensureAccountState(); return ME.groupIds || []; }
-async function grantXp(amount, reason='XP'){
-  ensureAccountState();
-  amount=Math.max(0,Math.floor(Number(amount)||0));
-  if(!amount) return false;
-  ME.xp += amount;
-  ME.xpState.lastReason = reason;
-  ME.xpState.lastEarnedAt = Date.now();
-  await saveMe();
-  return true;
-}
-async function spendXp(amount, reason='Purchase'){
-  ensureAccountState();
-  amount=Math.max(0,Math.floor(Number(amount)||0));
-  if(ME.xp < amount){ showToast(`Need ${amount} XP — you have ${ME.xp}`, 'ti-alert-triangle'); return false; }
-  ME.xp -= amount;
-  ME.xpState.lastSpentAt = Date.now();
-  ME.xpState.lastSpentReason = reason;
-  await saveMe();
-  return true;
-}
+function recordXpMetaOnly(delta,reason,type){ensureXpMeta();const entry={id:'xp_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),delta:Number(delta)||0,reason:String(reason||'XP'),type:type||((delta||0)>=0?'earn':'spend'),ts:Date.now()};ME.xpState.history=[entry,...(ME.xpState.history||[])].slice(0,150)}
+async function saveMeFields(fields){if(!ME||isViewerMode())return false;try{await window.fbUpdate('users/'+ME.id,fields);return true}catch(e){return false}}
+async function atomicUserXpDelta(uid,delta){const result=await window.fbTxn('users/'+uid+'/xp',current=>{const cur=Math.max(0,Number(current)||0);const next=cur+Number(delta||0);if(next<0)return;return next});return {ok:!!result.committed,xp:Number(result.snapshot?.val?.()??0)}}
+async function grantXp(amount,reason='XP'){if(viewerBlocked('Sign in to earn XP'))return false;ensureXpMeta();amount=Math.max(0,Math.floor(Number(amount)||0));if(!amount)return false;const mult=activeXpMultiplier(),effective=mult?Math.round(amount*Number(mult.multiplier||1)):amount;try{const r=await atomicUserXpDelta(ME.id,effective);if(!r.ok)return false;ME.xp=r.xp;recordXpMetaOnly(effective,reason,'earn');await saveMeFields({xpState:ME.xpState});return true}catch(e){showToast('Couldn’t add XP — try again','ti-alert-triangle');return false}}
+async function spendXp(amount,reason='Purchase'){if(viewerBlocked('Sign in to spend XP'))return false;ensureXpMeta();amount=Math.max(0,Math.floor(Number(amount)||0));try{const r=await atomicUserXpDelta(ME.id,-amount);if(!r.ok){showToast(`Need ${amount} XP — you have ${ME.xp}`,'ti-alert-triangle');return false}ME.xp=r.xp;recordXpMetaOnly(-amount,reason,'spend');await saveMeFields({xpState:ME.xpState});return true}catch(e){showToast('Couldn’t spend XP — try again','ti-alert-triangle');return false}}
 async function awardDailyXp(){
-  ensureAccountState();
+  if(viewerBlocked('Sign in to claim XP rewards')) return false;
+  ensureXpMeta(); cleanXpMultipliers(); recordCheckin();
   const today=localDateKey(), month=monthKey();
   let changed=false;
   if(ME.xpState.dailyClaim !== today){
-    ME.xp += XP_CONFIG.daily; ME.xpState.dailyClaim=today; changed=true;
+    recordXp(XP_CONFIG.daily,'Daily check-in','daily'); ME.xpState.dailyClaim=today; changed=true;
   }
   if(ME.xpState.monthlyClaim !== month){
-    ME.xp += XP_CONFIG.monthly; ME.xpState.monthlyClaim=month; changed=true;
+    recordXp(XP_CONFIG.monthly,'Monthly bonus','monthly'); ME.xpState.monthlyClaim=month; changed=true;
   }
-  if(changed){
-    ME.xpState.lastReason='Daily/monthly bonus';
-    ME.xpState.lastEarnedAt=Date.now();
-    await saveMe();
-  }
+  syncCompletedMissions();
+  if(changed){ await saveMe(); }
+  return changed;
 }
 async function awardGroupRoleXp(groupId, role){
-  ensureAccountState();
+  if(viewerBlocked('Sign in to receive group XP')) return;
+  ensureXpMeta();
   const key=`${groupId}:${role}`;
   if(ME.xpState.groupBonuses[key]) return;
   const amount=role==='owner'?30:role==='admin'?10:5;
-  ME.xp += amount;
+  recordXp(amount,`${role} group bonus`,'group');
   ME.xpState.groupBonuses[key]=Date.now();
-  ME.xpState.lastReason=`${role} group bonus`;
-  ME.xpState.lastEarnedAt=Date.now();
   await saveMe();
 }
 function groupMarkHtml(g,size=54, extraClass=''){
@@ -1130,7 +1271,7 @@ async function performDailySpin(){
   let r=Math.random()*total, reward=0;
   for(const opt of XP_CONFIG.spins){ r-=opt.weight; if(r<=0){ reward=opt.xp; break; } }
   ME.xpState.lastSpin=today;
-  if(reward) ME.xp += reward;
+  if(reward) recordXp(reward,'Daily spin reward','spin');
   ME.xpState.lastSpinReward=reward;
   ME.xpState.lastReason='Daily spin';
   await saveMe();
@@ -1174,11 +1315,16 @@ async function loadSquad(id){
   } catch(e){}
   return null;
 }
+let SQUAD_SYNC_BASE=null;
+function deepCloneSafe(v){try{return JSON.parse(JSON.stringify(v))}catch(e){return v}}
+function buildDeepPatch(base,current,prefix=''){const out={};const obj=v=>v&&typeof v==='object'&&!Array.isArray(v);if(!obj(base)||!obj(current)){out[prefix]=deepCloneSafe(current);return out}const keys=new Set([...Object.keys(base||{}),...Object.keys(current||{})]);for(const k of keys){const path=prefix?prefix+'/'+k:k;if(!(k in current)){out[path]=null;continue}if(!(k in base)){out[path]=deepCloneSafe(current[k]);continue}const a=base[k],b=current[k];if(obj(a)&&obj(b))Object.assign(out,buildDeepPatch(a,b,path));else if(JSON.stringify(a)!==JSON.stringify(b))out[path]=deepCloneSafe(b)}return out}
+function recordSquadSyncBase(){SQUAD_SYNC_BASE=deepCloneSafe(SQUAD)}
 async function saveSquad(){
-  if (!SQUAD || isViewerMode()) return;
-  try { localStorage.setItem('squadsync:squad_cache:' + SQUAD.id, JSON.stringify(SQUAD)); } catch(e){}
-  try { await window.fbSet('squads/' + SQUAD.id, SQUAD); }
-  catch(e){ console.warn('Firebase sync error:', e); showToast('Sync failed — check connection', 'ti-alert-triangle'); }
+  if(!SQUAD)return false;
+  if(isViewerMode()){showToast('Viewer Mode is read-only — sign in to save squad changes','ti-lock');return false}
+  try{localStorage.setItem('squadsync:squad_cache:'+SQUAD.id,JSON.stringify(SQUAD))}catch(e){}
+  const patch=buildDeepPatch(SQUAD_SYNC_BASE||{},SQUAD);
+  try{if(Object.keys(patch).length)await window.fbUpdate('squads/'+SQUAD.id,patch);recordSquadSyncBase();return true}catch(e){showToast(navigator.onLine?'Couldn’t sync changes — retrying when possible':'Offline — changes queued for sync','ti-alert-triangle');return false}
 }
 
 function attachSquadListener(){
@@ -1187,6 +1333,7 @@ function attachSquadListener(){
   squadUnsub = window.fbListen('squads/' + SQUAD_ID, (data) => {
     if (data) {
       SQUAD = data;
+      recordSquadSyncBase();
       if(currentScreen === 'tv-board' && watchPlayer.instance){
         reconcileWatchPlayer(SQUAD.watchParty);
       } else if (['home','manage','board','join-requests','group-settings','roles','activity-trivia','tv-board','customize'].includes(currentScreen)) renderAll(false);
@@ -1226,6 +1373,9 @@ function attachSquadListener(){
     activeCallToast = data.ts;
     showToast(`${(data.startedByName||'Someone').split(' ')[0]} started a call \u2014 open Messages to join`, 'ti-phone-incoming');
   });
+  if(pollUnsub) pollUnsub(); pollUnsub=window.fbListen('polls/'+SQUAD_ID,data=>{POLLS=data?Object.values(data):[];if(currentScreen==='board')renderAll(false);});
+  if(taskUnsub) taskUnsub(); taskUnsub=window.fbListen('tasks/'+SQUAD_ID,data=>{TASKS=data?Object.values(data):[];if(currentScreen==='board')renderAll(false);});
+  if(threadUnsub) threadUnsub(); threadUnsub=window.fbListen('chatThreads/'+SQUAD_ID,data=>{CHAT_THREADS=data||{};if(currentScreen==='messages')renderAll(false);});
 }
 
 async function enableNotifications(){
@@ -1303,25 +1453,17 @@ async function resolveJoinRequest(uid, approve){
   }
 
   if(requester){
-    requester.xp = Math.max(0,(Number(requester.xp)||0)-joinCost);
-    requester.groupIds = [...new Set([...(requester.groupIds || requester.squadId ? [requester.squadId].filter(Boolean) : []), SQUAD.id])];
-    requester.xpState = requester.xpState || {};
-    requester.xpState.groupBonuses = requester.xpState.groupBonuses || {};
-    const bonusKey = `${SQUAD.id}:member`;
-    if(!requester.xpState.groupBonuses[bonusKey]){
-      requester.xp += 5;
-      requester.xpState.groupBonuses[bonusKey] = Date.now();
-    }
     try{
-      await window.fbSet('users/' + uid, requester);
-    }catch(e){
-      showToast('Could not finalize the join — no XP was charged','ti-alert-triangle');
-      return;
-    }
+      if(joinCost>0){const charged=await atomicUserXpDelta(uid,-joinCost);if(!charged.ok){showToast(`${req.name.split(' ')[0]} no longer has ${joinCost} XP`,'ti-alert-triangle');return}requester.xp=charged.xp}
+      requester.groupIds=[...new Set([...(requester.groupIds||[]),...(requester.squadId?[requester.squadId]:[]),SQUAD.id])];
+      requester.xpState=requester.xpState||{};requester.xpState.groupBonuses=requester.xpState.groupBonuses||{};const bonusKey=`${SQUAD.id}:member`;if(!requester.xpState.groupBonuses[bonusKey])requester.xpState.groupBonuses[bonusKey]=Date.now();
+      await window.fbUpdate('users/'+uid,{groupIds:requester.groupIds,xpState:requester.xpState});
+    }catch(e){showToast('Could not finalize the join — membership was not committed','ti-alert-triangle');return}
   }
 
   SQUAD.joinRequests = (SQUAD.joinRequests || []).filter(r => r.id !== uid);
   SQUAD.members.push({ id: req.id, name: req.name, tz: req.tz, photo: req.photo || '', emoji: '' });
+  SQUAD.groupXp=Number(SQUAD.groupXp||0)+25;
   if(!SQUAD.status) SQUAD.status = {};
   SQUAD.status[uid] = { avail:'free', icon:'ti-hand-wave', text:'Just joined' };
   if(!SQUAD.roles) SQUAD.roles = {};
@@ -1412,6 +1554,57 @@ function timeUntil(ts){
   return `free in ${hrs}h ${mins%60}m`;
 }
 function genCode(){ return Math.floor(100000 + Math.random() * 900000).toString(); }
+
+function groupMemberCount(){ return Array.isArray(SQUAD?.members) ? SQUAD.members.length : 0; }
+function groupCapacity(){ return Number(SQUAD?.maxMembers || 6); }
+function groupXpValue(){ return Number(SQUAD?.groupXp || 0); }
+function groupLevel(){ return Math.max(1, Math.floor(Math.sqrt(groupXpValue()/100))+1); }
+function groupNextLevelXp(){ const lvl=groupLevel(); return Math.max(100,lvl*lvl*100); }
+function groupProgress(){ const lvl=groupLevel(); const prev=Math.max(0,(lvl-1)*(lvl-1)*100); const next=lvl*lvl*100; return Math.max(0,Math.min(1,(groupXpValue()-prev)/Math.max(1,next-prev))); }
+function groupStreak(){ return Number(SQUAD?.groupStreak || 0); }
+async function touchGroupStreak(){
+  if(!SQUAD || isViewerMode()) return;
+  const today=localDateKey();
+  const last=SQUAD.groupStreakDate||'';
+  if(last===today) return;
+  const prev=new Date(); prev.setDate(prev.getDate()-1);
+  const wasYesterday=last===localDateKey(prev);
+  SQUAD.groupStreak=wasYesterday?Math.max(1,Number(SQUAD.groupStreak||0)+1):1;
+  SQUAD.groupStreakDate=today;
+  SQUAD.groupXp=Number(SQUAD.groupXp||0)+5;
+  SQUAD.updatedAt=Date.now();
+  await saveSquad();
+}
+function groupAgeLabel(){
+  const ts=Number(SQUAD?.createdAt || SQUAD?.updatedAt || Date.now());
+  const days=Math.max(0,Math.floor((Date.now()-ts)/86400000));
+  return days < 1 ? 'Created today' : days === 1 ? '1 day old' : `${days} days old`;
+}
+function groupAchievements(){
+  const a=[]; const members=groupMemberCount();
+  if(SQUAD?.achievements?.includes('squad-created') || members>=1) a.push({icon:'ti-sparkles',label:'Squad Builder'});
+  if(members>=5) a.push({icon:'ti-users',label:'Full House'});
+  if(groupStreak()>=7) a.push({icon:'ti-flame',label:'7 Day Streak'});
+  if(groupXpValue()>=1000) a.push({icon:'ti-trophy',label:'1K Squad XP'});
+  return a;
+}
+function hashColorSeed(text){ let h=0; const t=String(text||''); for(let i=0;i<t.length;i++) h=((h<<5)-h)+t.charCodeAt(i)|0; return Math.abs(h); }
+const GROUP_PALETTES=[['#7C9CFF','#9B7CFF','#0B0E1A'],['#5B9CFF','#7CC4FF','#07111C'],['#4ADE80','#7CFFB2','#08140D'],['#FF7CA3','#FF9B7C','#180B12'],['#FBBF24','#FF9B4A','#181105'],['#5EEAD4','#60A5FA','#071517'],['#F472B6','#A78BFA','#150B17'],['#38BDF8','#818CF8','#08111A']];
+function groupPaletteFromSeed(seed){ return GROUP_PALETTES[hashColorSeed(seed)%GROUP_PALETTES.length]; }
+function safeInviteLink(code){ return `${location.origin}${location.pathname}#join=${encodeURIComponent(code||'')}`; }
+function groupInviteValid(sq){ return !!sq && (!sq.inviteExpiresAt || Date.now() <= Number(sq.inviteExpiresAt)); }
+function inviteExpiryLabel(ts){ if(!ts) return 'Never'; const diff=Number(ts)-Date.now(); if(diff<=0) return 'Expired'; const h=Math.ceil(diff/3600000); return h<24 ? `${h}h left` : `${Math.ceil(h/24)}d left`; }
+function defaultGroupStyle(){ return {tagline:'',description:'',logo:'✦',logoUrl:'',bannerUrl:'',bannerVideoUrl:'',accent:'#7C9CFF',accent2:'#9B7CFF',background:'#0B0E1A',backgroundPreset:'aurora',mode:'liquid',radius:18,motion:'ambient',density:'comfortable',showMemberCount:true,showStatusGlow:true,notificationStyle:'glass',soundPack:'subtle',ambientParticles:true}; }
+function ensureGroupMetaRaw(sq){
+  if(!sq) return sq;
+  if(!sq.createdAt) sq.createdAt=sq.updatedAt||Date.now();
+  if(sq.groupXp==null) sq.groupXp=0;
+  if(sq.groupStreak==null) sq.groupStreak=0;
+  if(!Array.isArray(sq.achievements)) sq.achievements=[];
+  if(!('inviteExpiresAt' in sq)) sq.inviteExpiresAt=null;
+  if(!('inviteAdminOnly' in sq)) sq.inviteAdminOnly=false;
+  return sq;
+}
 function timeAgo(ts){
   const diff = Date.now() - ts;
   const mins = Math.floor(diff/60000);
@@ -1421,6 +1614,18 @@ function timeAgo(ts){
   if(hrs < 24) return hrs + 'h ago';
   return Math.floor(hrs/24) + 'd ago';
 }
+function groupBackgroundFor(g){
+  const preset=String(g?.backgroundPreset||'aurora');
+  const map={
+    aurora:'radial-gradient(circle at 15% 5%, rgba(var(--group-accent-rgb),.23), transparent 42%),radial-gradient(circle at 90% 20%, rgba(155,124,255,.18), transparent 38%),linear-gradient(145deg,#0A0D18,#11162A)',
+    midnight:'radial-gradient(circle at 50% 0%, rgba(var(--group-accent-rgb),.12), transparent 46%),linear-gradient(160deg,#060912,#0E1424)',
+    nebula:'radial-gradient(circle at 20% 20%, rgba(var(--group-accent-rgb),.30), transparent 30%),radial-gradient(circle at 80% 70%, rgba(var(--group-accent-rgb),.14), transparent 35%),linear-gradient(150deg,#070914,#11152C)',
+    emerald:'radial-gradient(circle at 15% 20%, rgba(74,222,128,.18), transparent 35%),linear-gradient(150deg,#06110D,#0F1C18)',
+    rose:'radial-gradient(circle at 82% 10%, rgba(255,124,163,.20), transparent 38%),linear-gradient(150deg,#12080D,#1D1018)',
+    amber:'radial-gradient(circle at 80% 15%, rgba(251,191,36,.18), transparent 35%),linear-gradient(150deg,#120D05,#1E170C)'
+  };
+  return map[preset] || map.aurora;
+}
 function applyGroupStyle(){
   const g = (SQUAD && SQUAD.groupStyle) || {};
   const root = document.documentElement;
@@ -1429,8 +1634,10 @@ function applyGroupStyle(){
   root.style.setProperty('--group-accent-rgb', hexToRgb(g.accent || '#7C9CFF') || '124,156,255');
   root.style.setProperty('--card-radius', Math.max(10, Math.min(34, Number(g.radius)||18)) + 'px');
   if(g.background) root.style.setProperty('--group-bg', g.background);
+  root.style.setProperty('--group-background', groupBackgroundFor(g));
   document.body.classList.toggle('liquid-mode', (g.mode||'liquid') === 'liquid');
   document.body.dataset.groupMotion = g.motion || 'ambient';
+  document.body.classList.toggle('group-particles-off', g.ambientParticles === false);
 }
 
 function applyTheme(){
@@ -1586,10 +1793,7 @@ function softUpdate(containerSelector){
 
 
 function initParallax(){
-  if(window.__parallaxBound) return; window.__parallaxBound=true;
-  const root=document.documentElement;
-  window.addEventListener('pointermove',(e)=>{const x=(e.clientX/window.innerWidth)*100,y=(e.clientY/window.innerHeight)*100;root.style.setProperty('--pointer-x',x+'%');root.style.setProperty('--pointer-y',y+'%');document.querySelectorAll('.parallax-target').forEach((el,i)=>{const r=el.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;const dx=Math.max(-10,Math.min(10,(e.clientX-cx)/35)),dy=Math.max(-8,Math.min(8,(e.clientY-cy)/35));el.style.setProperty('--px',dx+'px');el.style.setProperty('--py',dy+'px');el.style.setProperty('--ry',(-dx*.18)+'deg');el.style.setProperty('--rx',(dy*.18)+'deg');});},{passive:true});
-}
+  if(window.__parallaxBound)return;window.__parallaxBound=true;const root=document.documentElement;let raf=0,last=null,cache=[],dirty=true;const refresh=()=>{cache=[...document.querySelectorAll('.parallax-target')].map(el=>({el,rect:el.getBoundingClientRect()}));dirty=false};const tick=()=>{raf=0;if(!last)return;if(dirty)refresh();const e=last;last=null;root.style.setProperty('--pointer-x',(e.clientX/window.innerWidth*100)+'%');root.style.setProperty('--pointer-y',(e.clientY/window.innerHeight*100)+'%');for(const {el,rect} of cache){if(rect.bottom<0||rect.top>innerHeight||rect.right<0||rect.left>innerWidth)continue;const dx=Math.max(-10,Math.min(10,(e.clientX-(rect.left+rect.width/2))/35));const dy=Math.max(-8,Math.min(8,(e.clientY-(rect.top+rect.height/2))/35));el.style.setProperty('--px',dx.toFixed(2)+'px');el.style.setProperty('--py',dy.toFixed(2)+'px');el.style.setProperty('--ry',(-dx*.18).toFixed(2)+'deg');el.style.setProperty('--rx',(dy*.18).toFixed(2)+'deg')}};window.addEventListener('pointermove',e=>{if(e.pointerType==='touch'||LOCAL.reduceMotion||LOCAL.parallax===false)return;last=e;if(!raf)raf=requestAnimationFrame(tick)},{passive:true});window.addEventListener('resize',()=>{dirty=true},{passive:true});window.addEventListener('scroll',()=>{dirty=true},{passive:true})}
 initParallax();
 
 
@@ -1620,7 +1824,7 @@ function initLiquidInteractions(){
     el.classList.add('liquid-interactive');
 
     const state={
-      active:false, pointerId:null,
+      active:false, pointerId:null, captured:false, clickEligible:false, clickMoved:false, pointerType:'',
       startX:0,startY:0,x:0,y:0,vx:0,vy:0,lastX:0,lastY:0,lastT:0,
       targetX:0,targetY:0,animating:false,raf:0
     };
@@ -1697,15 +1901,33 @@ function initLiquidInteractions(){
       state.startX=e.clientX; state.startY=e.clientY;
       state.x=0; state.y=0; state.vx=0; state.vy=0;
       state.lastX=e.clientX; state.lastY=e.clientY; state.lastT=performance.now();
+      state.clickEligible = !!el.matches('button, .btn, .icon-btn, .nav-item, .fab, .preset-pill, .avail-chip, .reaction-chip, .theme-swatch, .color-swatch-custom, .nudge-btn, [role=button], [data-board-tab], [data-xp-tab], [data-motion-tab], .layout-opt');
+      state.clickMoved = false;
+      state.captured = false;
+      state.pointerType = e.pointerType || '';
+      // For desktop controls, suppress the browser's native click while the
+      // element is being physically transformed. Native click hit-testing can
+      // be cancelled when the element moves under the pointer. The normal click
+      // handler is invoked once from pointerup below, preserving all effects.
+      if(state.clickEligible && (state.pointerType==='mouse' || state.pointerType==='pen') && e.cancelable) e.preventDefault();
       el.classList.remove('liquid-release');
       render(0,0,true);
-      try{el.setPointerCapture(e.pointerId);}catch(_){ }
+      // Do not capture immediately. Capturing on pointerdown can cause Chromium
+      // to cancel the native click when the transformed target moves beneath
+      // the pointer. We capture only once an actual drag is detected.
     }
 
     function onMove(e){
       if(!state.active || e.pointerId!==state.pointerId) return;
       const now=performance.now(), dt=Math.max(8,now-state.lastT);
       const rawX=e.clientX-state.startX, rawY=e.clientY-state.startY;
+      if(Math.hypot(rawX,rawY)>5){
+        state.clickMoved = true;
+        if(!state.captured){
+          state.captured=true;
+          try{el.setPointerCapture(e.pointerId);}catch(_){ }
+        }
+      }
       // Rubber-band the further part of the gesture instead of allowing the
       // card to feel detached from its original position.
       const damp=v=>Math.sign(v)*Math.pow(Math.min(Math.abs(v),120),.82)*.92;
@@ -1720,12 +1942,22 @@ function initLiquidInteractions(){
 
     function onUp(e){
       if(!state.active || (e.pointerId!==undefined && e.pointerId!==state.pointerId)) return;
-      try{el.releasePointerCapture(e.pointerId);}catch(_){ }
+      try{if(state.captured) el.releasePointerCapture(e.pointerId);}catch(_){ }
       // Preserve a fraction of release velocity so the snap-back has a little
       // personality rather than merely easing from a static offset.
       state.vx=clamp(state.vx*.12,-155,155);
       state.vy=clamp(state.vy*.12,-155,155);
       springBack();
+      // Desktop-safe click recovery: if a small interactive control moved under
+      // the pointer during the liquid gesture, Chromium may suppress its native
+      // click. Re-issue a click only when the gesture remained click-sized.
+      if(state.clickEligible && !state.clickMoved && !el.disabled && (state.pointerType==='mouse' || state.pointerType==='pen')){
+        setTimeout(()=>{
+          if(document.body.contains(el) && !el.matches(':disabled')){
+            el.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window}));
+          }
+        },0);
+      }
     }
 
     function onCancel(){
@@ -1739,7 +1971,7 @@ function initLiquidInteractions(){
       el.style.setProperty('--liq-light-y',clamp(((e.clientY-r.top)/r.height)*100,5,95).toFixed(1)+'%');
     }
 
-    el.addEventListener('pointerdown',onDown,{passive:true});
+    el.addEventListener('pointerdown',onDown,{passive:false});
     el.addEventListener('pointermove',onMove,{passive:true});
     el.addEventListener('pointerup',onUp,{passive:true});
     el.addEventListener('pointercancel',onCancel,{passive:true});
@@ -1767,7 +1999,7 @@ function openFriendNotes(friendId){
 
 function renderNav(active){
   return `
-    <div class="bottom-nav">
+    <div class="bottom-nav"><div id="global-sync-state" class="global-sync-state">LIVE</div>
       <div class="nav-item ${active==='home'?'active':''}" id="nav-home"><span class="ti">${icon('ti-grid-dots')}</span>Squad</div>
       <div class="nav-item ${active==='board'?'active':''}" id="nav-board"><span class="ti">${icon('ti-notes')}</span>Board</div>
       <div class="nav-item ${active==='activities'?'active':''}" id="nav-activities"><span class="ti">${icon('ti-device-gamepad-2')}</span>Play</div>
@@ -1797,7 +2029,7 @@ function renderLogin(){
         </div>
         <button class="btn btn-ghost btn-block" id="viewer-mode-btn" style="padding:14px;"><span class="ti">${icon('ti-eye')}</span> Try Viewer Mode</button>
       </div>
-      <p class="small-note" style="margin-top:16px;max-width:340px;">Viewer Mode opens a safe demo squad. Nothing is written to Firebase until you sign in.</p>
+      <p class="small-note" style="margin-top:16px;max-width:340px;">${window.__pendingInviteCode?`You were invited with code <strong style="color:var(--accent);">${escapeHtml(window.__pendingInviteCode)}</strong>. Sign in to join it.`:'Viewer Mode opens a safe demo squad. Nothing is written to Firebase until you sign in.'}</p>
     </div>
   `;
 }
@@ -1906,53 +2138,37 @@ function renderSquadCreated(){
 function renderHome(){
   const layout = LOCAL.layout || 'grid';
   const others = SQUAD.members;
-  let body = '';
-  if(others.length === 0) body = `<div class="empty-hint glass">No one in your squad yet.</div>`;
-  else if(layout === 'grid') body = renderGrid(others);
-  else if(layout === 'list') body = renderList(others);
-  else body = renderWheel(others);
-
-  const online = window.__fbReady;
-
-  const g=SQUAD.groupStyle||{};
+  const g=Object.assign(defaultGroupStyle(),SQUAD.groupStyle||{});
+  const pct=Math.round(groupProgress()*100);
+  let body='';
+  if(others.length===0) body=`<div class="empty-hint glass motion-card liquid-interactive"><div style="font-size:24px;margin-bottom:8px;">${escapeHtml(g.logo||'✦')}</div><strong>Your squad is quiet.</strong><div style="margin-top:6px;">Invite someone and wake it up.</div></div>`;
+  else if(layout==='grid') body=renderGrid(others);
+  else if(layout==='list') body=renderList(others);
+  else body=renderWheel(others);
+  const online=window.__fbReady;
+  const achievements=groupAchievements().slice(0,3);
   return `
-    <div class="screen group-theme-card">${isViewerMode()?`<div class="viewer-banner"><span class="ti">${icon('ti-eye')}</span><div><strong>Viewer Mode</strong><br>Demo data only — sign in to make changes.</div><button class="viewer-exit" id="viewer-exit-btn">Sign in</button></div>`:''}
-      <div class="top-row">
-        <div class="brand">
-          ${groupMarkHtml(g,42)}
-          <div>
-            <div class="brand-name">${escapeHtml(SQUAD.name)}</div>
-            <div class="sync-badge ${online?'':'offline'}"><span class="ti">${icon(online?'ti-refresh':'ti-cloud-off')}</span> ${online?'Connected live':'Offline — cached view'}</div>
-          </div>
-        </div>
-        ${renderAvatarGroup(others)}
-        <div style="display:flex;align-items:center;gap:7px;margin-left:auto;">
-          <div class="sync-badge ${online?'':'offline'}" id="home-sync-badge" style="cursor:pointer;">${icon(online?'ti-refresh':'ti-cloud-off')} ${online?'Live':'Offline'}</div>
-          <div class="icon-btn" id="my-status-btn"><span class="ti">${icon('ti-mood-smile')}</span></div>
-          <div class="icon-btn" id="go-messages-btn"><span class="ti">${icon('ti-message')}</span></div>
-        </div>
-      </div>
-      <div class="xp-hero glass liquid-sheen" id="open-xp" style="margin-bottom:14px;cursor:pointer;">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
-          <div>
-            <div style="font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-lo);font-weight:800;">Your XP</div>
-            <div class="xp-number">${Math.floor(ME.xp||0)} <span style="font-size:14px;color:var(--text-lo);font-weight:700;">XP</span></div>
-          </div>
-          <div style="text-align:right;"><div class="xp-badge">${icon('ti-flame')} Daily +10</div><div style="font-size:10.5px;color:var(--text-faint);margin-top:6px;">Tap for XP &amp; shop</div></div>
+    <div class="screen group-theme-card">
+      ${isViewerMode()?`<div class="viewer-banner"><span class="ti">${icon('ti-eye')}</span><div><strong>Viewer Mode</strong><br>Demo data only — sign in to make changes.</div><button class="viewer-exit" id="viewer-exit-btn">Sign in</button></div>`:''}
+      <div class="group-hero glass-strong liquid-sheen liquid-interactive motion-card" style="--group-hero-bg:${g.background};--group-background:${groupBackgroundFor(g)};">
+        ${g.bannerVideoUrl?`<video class="group-hero-media" src="${escapeHtml(g.bannerVideoUrl)}" autoplay muted loop playsinline></video>`:''}
+        ${g.bannerUrl&&!g.bannerVideoUrl?`<div class="group-hero-media" style="background-image:url('${escapeHtml(g.bannerUrl)}');background-size:cover;background-position:center;"></div>`:''}
+        <div class="group-particle-field" aria-hidden="true"></div><div class="group-hero-overlay"></div>
+        <div class="group-hero-content">
+          <div class="group-hero-top">${groupMarkHtml(g,64)}<div style="min-width:0;flex:1;"><div class="group-kicker">${escapeHtml(g.tagline||'Your squad, your space')}</div><h1>${escapeHtml(SQUAD.name)}</h1><div class="group-meta">${groupMemberCount()} / ${groupCapacity()} members · ${escapeHtml(groupAgeLabel())}</div></div><button class="icon-btn liquid-interactive motion-card" id="group-identity-open">${icon('ti-settings')}</button></div>
+          ${g.description?`<p class="group-description">${escapeHtml(g.description)}</p>`:''}
+          <div class="group-stat-row"><div class="group-stat"><strong>Level ${groupLevel()}</strong><span>${groupXpValue()} XP</span></div><div class="group-stat"><strong>${groupStreak()} day</strong><span>streak</span></div><div class="group-stat"><strong>${pct}%</strong><span>to next level</span></div></div>
+          <div class="group-level-bar"><span style="width:${pct}%"></span></div>
+          ${achievements.length?`<div class="group-achievements">${achievements.map(x=>`<span class="group-achievement"><span class="ti">${icon(x.icon)}</span>${x.label}</span>`).join('')}</div>`:''}
+          <div class="group-hero-actions"><button class="btn btn-primary liquid-interactive motion-card" id="group-invite-btn">${icon('ti-share-3')} Invite</button><button class="btn btn-ghost liquid-interactive motion-card" id="group-manage-btn">${icon('ti-settings')} Manage</button></div>
         </div>
       </div>
-      <div class="layout-switch" id="layout-switch">
-        <div class="layout-pill" id="layout-pill"></div>
-        <div class="layout-opt motion-card ${layout==='grid'?'active':''}" data-layout="grid">Grid</div>
-        <div class="layout-opt motion-card ${layout==='list'?'active':''}" data-layout="list">List</div>
-        <div class="layout-opt motion-card ${layout==='wheel'?'active':''}" data-layout="wheel">Wheel</div>
-      </div>
+      <div class="top-row" style="margin-top:14px;"><div class="brand">${groupMarkHtml(g,38)}<div><div class="brand-name">${escapeHtml(SQUAD.name)}</div><div class="sync-badge ${online?'':'offline'}"><span class="ti">${icon(online?'ti-refresh':'ti-cloud-off')}</span> ${online?'Connected live':'Offline — cached view'}</div></div></div>${renderAvatarGroup(others)}<div style="display:flex;align-items:center;gap:7px;margin-left:auto;"><div class="sync-badge" id="home-sync-badge" style="cursor:pointer;">${icon(online?'ti-refresh':'ti-cloud-off')} ${online?'Live':'Offline'}</div><div class="icon-btn liquid-interactive motion-card" id="my-status-btn">${icon('ti-mood-smile')}</div><div class="icon-btn liquid-interactive motion-card" id="go-messages-btn">${icon('ti-message')}</div></div></div>
+      <div class="xp-hero glass liquid-sheen liquid-interactive motion-card" id="open-xp" style="margin-bottom:14px;cursor:pointer;"><div style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><div><div style="font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-lo);font-weight:800;">Your XP</div><div class="xp-number">${Math.floor(ME.xp||0)} <span style="font-size:14px;color:var(--text-lo);font-weight:700;">XP</span></div></div><div style="text-align:right;"><div class="xp-badge">${icon('ti-flame')} Daily +10</div><div style="font-size:10.5px;color:var(--text-faint);margin-top:6px;">Tap for XP &amp; shop</div></div></div></div>
+      <div class="layout-switch" id="layout-switch"><div class="layout-pill" id="layout-pill"></div><div class="layout-opt liquid-interactive motion-card ${layout==='grid'?'active':''}" data-layout="grid">Grid</div><div class="layout-opt liquid-interactive motion-card ${layout==='list'?'active':''}" data-layout="list">List</div><div class="layout-opt liquid-interactive motion-card ${layout==='wheel'?'active':''}" data-layout="wheel">Wheel</div></div>
       ${body}
-    </div>
-    ${renderNav('home')}
-  `;
+    </div>${renderNav('home')}`;
 }
-
 function renderGrid(members){
   const tiles = members.map(f => {
     const st = friendState(f);
@@ -2269,22 +2485,73 @@ function renderJoinRequests(){
   `;
 }
 
+
+function openGroupInviteDialog(){
+  const link=safeInviteLink(SQUAD?.code), g=Object.assign(defaultGroupStyle(),SQUAD?.groupStyle||{});
+  const wrap=document.createElement('div'); wrap.className='dialog-backdrop';
+  wrap.innerHTML=`<div class="dialog glass-strong liquid-interactive motion-card" style="max-width:410px;width:calc(100% - 32px);padding:18px;">
+    <div class="dialog-header"><div><div class="field-label" style="margin:0;">Invite to</div><h3>${escapeHtml(SQUAD.name)}</h3></div><button class="icon-btn dialog-close">${icon('ti-x')}</button></div>
+    <div class="invite-preview glass liquid-interactive motion-card" style="padding:14px;margin:12px 0;">${groupMarkHtml(g,54)}<div style="font-weight:800;margin-top:8px;">${escapeHtml(g.tagline||'Join the squad')}</div><div class="small-note">${escapeHtml(g.description||'A shared space for friends, plans and activities.')}</div></div>
+    <div class="field"><label class="field-label">Invite link</label><input id="invite-link-field" value="${escapeHtml(link)}" readonly></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"><button class="btn btn-primary liquid-interactive motion-card" id="invite-copy">${icon('ti-copy')} Copy</button><button class="btn btn-ghost liquid-interactive motion-card" id="invite-share">${icon('ti-share-3')} Share</button></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;"><button class="btn btn-ghost liquid-interactive motion-card" id="invite-qr">${icon('ti-qrcode')} QR code</button><button class="btn btn-ghost liquid-interactive motion-card dialog-close">${icon('ti-check')} Done</button></div>
+    <div class="small-note" style="margin-top:10px;">${inviteExpiryLabel(SQUAD.inviteExpiresAt)} · Code ${escapeHtml(SQUAD.code)}</div>
+  </div>`;
+  document.body.appendChild(wrap);
+  const close=()=>wrap.remove();
+  wrap.addEventListener('click',e=>{if(e.target===wrap||e.target.closest('.dialog-close'))close();});
+  wrap.querySelector('#invite-copy').onclick=()=>navigator.clipboard?.writeText(link).then(()=>showToast('Invite link copied','ti-copy'));
+  wrap.querySelector('#invite-share').onclick=async()=>{try{if(navigator.share) await navigator.share({title:`Join ${SQUAD.name}`,text:g.tagline||'Join my SquadZync group',url:link}); else await navigator.clipboard?.writeText(link); showToast(navigator.share?'Invite shared':'Invite link copied','ti-share-3')}catch(e){}};
+  wrap.querySelector('#invite-qr').onclick=()=>openQrDialog(link,SQUAD.name);
+  initLiquidInteractions(); initMotionCards();
+}
+function openQrDialog(link,title){
+  const wrap=document.createElement('div'); wrap.className='dialog-backdrop';
+  wrap.innerHTML=`<div class="dialog glass-strong liquid-interactive motion-card" style="max-width:330px;width:calc(100% - 32px);padding:18px;text-align:center;"><div class="dialog-header"><div><div class="field-label" style="margin:0;">Scan to join</div><h3>${escapeHtml(title)}</h3></div><button class="icon-btn dialog-close">${icon('ti-x')}</button></div><div class="qr-shell glass liquid-interactive motion-card"><img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(link)}" alt="Invite QR code"></div><div class="small-note" style="margin-top:10px;">${escapeHtml(link)}</div></div>`;
+  document.body.appendChild(wrap); wrap.addEventListener('click',e=>{if(e.target===wrap||e.target.closest('.dialog-close'))wrap.remove();}); initLiquidInteractions(); initMotionCards();
+}
 function renderGroupSettings(){
-  const cap=SQUAD.maxMembers||6; const g=Object.assign({tagline:'',description:'',logo:'',logoUrl:'',bannerUrl:'',accent:'#7C9CFF',accent2:'#9B7CFF',background:'#0B0E1A',mode:'liquid',radius:18,motion:'ambient',density:'comfortable',showMemberCount:true,showStatusGlow:true},SQUAD.groupStyle||{});
-  const sw=(label,id,value,type='text',extra='')=>`<div class="field"><label class="field-label">${label}</label><input type="${type}" id="${id}" value="${escapeHtml(String(value||''))}" ${extra}></div>`;
-  return `<div class="screen group-theme-card"><div class="page-title-row">${backBtn('group-settings-back')}<h2>Group studio</h2></div><p class="small-note" style="margin:8px 0 20px 48px;">Group-level identity and visual settings sync to everyone.</p>
-  <div class="glass liquid-sheen group-identity" style="padding:16px;margin-bottom:14px;background:${g.bannerUrl?`linear-gradient(180deg,rgba(8,10,18,.1),rgba(8,10,18,.8)),url('${escapeHtml(g.bannerUrl)}') center/cover`:'linear-gradient(135deg,rgba(124,156,255,.18),rgba(155,124,255,.10))'};"><div style="display:flex;align-items:center;gap:12px;"><div class="avatar" style="width:58px;height:58px;font-size:23px;background:linear-gradient(135deg,${g.accent},${g.accent2});">${g.logoUrl?`<img src="${escapeHtml(g.logoUrl)}" alt="">`:escapeHtml(g.logo||'✦')}</div><div style="min-width:0;"><div style="font-size:19px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(SQUAD.name)}</div><div style="color:var(--text-lo);font-size:12px;margin-top:3px;">${escapeHtml(g.tagline||'Your squad, your space')}</div></div></div></div>
+  const cap=SQUAD.maxMembers||6, g=Object.assign(defaultGroupStyle(),SQUAD.groupStyle||{});
+  const sw=(label,id,value,type='text',extra='')=>`<div class="field"><label class="field-label">${label}</label><input type="${type}" id="${id}" value="${escapeHtml(String(value??''))}" ${extra}></div>`;
+  const bg=[['aurora','Aurora'],['midnight','Midnight'],['nebula','Nebula'],['emerald','Emerald'],['rose','Rose'],['amber','Amber']];
+  const achievements=groupAchievements();
+  return `<div class="screen group-theme-card"><div class="page-title-row">${backBtn('group-settings-back')}<h2>Group studio</h2></div>
+  <p class="small-note" style="margin:8px 0 20px 48px;">Build the identity of this squad. These settings sync to everyone.</p>
+  <div class="glass-strong liquid-sheen liquid-interactive motion-card group-identity" style="padding:0;overflow:hidden;margin-bottom:14px;background:var(--group-background);">
+    ${g.bannerVideoUrl?`<video src="${escapeHtml(g.bannerVideoUrl)}" autoplay muted loop playsinline style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.34;"></video>`:''}
+    ${g.bannerUrl&&!g.bannerVideoUrl?`<div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(8,10,18,.05),rgba(8,10,18,.8)),url('${escapeHtml(g.bannerUrl)}') center/cover;"></div>`:''}
+    <div style="position:relative;z-index:1;padding:18px;"><div style="display:flex;align-items:center;gap:12px;">${groupMarkHtml(g,64)}<div style="min-width:0;flex:1;"><div class="field-label" style="margin:0;">Group identity</div><div style="font-size:21px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(SQUAD.name)}</div><div style="color:var(--text-lo);font-size:12px;margin-top:3px;">${escapeHtml(g.tagline||'Your squad, your space')}</div></div><div class="xp-badge">Level ${groupLevel()}</div></div>
+    <div class="group-stat-row"><div class="group-stat"><strong>${groupMemberCount()}/${cap}</strong><span>Members</span></div><div class="group-stat"><strong>${groupXpValue()}</strong><span>Squad XP</span></div><div class="group-stat"><strong>${groupStreak()}</strong><span>Day streak</span></div></div></div>
+  </div>
+
   <div class="section-label">Identity</div>${sw('Squad name','gs-name',SQUAD.name,'text','maxlength="28"')}${sw('Tagline','gs-tagline',g.tagline,'text','maxlength="60"')}
   <div class="field"><label class="field-label">Description</label><textarea id="gs-description" maxlength="220" rows="3" placeholder="What is this squad about?">${escapeHtml(g.description||'')}</textarea></div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">${sw('Logo emoji','gs-logo',g.logo,'text','maxlength="4" placeholder="✦"')}${sw('Logo image URL','gs-logo-url',g.logoUrl,'url','placeholder="https://..."')}</div>${sw('Banner image URL','gs-banner-url',g.bannerUrl,'url','placeholder="https://..."')}
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">${sw('Logo emoji','gs-logo',g.logo,'text','maxlength="4" placeholder="✦"')}${sw('Logo image URL','gs-logo-url',g.logoUrl,'url','placeholder="https://..."')}</div>
+  ${sw('Banner image URL','gs-banner-url',g.bannerUrl,'url','placeholder="https://.../banner.jpg"')}${sw('Banner video URL','gs-banner-video-url',g.bannerVideoUrl,'url','placeholder="https://.../banner.mp4"')}
+  <button class="btn btn-ghost btn-block liquid-interactive motion-card" id="gs-generate-palette" style="padding:12px;">${icon('ti-palette')} Generate palette from logo</button>
+
+  <div class="section-label">Group progression</div><div class="glass xp-rule liquid-interactive motion-card"><div><strong>Squad Level ${groupLevel()}</strong><div class="small-note">${groupXpValue()} / ${groupNextLevelXp()} XP</div></div><span class="xp-reward">${Math.round(groupProgress()*100)}%</span></div>
+  <div class="group-achievements" style="margin-bottom:10px;">${(achievements.length?achievements:[{icon:'ti-sparkles',label:'New squad'}]).map(x=>`<span class="group-achievement"><span class="ti">${icon(x.icon)}</span>${x.label}</span>`).join('')}</div>
+
+  <div class="section-label">Invites</div><div class="glass liquid-interactive motion-card" style="padding:14px 15px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;"><div><div style="font-size:13px;font-weight:800;">${escapeHtml(SQUAD.code)}</div><div class="small-note">${inviteExpiryLabel(SQUAD.inviteExpiresAt)}</div></div><button class="icon-btn liquid-interactive motion-card" id="gs-copy-invite">${icon('ti-copy')}</button></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"><button class="btn btn-ghost liquid-interactive motion-card" id="gs-share-invite">${icon('ti-share-3')} Share link</button><button class="btn btn-ghost liquid-interactive motion-card" id="gs-qr-invite">${icon('ti-qrcode')} QR</button></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;"><select class="control-select" id="gs-invite-expiry"><option value="0">Never expires</option><option value="3600000">1 hour</option><option value="86400000">24 hours</option><option value="604800000">7 days</option></select><button class="btn btn-ghost liquid-interactive motion-card" id="gs-regenerate-invite">${icon('ti-refresh')} Regenerate</button></div>
+    <div class="small-note" style="margin-top:8px;">Invite creation and regeneration are restricted to users with group-settings permission.</div>
+  </div>
+
   <div class="section-label">Membership</div><div class="field"><label class="field-label">Member limit — <span id="gs-cap-value" style="color:var(--accent);">${cap}</span></label><input type="range" id="gs-cap" min="2" max="15" value="${cap}" style="width:100%;accent-color:var(--accent);"><div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-faint);margin-top:4px;"><span>2</span><span>15</span></div></div>
-  <div class="glass" style="padding:14px 16px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;margin-bottom:12px;" id="gs-locked-toggle"><div style="display:flex;align-items:center;gap:10px;">${icon('ti-lock')}<div><div style="font-size:14px;font-weight:700;">Require approval to join</div><div style="font-size:11.5px;color:var(--text-lo);">New joins wait for an admin</div></div></div><span class="ti" id="gs-locked-icon" style="font-size:24px;color:${SQUAD.locked?'var(--accent)':'var(--text-faint)'};">${icon(SQUAD.locked?'ti-toggle-right':'ti-toggle-left')}</span></div>
-  <div class="section-label">Visual system</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">${sw('Accent','gs-accent',g.accent,'text','type="color"')}${sw('Accent 2','gs-accent2',g.accent2,'text','type="color"')}</div>${sw('Background','gs-background',g.background,'text','type="color"')}
+  <div class="glass liquid-interactive motion-card" style="padding:14px 16px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;margin-bottom:12px;" id="gs-locked-toggle"><div style="display:flex;align-items:center;gap:10px;">${icon('ti-lock')}<div><div style="font-size:14px;font-weight:700;">Require approval to join</div><div style="font-size:11.5px;color:var(--text-lo);">New joins wait for an admin</div></div></div><span class="ti" id="gs-locked-icon" style="font-size:24px;color:${SQUAD.locked?'var(--accent)':'var(--text-faint)'};">${icon(SQUAD.locked?'ti-toggle-right':'ti-toggle-left')}</span></div>
+
+  <div class="section-label">Visual system</div><div class="field"><label class="field-label">Background preset</label><select class="control-select" id="gs-bg-preset">${bg.map(([v,l])=>`<option value="${v}" ${g.backgroundPreset===v?'selected':''}>${l}</option>`).join('')}</select></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">${sw('Accent','gs-accent',g.accent,'text','type="color"')}${sw('Accent 2','gs-accent2',g.accent2,'text','type="color"')}</div>${sw('Background','gs-background',g.background,'text','type="color"')}
   <div class="field"><label class="field-label">Surface</label><select class="control-select" id="gs-mode"><option value="liquid" ${g.mode==='liquid'?'selected':''}>Liquid glass</option><option value="crystal" ${g.mode==='crystal'?'selected':''}>Crystal glass</option></select></div>
   <div class="field"><label class="field-label">Corner radius — <span id="gs-radius-value" style="color:var(--accent);">${g.radius}px</span></label><input type="range" id="gs-radius" min="10" max="34" value="${g.radius}" style="width:100%;accent-color:var(--accent);"></div>
   <div class="field"><label class="field-label">Ambient motion</label><select class="control-select" id="gs-motion"><option value="ambient" ${g.motion==='ambient'?'selected':''}>Ambient + parallax</option><option value="waves" ${g.motion==='waves'?'selected':''}>Slow waves</option><option value="minimal" ${g.motion==='minimal'?'selected':''}>Minimal</option></select></div>
-  <div class="stack"><div class="glass" style="padding:13px 15px;display:flex;align-items:center;justify-content:space-between;"><span style="font-size:13px;font-weight:600;">Glow status rings</span><input type="checkbox" id="gs-status-glow" ${g.showStatusGlow!==false?'checked':''}></div><div class="glass" style="padding:13px 15px;display:flex;align-items:center;justify-content:space-between;"><span style="font-size:13px;font-weight:600;">Show member count</span><input type="checkbox" id="gs-member-count" ${g.showMemberCount!==false?'checked':''}></div></div>
-  <button class="btn btn-primary btn-block" id="gs-save" style="padding:15px;margin-top:18px;">Save group design</button>${can(ME.id,'manageRoles')?`<button class="btn btn-ghost btn-block" id="go-roles" style="padding:13px;margin-top:10px;">${icon('ti-shield')} Manage roles &amp; permissions</button>`:''}
+  <div class="field"><label class="field-label">Notification style</label><select class="control-select" id="gs-notification"><option value="glass" ${g.notificationStyle==='glass'?'selected':''}>Glass</option><option value="minimal" ${g.notificationStyle==='minimal'?'selected':''}>Minimal</option><option value="cinematic" ${g.notificationStyle==='cinematic'?'selected':''}>Cinematic</option></select></div>
+  <div class="field"><label class="field-label">Sound pack</label><select class="control-select" id="gs-sound"><option value="off" ${g.soundPack==='off'?'selected':''}>Off</option><option value="subtle" ${g.soundPack==='subtle'?'selected':''}>Subtle</option><option value="full" ${g.soundPack==='full'?'selected':''}>Full</option></select></div>
+  <div class="stack"><div class="glass liquid-interactive motion-card" style="padding:13px 15px;display:flex;align-items:center;justify-content:space-between;"><span style="font-size:13px;font-weight:600;">Ambient particles</span><input type="checkbox" id="gs-particles" ${g.ambientParticles!==false?'checked':''}></div><div class="glass liquid-interactive motion-card" style="padding:13px 15px;display:flex;align-items:center;justify-content:space-between;"><span style="font-size:13px;font-weight:600;">Glow status rings</span><input type="checkbox" id="gs-status-glow" ${g.showStatusGlow!==false?'checked':''}></div><div class="glass liquid-interactive motion-card" style="padding:13px 15px;display:flex;align-items:center;justify-content:space-between;"><span style="font-size:13px;font-weight:600;">Show member count</span><input type="checkbox" id="gs-member-count" ${g.showMemberCount!==false?'checked':''}></div></div>
+  <button class="btn btn-primary btn-block liquid-interactive motion-card" id="gs-save" style="padding:15px;margin-top:18px;">${icon('ti-check')} Save group design</button>${can(ME.id,'manageRoles')?`<button class="btn btn-ghost btn-block liquid-interactive motion-card" id="go-roles" style="padding:13px;margin-top:10px;">${icon('ti-shield')} Manage roles &amp; permissions</button>`:''}
   </div>`;
 }
 
@@ -2458,27 +2725,12 @@ async function initWatchPlayer(room){
     host.innerHTML=`<iframe src="${escapeHtml(source.url)}" style="width:100%;height:100%;border:0;background:#05070d;" allow="autoplay; fullscreen; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin"></iframe>`;
     watchPlayer.type='iframe'; watchPlayer.instance=host.querySelector('iframe');
   }
-  watchPlayer.timer=setInterval(()=>reconcileWatchPlayer(SQUAD?.watchParty),1500);
+  watchPlayer.timer=setInterval(()=>reconcileWatchPlayer(SQUAD?.watchParty),900);
 }
 async function reconcileWatchPlayer(room){
-  if(!room || watchPlayer.roomId!==room.startedAt || !watchPlayer.instance || watchPlayer.type==='iframe') return;
-  const target=estimateWatchPosition(room);
-  const cur=watchPlayerPosition();
-  const delta=target-cur;
-  watchPlayer.applying=true;
-  try{
-    if(watchPlayer.type==='youtube'){
-      if(Math.abs(delta)>1.5) watchPlayer.instance.seekTo(target,true);
-      const state=watchPlayer.instance.getPlayerState();
-      if(room.playing && state!==YT.PlayerState.PLAYING) watchPlayer.instance.playVideo();
-      if(!room.playing && state===YT.PlayerState.PLAYING) watchPlayer.instance.pauseVideo();
-    }else if(watchPlayer.type==='video'){
-      if(Math.abs(delta)>1.25) watchPlayer.instance.currentTime=target;
-      if(room.playing && watchPlayer.instance.paused) await watchPlayer.instance.play().catch(()=>{});
-      if(!room.playing && !watchPlayer.instance.paused) watchPlayer.instance.pause();
-    }
-  }catch(e){} finally{ setTimeout(()=>watchPlayer.applying=false,80); }
-}
+  if(!room||watchPlayer.roomId!==room.startedAt||!watchPlayer.instance||watchPlayer.type==='iframe')return;const target=estimateWatchPosition(room),cur=watchPlayerPosition(),delta=target-cur,hard=Math.abs(delta)>2.25,soft=Math.abs(delta)>0.65;watchPlayer.applying=true;try{if(watchPlayer.type==='youtube'){if(hard)watchPlayer.instance.seekTo(target,true);const state=watchPlayer.instance.getPlayerState();if(room.playing&&state!==YT.PlayerState.PLAYING){try{await watchPlayer.instance.playVideo()}catch(e){room.autoplayBlocked=true}}if(!room.playing&&state===YT.PlayerState.PLAYING)watchPlayer.instance.pauseVideo()}else if(watchPlayer.type==='video'){if(hard)watchPlayer.instance.currentTime=target;if(room.playing&&watchPlayer.instance.paused){try{await watchPlayer.instance.play()}catch(e){room.autoplayBlocked=true}}if(!room.playing&&!watchPlayer.instance.paused)watchPlayer.instance.pause()}if(typeof window.updateWatchSyncBadge==='function')window.updateWatchSyncBadge(soft?'resyncing':'synced',Math.abs(delta))}catch(e){if(typeof window.updateWatchSyncBadge==='function')window.updateWatchSyncBadge('error',Math.abs(delta))}finally{setTimeout(()=>watchPlayer.applying=false,120)}}
+
+window.updateWatchSyncBadge=(state,drift=0)=>{const el=document.getElementById('watch-sync-badge');if(!el)return;el.textContent=state==='synced'?'SYNCED':state==='resyncing'?`RESYNCING · ${Math.abs(drift).toFixed(2)}s`:state==='error'?'SYNC ERROR':'SYNCING…'};
 
 function renderTvBoard(){
   const room=SQUAD.watchParty;
@@ -2493,7 +2745,7 @@ function renderTvBoard(){
   const position=Math.floor(estimateWatchPosition(room));
   const mm=String(Math.floor(position/60)).padStart(2,'0'), ss=String(position%60).padStart(2,'0');
   return `<div class="screen" id="tv-board-screen"><div class="page-title-row">${backBtn('tv-board-back')}<h2>TVBox</h2><button class="icon-btn" id="tvbox-fullscreen" style="margin-left:auto;">${icon('ti-maximize')}</button></div>
-  <div class="glass-strong liquid-sheen watch-hero" style="padding:14px;margin-bottom:12px;"><div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;"><span class="ti" style="font-size:22px;color:${svc.color};">${icon(svc.icon)}</span><div style="min-width:0;flex:1;"><div style="font-weight:800;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(room.title||svc.label)}</div><div style="font-size:11.5px;color:var(--text-lo);">${room.playing?'Live now':'Paused'} · ${watcherList.length} watching</div></div></div>
+  <div class="glass-strong liquid-sheen watch-hero" style="padding:14px;margin-bottom:12px;"><div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;"><span class="ti" style="font-size:22px;color:${svc.color};">${icon(svc.icon)}</span><div style="min-width:0;flex:1;"><div style="font-weight:800;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(room.title||svc.label)}</div><div style="font-size:11.5px;color:var(--text-lo);display:flex;gap:7px;align-items:center;">${room.playing?'Live now':'Paused'} · ${watcherList.length} watching <span id="watch-sync-badge" style="padding:3px 6px;border-radius:999px;background:rgba(255,255,255,.05);border:1px solid var(--glass-border);font-size:8px;font-weight:800;color:var(--green);">SYNCED</span></div></div></div>
   <div id="watch-player-shell" style="aspect-ratio:16/9;border-radius:18px;overflow:hidden;background:#05070d;border:1px solid rgba(255,255,255,.11);position:relative;"><div id="watch-player-host" style="width:100%;height:100%;"></div>${protectedMode?`<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:26px;background:radial-gradient(circle at 50% 30%,rgba(255,255,255,.08),transparent 55%),rgba(5,7,13,.96);"><div class="brand-mark" style="width:54px;height:54px;border-radius:18px;margin-bottom:12px;">${icon('ti-device-tv-play')}</div><div style="font-weight:800;font-size:16px;">${svc.label} is protected</div><div style="font-size:12px;line-height:1.5;color:var(--text-lo);max-width:300px;margin-top:6px;">The service does not allow its protected player to be embedded here. The room can still synchronize the session state, but each member must play the title in the provider.</div><a href="${escapeHtml(room.link)}" target="_blank" rel="noopener" class="btn btn-primary" style="margin-top:14px;padding:11px 15px;">Open ${svc.label}</a></div>`:''}</div>
   <div style="display:flex;align-items:center;gap:8px;margin-top:10px;"><span class="glass" style="padding:7px 10px;font-size:11px;font-weight:700;">${mm}:${ss}</span><div style="flex:1;height:5px;background:rgba(255,255,255,.08);border-radius:99px;overflow:hidden;"><div style="width:${Math.min(100,Math.max(4,(position%600)/6))}%;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-2));"></div></div><span style="font-size:10px;color:var(--text-faint);">${source.type==='youtube'?'YouTube sync':source.type==='video'?'Direct sync':'Room sync'}</span></div></div>
   ${room.link?`<div style="display:flex;gap:8px;margin-bottom:14px;"><a href="${escapeHtml(room.link)}" target="_blank" rel="noopener" class="btn btn-ghost" style="flex:1;padding:12px;">${icon('ti-device-tv-play')} Open source</a>${iAmHost?`<button class="btn btn-ghost" id="watch-sync-now" style="padding:12px;">${icon('ti-refresh')} Sync</button>`:''}</div>`:''}
@@ -2627,68 +2879,32 @@ function renderTriviaGame(){
 // Honest limitation: this app has no audio/video/WebRTC backend, so a
 // "call" here is a live, shared presence list (who's in the call) rather
 // than actual voice/video — it's the coordination layer, not the pipe.
+function socialText(t){return escapeHtml(t||'').replace(/(^|\s)@([A-Za-z0-9_ -]{1,32})/g,(m,p,n)=>p+'<span class="mention">@'+n.trim()+'</span>');}
 function renderMessages(){
-  const call = SQUAD.activeCall;
-  const inCall = call && call.participants && call.participants[ME.id];
-  const msgs = (CHAT || []).slice().sort((a,b)=>a.ts-b.ts);
-
-  const callBanner = call && call.active ? `
-    <div class="glass-strong" style="padding:14px 16px; margin-bottom:14px; display:flex; align-items:center; gap:12px;">
-      <span class="ti" style="font-size:20px; color:var(--green);">${icon('ti-phone-incoming')}</span>
-      <div style="flex:1; min-width:0;">
-        <div style="font-weight:700; font-size:13.5px;">Call in progress</div>
-        <div style="font-size:11.5px; color:var(--text-lo);">${Object.values(call.participants||{}).map(p=>p.name.split(' ')[0]).join(', ') || 'No one yet'}</div>
-      </div>
-      ${inCall ? `<button class="btn btn-ghost" id="call-leave-btn" style="padding:9px 14px; font-size:12.5px; color:var(--red); border-color:rgba(248,113,113,0.3);">Leave</button>` : `<button class="btn btn-primary" id="call-join-btn" style="padding:9px 14px; font-size:12.5px;">Join</button>`}
-    </div>` : '';
-
-  const bubbles = msgs.length ? msgs.map(m => {
-    const mine = m.authorId === ME.id;
-    return `
-    <div style="display:flex; ${mine?'justify-content:flex-end;':''} margin-bottom:10px;">
-      <div style="max-width:78%;">
-        ${!mine ? `<div style="font-size:11px; color:var(--text-faint); margin:0 0 3px 4px;">${escapeHtml(m.authorName.split(' ')[0])}</div>` : ''}
-        <div class="glass" style="padding:10px 13px; border-radius:16px; position:relative; ${mine?'background:var(--accent-soft); border-color:var(--accent);':''}">
-          <div style="font-size:13.5px; line-height:1.4; overflow-wrap:break-word; padding-right:${(mine||can(ME.id,'manageMembers'))?'22px':'0'}">${escapeHtml(m.text)}</div>
-          ${(mine||can(ME.id,'manageMembers'))?`<button class="icon-btn" data-delete-chat="${escapeHtml(m.id)}" title="Remove message" style="position:absolute;right:5px;top:5px;width:22px;height:22px;color:var(--red);border:none;background:transparent;">${icon('ti-trash')}</button>`:''}
-        </div>
-        <div style="font-size:10px; color:var(--text-faint); margin:3px 4px 0; text-align:${mine?'right':'left'};">${timeAgo(m.ts)}</div>
-      </div>
-    </div>`;
-  }).join('') : `<div class="empty-hint glass">No messages yet. Say hi!</div>`;
-
-  return `
-    <div class="screen" style="padding-bottom:90px;">
-      <div class="top-row">
-        <div class="page-title-row" style="margin:0;">${backBtn('messages-back')}<h2>Messages</h2></div>
-        ${!call || !call.active ? `<div class="icon-btn" id="call-start-btn" title="Start a call"><span class="ti">${icon('ti-phone')}</span></div>` : ''}
-      </div>
-      ${callBanner}
-      <div id="chat-scroll" style="margin-top:10px;">${bubbles}</div>
-    </div>
-    <div class="glass" style="position:fixed; bottom:calc(10px + env(safe-area-inset-bottom)); left:0; right:0; max-width:480px; margin:0 auto; padding:10px; display:flex; gap:8px; z-index:70;">
-      <input type="text" id="chat-input" placeholder="Message the squad\u2026" maxlength="500" style="flex:1; margin:0;">
-      <div class="icon-btn" id="chat-send-btn" style="flex-shrink:0;"><span class="ti">${icon('ti-send')}</span></div>
-    </div>
-  `;
+ const call=SQUAD.activeCall,inCall=call&&call.participants&&call.participants[ME.id],msgs=(CHAT||[]).slice().sort((a,b)=>a.ts-b.ts);
+ const bubbles=msgs.length?msgs.map(m=>{const mine=m.authorId===ME.id,reply=m.replyTo?(CHAT||[]).find(x=>x.id===m.replyTo):null;const tc=Object.values(CHAT_THREADS||{}).filter(t=>t.parentId===m.id).length;return `<div style="display:flex;${mine?'justify-content:flex-end;':''}margin-bottom:13px"><div style="max-width:82%"><div class="glass liquid-interactive motion-card" style="padding:10px 13px;border-radius:16px;position:relative;${mine?'background:var(--accent-soft);':''}">${m.pinned?'<span class="pin-mark">'+icon('ti-pin')+'</span>':''}${!mine?'<div style="font-size:11px;color:var(--text-faint);margin-bottom:3px">'+escapeHtml(m.authorName.split(' ')[0])+'</div>':''}${reply?'<div class="reply-preview">↳ '+escapeHtml(reply.authorName.split(' ')[0])+': '+escapeHtml(reply.text.slice(0,80))+'</div>':''}<div style="font-size:13.5px;line-height:1.45">${socialText(m.text)}</div><div class="message-actions"><button class="message-action" data-chat-reply="${m.id}">Reply</button><button class="message-action" data-chat-react="${m.id}">React</button><button class="message-action" data-chat-pin="${m.id}">${m.pinned?'Unpin':'Pin'}</button>${tc?'<button class="message-action" data-chat-thread="'+m.id+'">'+tc+' replies</button>':''}</div></div><div style="font-size:10px;color:var(--text-faint);margin:3px 4px;text-align:${mine?'right':'left'}">${timeAgo(m.ts)}</div></div></div>`}).join(''):'<div class="empty-hint glass liquid-interactive">No messages yet. Say hi!</div>';
+ return `<div class="screen" style="padding-bottom:112px"><div class="top-row"><div class="page-title-row" style="margin:0">${backBtn('messages-back')}<h2>Messages</h2></div>${!call||!call.active?'<div class="icon-btn liquid-interactive" id="call-start-btn">'+icon('ti-phone')+'</div>':''}</div>${call&&call.active?'<div class="glass-strong" style="padding:14px;margin-bottom:12px">Call in progress '+(inCall?'<button class="btn btn-ghost" id="call-leave-btn">Leave</button>':'<button class="btn btn-primary" id="call-join-btn">Join</button>')+'</div>':''}<div id="chat-scroll">${bubbles}</div><div class="glass liquid-interactive motion-card" style="position:fixed;bottom:10px;left:10px;right:10px;max-width:460px;margin:auto;padding:10px;z-index:70"><input id="chat-input" type="text" placeholder="Message the squad… Use @ to mention" maxlength="500"><div id="mention-picker" class="mention-picker hidden"></div><div class="social-compose-tools"><button class="social-mini-btn" id="chat-poll-btn">▣ Poll</button><button class="social-mini-btn" id="chat-thread-btn">↩ Reply</button><button class="btn btn-primary" id="chat-send-btn" style="margin-left:auto;padding:7px 13px;font-size:12px">Send</button></div></div></div>`;
 }
-
 async function deleteChatMessage(id){
+  if(viewerBlocked('Sign in to delete messages')) return;
   const msg=(CHAT||[]).find(m=>m.id===id);
   if(!msg || !SQUAD) return;
   if(msg.authorId!==ME.id && !can(ME.id,'manageMembers')) return showToast('You cannot remove this message','ti-ban');
   try{ await window.fbSet('chats/' + SQUAD.id + '/' + id, null); showToast('Message removed','ti-trash'); }
   catch(e){ showToast('Could not remove message','ti-alert-triangle'); }
 }
-async function sendChatMessage(text){
+async function sendChatMessage(text,replyTo=null){
+  if(viewerBlocked('Sign in to send squad messages')) return;
   if(!text || !text.trim() || !SQUAD) return;
   const id = 'msg_' + Date.now() + '_' + Math.floor(Math.random()*1000);
   try{
-    await window.fbSet('chats/' + SQUAD.id + '/' + id, { id, text: text.trim(), authorId: ME.id, authorName: ME.name, ts: Date.now() });
+    await window.fbSet('chats/' + SQUAD.id + '/' + id, { id, text: text.trim(), authorId: ME.id, authorName: ME.name, replyTo, ts: Date.now(), reactions:{} });
+    incrementMission('messages',1); syncCompletedMissions(); await saveMe();
   }catch(e){ showToast('Could not send \u2014 check connection', 'ti-alert-triangle'); }
 }
 
 async function startCall(){
+  if(viewerBlocked('Sign in to start a call')) return;
   if(!SQUAD) return;
   SQUAD.activeCall = { active: true, startedBy: ME.id, startedByName: ME.name, ts: Date.now(), participants: { [ME.id]: { id: ME.id, name: ME.name, ts: Date.now() } } };
   SQUAD.updatedAt = Date.now();
@@ -2698,6 +2914,7 @@ async function startCall(){
   showToast('Call started \u2014 squad notified', 'ti-phone');
 }
 async function joinCall(){
+  if(viewerBlocked('Sign in to join the call')) return;
   if(!SQUAD.activeCall) return;
   if(!SQUAD.activeCall.participants) SQUAD.activeCall.participants = {};
   SQUAD.activeCall.participants[ME.id] = { id: ME.id, name: ME.name, ts: Date.now() };
@@ -2706,6 +2923,7 @@ async function joinCall(){
   softUpdate();
 }
 async function leaveCall(){
+  if(viewerBlocked('Sign in to leave the call')) return;
   if(!SQUAD.activeCall || !SQUAD.activeCall.participants) return;
   delete SQUAD.activeCall.participants[ME.id];
   const remaining = Object.keys(SQUAD.activeCall.participants).length;
@@ -2721,43 +2939,11 @@ async function leaveCall(){
 const REACTION_EMOJIS = ['👍','❤️','😂','🎉','😮','🙌'];
 
 function renderBoard(){
-  const notes = (BOARD || []).slice().sort((a,b)=>b.ts-a.ts);
-  const body = notes.length ? `<div class="board-grid">${notes.map(n=>{
-    const author = SQUAD.members.find(m=>m.id===n.authorId);
-    const reactions = n.reactions || {};
-    // Tally reactions by emoji so multiple people reacting the same way collapse into one chip with a count.
-    const tally = {};
-    Object.entries(reactions).forEach(([uid, emoji]) => { if(!tally[emoji]) tally[emoji] = []; tally[emoji].push(uid); });
-    const chips = Object.entries(tally).map(([emoji, uids]) => {
-      const mine = uids.includes(ME.id);
-      return `<div class="reaction-chip ${mine?'mine':''}" data-note="${n.id}" data-emoji="${emoji}">${emoji} ${uids.length}</div>`;
-    }).join('');
-    return `
-    <div class="board-note glass" data-board-note="${escapeHtml(n.id)}">
-      ${((n.authorId===ME.id)||can(ME.id,'pinNotes')) ? `<button class="icon-btn" data-delete-board-note="${escapeHtml(n.id)}" title="${can(ME.id,'pinNotes')?'Remove note':'Remove your note'}" style="position:absolute;right:8px;top:8px;width:30px;height:30px;color:var(--red);">${icon('ti-trash')}</button>` : ''}
-      <div class="board-note-text" style="padding-right:28px;">${escapeHtml(n.text)}</div>
-      <div class="board-note-meta">
-        <div class="avatar">${author && author.photo ? `<img src="${author.photo}" alt="">` : getInitials(n.authorName)}</div>
-        <span>${n.authorName.split(' ')[0]} · ${timeAgo(n.ts)}</span>
-      </div>
-      <div class="reaction-row">
-        ${chips}
-        <div class="reaction-add" data-note-picker="${n.id}"><span class="ti">${icon('ti-mood-plus')}</span></div>
-      </div>
-    </div>`;
-  }).join('')}</div>` : `<div class="empty-hint glass">No notes yet. Tap + to pin one for the squad.</div>`;
-
-  return `
-    <div class="screen">
-      <div class="top-row">
-        <div class="page-title-row" style="margin:0;"><h2>Team board</h2></div>
-      </div>
-      <p class="small-note" style="margin-bottom:18px;">Shared with everyone in ${SQUAD.name}. Great for reminders, plans, or a running joke.</p>
-      ${body}
-    </div>
-    <div class="fab" id="add-board-note"><span class="ti">${icon('ti-plus')}</span></div>
-    ${renderNav('board')}
-  `;
+ const notes=(BOARD||[]).slice().sort((a,b)=>b.ts-a.ts);
+ const noteHtml=notes.map(n=>{const r=n.reactions||{},tally={};Object.entries(r).forEach(([u,e])=>(tally[e]??=[]).push(u));const chips=Object.entries(tally).map(([e,u])=>`<button class="reaction-chip ${u.includes(ME.id)?'mine':''}" data-note="${n.id}" data-emoji="${e}">${e} ${u.length}</button>`).join('');return `<div class="board-note glass liquid-interactive motion-card" style="position:relative">${n.pinned?'<span class="pin-mark">'+icon('ti-pin')+'</span>':''}<div class="board-note-text">${socialText(n.text)}</div><div class="board-note-meta"><div class="avatar">${getInitials(n.authorName)}</div><span>${escapeHtml(n.authorName.split(' ')[0])} · ${timeAgo(n.ts)}</span></div><div class="reaction-row">${chips}<button class="reaction-add" data-note-picker="${n.id}">${icon('ti-mood-plus')}</button></div><div style="display:flex;gap:6px;margin-top:8px"><button class="message-action" data-note-pin="${n.id}">${n.pinned?'Unpin':'Pin'}</button><button class="message-action" data-note-thread="${n.id}">Reply</button></div></div>`}).join('');
+ const polls=(POLLS||[]).map(p=>{const v=p.votes||{},cnt={};Object.values(v).forEach(x=>cnt[x]=(cnt[x]||0)+1);const total=Object.keys(v).length;return `<div class="poll-card glass liquid-interactive motion-card"><b>${escapeHtml(p.question)}</b>${(p.options||[]).map((o,i)=>{const c=cnt[i]||0,pct=total?Math.round(c/total*100):0;return `<div class="poll-option" data-poll="${p.id}" data-poll-option="${i}"><div class="poll-option-fill" style="width:${pct}%"></div><div class="poll-option-inner"><span>${escapeHtml(o)}</span><span class="poll-count">${pct}% · ${c}</span></div></div>`}).join('')}</div>`}).join('')||'<div class="empty-hint glass">No polls yet.</div>';
+ const tasks=(TASKS||[]).map(t=>`<div class="task-card glass liquid-interactive motion-card"><div class="task-row"><button class="task-check ${t.done?'done':''}" data-task-toggle="${t.id}">${t.done?icon('ti-check'):''}</button><div class="task-title" style="${t.done?'text-decoration:line-through;color:var(--text-faint)':''}">${escapeHtml(t.title)}<div class="task-meta">${t.xp?`+${t.xp} XP`:''}</div></div></div></div>`).join('')||'<div class="empty-hint glass">No shared tasks yet.</div>';
+ return `<div class="screen"><div class="page-title-row"><h2>Team board</h2></div><p class="small-note" style="margin-bottom:18px">Notes, polls and shared tasks for ${escapeHtml(SQUAD.name)}.</p><div class="social-tabs"><div class="social-tab-pill" id="board-tab-pill"></div><button class="social-tab active" data-board-tab="notes">Notes</button><button class="social-tab" data-board-tab="polls">Polls</button><button class="social-tab" data-board-tab="tasks">Tasks</button></div><div style="display:flex;gap:7px;margin:-4px 0 14px"><button class="social-mini-btn" id="board-add-poll">+ Poll</button><button class="social-mini-btn" id="board-add-task">+ Task</button></div><div id="board-panel-notes">${noteHtml||'<div class="empty-hint glass">Your board is quiet.</div>'}</div><div id="board-panel-polls" class="hidden">${polls}</div><div id="board-panel-tasks" class="hidden">${tasks}</div></div><div class="fab liquid-interactive motion-card" id="add-board-note">${icon('ti-plus')}</div>${renderNav('board')}`;
 }
 function escapeHtml(s){
   const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML;
@@ -2765,7 +2951,32 @@ function escapeHtml(s){
 
 // Reactions are stored per-note as { [userId]: emoji } — one reaction per
 // person per note, tapping the same emoji again clears it.
+function openSocialPrompt(kind){
+ const wrap=document.createElement('div');wrap.className='sheet-backdrop';
+ wrap.innerHTML=kind==='poll'?`<div class="sheet"><div class="sheet-handle"></div><div class="sheet-title">Create a poll</div><div class="field"><input id="poll-q" placeholder="Where tonight?"></div><div class="field"><input id="poll-o1" placeholder="Pizza"><input id="poll-o2" placeholder="Burgers" style="margin-top:7px"><input id="poll-o3" placeholder="Home" style="margin-top:7px"></div><button class="btn btn-primary btn-block" id="poll-create">Create poll</button></div>`:
+  `<div class="sheet"><div class="sheet-handle"></div><div class="sheet-title">Shared task</div><div class="field"><input id="task-title" placeholder="Buy tickets"></div><div class="field"><select id="task-xp"><option value="0">No XP</option><option value="10">10 XP</option><option value="25">25 XP</option></select></div><button class="btn btn-primary btn-block" id="task-create">Add task</button></div>`;
+ mountSheet(wrap);
+ if(kind==='poll'){
+   byId('poll-create').onclick=async()=>{if(viewerBlocked('Sign in to create polls')) return;let q=byId('poll-q').value.trim(),o=[1,2,3].map(i=>byId('poll-o'+i).value.trim()).filter(Boolean);if(!q||o.length<2)return showToast('Add a question and two options','ti-alert-circle');let id='poll_'+Date.now();await fbSetSafe('polls/'+SQUAD.id+'/'+id,{id,question:q,options:o,authorId:ME.id,authorName:ME.name,ts:Date.now(),votes:{}});showToast('Poll created','ti-circle-check');};
+ }else{
+   byId('task-create').onclick=async()=>{if(viewerBlocked('Sign in to create tasks')) return;let title=byId('task-title').value.trim();if(!title)return;let id='task_'+Date.now();await fbSetSafe('tasks/'+SQUAD.id+'/'+id,{id,title,xp:Number(byId('task-xp').value)||0,authorId:ME.id,ts:Date.now(),done:false});showToast('Task added','ti-circle-check');};
+ }
+}
+async function fbSetSafe(path,val){try{await window.fbSet(path,val)}catch(e){showToast('Could not save — check connection','ti-alert-triangle')}}
+async function votePoll(id,i){
+  if(viewerBlocked('Sign in to vote in polls')) return;let p=(POLLS||[]).find(x=>x.id===id);if(!p)return;p.votes=p.votes||{};p.votes[ME.id]===i?delete p.votes[ME.id]:p.votes[ME.id]=i;await window.fbUpdate('polls/'+SQUAD.id+'/'+id,{votes:p.votes})}
+async function toggleTask(id){
+  if(viewerBlocked('Sign in to update shared tasks')) return;let t=(TASKS||[]).find(x=>x.id===id);if(!t)return;t.done=!t.done;await window.fbUpdate('tasks/'+SQUAD.id+'/'+id,{done:t.done,completedBy:t.done?ME.id:null,completedAt:t.done?Date.now():null})}
+async function toggleChatPin(id){
+  if(viewerBlocked('Sign in to pin messages')) return;let m=(CHAT||[]).find(x=>x.id===id);if(!m)return;m.pinned=!m.pinned;await window.fbUpdate('chats/'+SQUAD.id+'/'+id,{pinned:m.pinned})}
+async function reactToChat(id,e){
+  if(viewerBlocked('Sign in to react')) return;let m=(CHAT||[]).find(x=>x.id===id);if(!m)return;m.reactions=m.reactions||{};m.reactions[ME.id]===e?delete m.reactions[ME.id]:m.reactions[ME.id]=e;await window.fbUpdate('chats/'+SQUAD.id+'/'+id,{reactions:m.reactions});let b=document.createElement('div');b.className='reaction-burst';b.textContent=e;b.style.left='50%';b.style.top='40%';document.body.appendChild(b);setTimeout(()=>b.remove(),800)}
+function openChatReactionPicker(id,a){let box=document.createElement('div');box.className='glass reaction-picker';box.style.cssText='position:fixed;z-index:300;display:flex;gap:4px';let r=a.getBoundingClientRect();box.style.left=r.left+'px';box.style.top=(r.bottom+6)+'px';box.innerHTML=REACTION_EMOJIS.map(e=>`<button class="reaction-pick-opt" data-e="${e}">${e}</button>`).join('');document.body.appendChild(box);box.querySelectorAll('[data-e]').forEach(x=>x.onclick=async()=>{await reactToChat(id,x.dataset.e);box.remove()});setTimeout(()=>{const d=e=>{if(!box.contains(e.target)){box.remove();document.removeEventListener('pointerdown',d)}};document.addEventListener('pointerdown',d)},0)}
+function openChatThread(id){let m=(CHAT||[]).find(x=>x.id===id);if(!m)return;let wrap=document.createElement('div');wrap.className='sheet-backdrop';wrap.innerHTML=`<div class="sheet"><div class="sheet-handle"></div><div class="sheet-title">Thread</div><div class="reply-preview">${escapeHtml(m.authorName)}: ${escapeHtml(m.text)}</div><input id="thread-input" placeholder="Reply…" style="margin-top:12px"><button class="btn btn-primary btn-block" id="thread-send" style="margin-top:10px">Reply</button></div>`;mountSheet(wrap);byId('thread-send').onclick=async()=>{if(viewerBlocked('Sign in to reply')) return;let t=byId('thread-input').value.trim();if(!t)return;let tid='thread_'+Date.now();await window.fbSet('chatThreads/'+SQUAD.id+'/'+tid,{id:tid,parentId:id,text:t,authorId:ME.id,authorName:ME.name,ts:Date.now()});showToast('Reply sent','ti-message')}}
+async function toggleBoardPin(id){
+  if(viewerBlocked('Sign in to pin board notes')) return;let n=(BOARD||[]).find(x=>x.id===id);if(!n)return;await window.fbUpdate('boards/'+SQUAD.id+'/'+id,{pinned:!n.pinned})}
 async function deleteBoardNote(noteId){
+  if(viewerBlocked('Sign in to delete board notes')) return;
   const note = (BOARD||[]).find(n=>n.id===noteId);
   if(!note || !SQUAD) return;
   const allowed = note.authorId === ME.id || can(ME.id,'pinNotes');
@@ -2776,6 +2987,7 @@ async function deleteBoardNote(noteId){
   }catch(e){ showToast('Could not remove note','ti-alert-triangle'); }
 }
 async function toggleReaction(noteId, emoji){
+  if(viewerBlocked('Sign in to react')) return;
   const note = (BOARD || []).find(n => n.id === noteId);
   if(!note) return;
   if(!note.reactions) note.reactions = {};
@@ -2851,67 +3063,72 @@ function renderFriendNotes(friendId){
 }
 
 
+let XP_LEADERBOARD_CACHE={};
+async function hydrateXpLeaderboard(){
+  if(!SQUAD || !window.fbGet) return;
+  const ids=(SQUAD.members||[]).map(m=>m.id);
+  let changed=false;
+  for(const id of ids){
+    if(id===ME.id){ XP_LEADERBOARD_CACHE[id]=Number(ME.xp)||0; continue; }
+    if(XP_LEADERBOARD_CACHE[id]!==undefined) continue;
+    try{ const u=await window.fbGet('users/'+id); XP_LEADERBOARD_CACHE[id]=Number(u?.xp)||0; changed=true; }catch(e){ XP_LEADERBOARD_CACHE[id]=0; }
+  }
+  if(changed && currentScreen==='xp' && (currentParams.xpTab||'overview')==='leaderboard') softUpdate();
+}
 function renderXp(){
-  ensureAccountState();
+  ensureXpMeta(); cleanXpMultipliers();
   const role=roleOf(ME.id), ids=getGroupIds();
   const today=localDateKey(), month=monthKey();
   const spinUsed=ME.xpState.lastSpin===today;
   const dailyClaim=ME.xpState.dailyClaim===today;
   const monthlyClaim=ME.xpState.monthlyClaim===month;
-  const spinRows=XP_CONFIG.spins.map((o,i)=>`<div class="glass xp-rule"><span>${o.xp?`Win ${o.xp} XP`:'Nothing'}</span><span style="font-size:11px;color:var(--text-faint);">${(o.weight/XP_CONFIG.spins.reduce((a,b)=>a+b.weight,0)*100).toFixed(1)}%</span></div>`).join('');
-  const groups=ids.map(id=>id===SQUAD_ID?SQUAD:null).filter(Boolean);
-  return `<div class="screen">
-    <div class="page-title-row">${backBtn()}<h2>XP &amp; Rewards</h2></div>
-    <div class="xp-hero glass liquid-sheen">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
-        <div><div class="small-note" style="margin:0 0 5px;">Current balance</div><div class="xp-number">${Math.floor(ME.xp||0)} <span style="font-size:14px;color:var(--text-lo);">XP</span></div></div>
-        <div class="xp-badge">${icon('ti-crown')} ${role}</div>
-      </div>
-      <div style="font-size:11px;color:var(--text-lo);margin-top:12px;">XP is shared across your account and follows you between groups.</div>
-    </div>
+  const level=xpLevel(ME.xp), progress=Math.round(xpProgress(ME.xp)*100), start=xpLevelStart(level), next=xpLevelNext(level);
+  const mult=activeXpMultiplier();
+  const tab=currentParams.xpTab||'overview';
+  const tabs=[['overview','Overview'],['history','History'],['missions','Missions'],['achievements','Achievements'],['leaderboard','Leaderboard']];
+  const spinRows=XP_CONFIG.spins.map(o=>`<div class="glass xp-rule"><span>${o.xp?`Win ${o.xp} XP`:'Nothing'}</span><span style="font-size:11px;color:var(--text-faint);">${(o.weight/XP_CONFIG.spins.reduce((a,b)=>a+b.weight,0)*100).toFixed(1)}%</span></div>`).join('');
 
+  const overview=`
+    <div class="xp-level-card glass liquid-interactive motion-card">
+      <div class="xp-level-row"><div><div class="small-note" style="margin:0 0 3px;">Personal progression</div><div class="xp-level-badge">Level ${level}</div></div><div style="text-align:right"><div class="xp-number" style="font-size:30px;">${Math.floor(ME.xp||0)}<span style="font-size:12px;color:var(--text-lo);font-weight:700;"> XP</span></div><div class="small-note">${next-(Math.floor(ME.xp||0))} XP to next</div></div></div>
+      <div class="xp-progress"><span style="width:${progress}%;"></span></div>
+      <div style="display:flex;justify-content:space-between;margin-top:7px;font-size:10.5px;color:var(--text-faint);"><span>${start} XP</span><strong style="color:var(--accent);">${progress}%</strong><span>${next} XP</span></div>
+    </div>
+    ${mult?`<div class="xp-multiplier glass liquid-interactive motion-card" style="margin-top:10px;"><div><strong>${Number(mult.multiplier).toFixed(1)}× XP</strong><div class="small-note">Active boost · ${Math.max(1,Math.ceil((mult.expiresAt-Date.now())/3600000))}h left</div></div><span class="xp-badge">BOOST</span></div>`:''}
     <div class="section-label">Earn</div>
     <div class="stack">
-      <div class="glass xp-rule"><div><div style="font-weight:700;">Daily</div><div class="small-note">Once per calendar day</div></div><div class="xp-reward">+10 XP ${dailyClaim?'✓':''}</div></div>
-      <div class="glass xp-rule"><div><div style="font-weight:700;">Monthly</div><div class="small-note">Additional monthly bonus</div></div><div class="xp-reward">+50 XP ${monthlyClaim?'✓':''}</div></div>
-      <div class="glass xp-rule"><div><div style="font-weight:700;">Group membership</div><div class="small-note">One-time bonus for each group role</div></div><div class="xp-reward">+${role==='owner'?30:role==='admin'?10:5} XP</div></div>
+      <div class="glass xp-rule liquid-interactive motion-card"><div><div style="font-weight:700;">Daily</div><div class="small-note">Once per calendar day</div></div><div class="xp-reward">+10 XP ${dailyClaim?'✓':''}</div></div>
+      <div class="glass xp-rule liquid-interactive motion-card"><div><div style="font-weight:700;">Monthly</div><div class="small-note">Additional monthly bonus</div></div><div class="xp-reward">+50 XP ${monthlyClaim?'✓':''}</div></div>
+      <div class="glass xp-rule liquid-interactive motion-card"><div><div style="font-weight:700;">Group membership</div><div class="small-note">One-time bonus for your role</div></div><div class="xp-reward">+${role==='owner'?30:role==='admin'?10:5} XP</div></div>
     </div>
-
     <div class="section-label">Daily spin</div>
-    <div class="glass" style="padding:18px;text-align:center;">
+    <div class="glass liquid-interactive motion-card" style="padding:18px;text-align:center;">
       <div class="spin-wheel" id="daily-spin-wheel">${icon('ti-dice')}</div>
       <div style="font-weight:800;font-size:16px;">Spend 15 XP to spin</div>
-      <div class="small-note" style="margin:6px 0 14px;">Rare rewards are exponentially harder to hit. Two slots are “Nothing”.</div>
-      <button class="btn btn-primary btn-block" id="daily-spin-btn" ${spinUsed?'disabled':''} style="padding:14px;">${spinUsed?'Spin used today':`Spin for 15 XP`}</button>
+      <div class="small-note" style="margin:6px 0 14px;">Rare rewards are exponentially harder to hit.</div>
+      <button class="btn btn-primary btn-block liquid-interactive motion-card" id="daily-spin-btn" ${spinUsed?'disabled':''} style="padding:14px;">${spinUsed?'Spin used today':`Spin for 15 XP`}</button>
     </div>
-    <div class="section-label">Spin table</div>
-    <div class="stack">${spinRows}</div>
-
+    <div class="section-label">Spin table</div><div class="stack">${spinRows}</div>
     <div class="section-label">Groups</div>
-    <div class="glass" style="padding:14px;">
+    <div class="glass liquid-interactive motion-card" style="padding:14px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><span style="font-size:12px;color:var(--text-lo);">Groups joined</span><strong>${ids.length}/${XP_CONFIG.maxGroups}</strong></div>
-      ${ids.length?ids.map(id=>{
-        const active=id===SQUAD_ID, fallback=active&&SQUAD?SQUAD:{name:'Saved group',id};
-        return `<div class="xp-group-row glass ${active?'group-identity':''}" data-switch-group="${escapeHtml(id)}" style="cursor:pointer;margin-bottom:6px;">
-          ${active?groupMarkHtml(fallback.groupStyle||{},38):`<div class="group-mark" style="width:38px;height:38px;"><span style="font-size:16px;">✦</span></div>`}
-          <div style="min-width:0;flex:1;"><div style="font-size:13px;font-weight:700;">${escapeHtml(fallback.name||'Group')}</div><div style="font-size:10.5px;color:var(--text-faint);">${active?'Active group':'Tap to switch'}</div></div>
-          ${active?`<span class="xp-badge">Active</span>`:`<span class="ti" style="color:var(--text-faint);">${icon('ti-chevron-right')}</span>`}
-        </div>`;
-      }).join(''):'<div class="small-note">No groups yet.</div>'}
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;">
-        <button class="btn btn-ghost" id="group-create-btn" style="padding:11px 10px;">${icon('ti-plus')} New group</button>
-        <button class="btn btn-ghost" id="group-join-btn" style="padding:11px 10px;">${icon('ti-key')} Join group</button>
-      </div>
-      <button class="btn btn-ghost btn-block" id="xp-shop-btn" style="padding:12px;margin-top:8px;">${icon('ti-trophy')} Open XP shop</button>
-    </div>
+      ${ids.length?ids.map(id=>{const active=id===SQUAD_ID,fallback=active&&SQUAD?SQUAD:{name:'Saved group',id};return `<div class="xp-group-row glass ${active?'group-identity':''}" data-switch-group="${escapeHtml(id)}" style="cursor:pointer;margin-bottom:6px;">${active?groupMarkHtml(fallback.groupStyle||{},38):`<div class="group-mark" style="width:38px;height:38px;"><span style="font-size:16px;">✦</span></div>`}<div style="min-width:0;flex:1;"><div style="font-size:13px;font-weight:700;">${escapeHtml(fallback.name||'Group')}</div><div style="font-size:10.5px;color:var(--text-faint);">${active?'Active group':'Tap to switch'}</div></div>${active?`<span class="xp-badge">Active</span>`:`<span class="ti" style="color:var(--text-faint);">${icon('ti-chevron-right')}</span>`}</div>`}).join(''):'<div class="small-note">No groups yet.</div>'}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;"><button class="btn btn-ghost liquid-interactive motion-card" id="group-create-btn" style="padding:11px 10px;">${icon('ti-plus')} New group</button><button class="btn btn-ghost liquid-interactive motion-card" id="group-join-btn" style="padding:11px 10px;">${icon('ti-key')} Join group</button></div>
+    </div>`;
 
-    <div class="section-label">Costs</div>
-    <div class="stack">
-      <div class="glass xp-rule"><span>Nudge a member</span><span class="xp-reward xp-negative">−1 XP</span></div>
-      <div class="glass xp-rule"><span>Create a group after your first</span><span class="xp-reward xp-negative">−70 XP</span></div>
-      <div class="glass xp-rule"><span>Join group #3–#5</span><span class="xp-reward xp-negative">−20 XP</span></div>
-    </div>
-    <div style="margin:16px 0 4px;font-size:11px;color:var(--text-faint);line-height:1.5;">Limits: first group free, first two groups join free, maximum five groups. XP is checked before the action is committed.</div>
+  const history=(ME.xpState.history||[]).slice(0,30).map(h=>`<div class="glass xp-history-row liquid-interactive motion-card"><div class="xp-history-dot">${icon(h.amount>=0?'ti-sparkles':'ti-bolt')}</div><div style="min-width:0;"><div style="font-weight:700;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(h.reason)}</div><div class="small-note">${timeAgo(h.ts)}</div></div><div class="xp-history-amt ${h.amount<0?'negative':''}">${h.amount>0?'+':''}${h.amount} XP</div></div>`).join('') || `<div class="empty-hint glass">Your XP history will appear here.</div>`;
+  const missions=XP_MISSIONS.map(m=>{const p=missionProgress(m),pct=Math.round(p.count/m.goal*100),done=p.complete;return `<div class="xp-mission glass liquid-interactive motion-card"><div class="xp-mission-head"><div><div style="font-weight:800;">${escapeHtml(m.title)}</div><div class="small-note">${escapeHtml(m.desc)}</div></div><span class="xp-badge">+${m.reward} XP</span></div><div class="xp-mini-progress"><span style="width:${pct}%"></span></div><div style="display:flex;justify-content:space-between;margin-top:6px;font-size:10.5px;color:var(--text-faint);"><span>${p.count}/${m.goal}</span><strong style="color:${done?'var(--green)':'var(--accent)'};">${done?'Complete':'In progress'}</strong></div></div>`}).join('');
+  const achievementsDefs=[
+    ['first-spin','First Spin','Make your first daily spin','ti-dice'],['7-day','7-Day Streak','Check in on seven different days','ti-calendar-check'],['builder','Squad Builder','Join at least two squads','ti-users-group'],['early','Early Bird','Open SquadZync before 07:00','ti-sunrise'],['night','Night Owl','Open SquadZync after 23:00','ti-moon'],['messages-100','100 Messages','Send one hundred squad messages','ti-message'],['watch-party','Watch Party','Join a shared watch session','ti-device-tv']
+  ];
+  const unlocked=xpAchievements().map(a=>a.id); const achievements=achievementsDefs.map(a=>{const on=unlocked.includes(a[0]);return `<div class="xp-achievement ${on?'':'locked'} liquid-interactive motion-card"><div class="xp-achievement-icon">${icon(a[3])}</div><div style="min-width:0;"><div style="font-weight:800;font-size:12px;">${a[1]}</div><div class="small-note">${a[2]}</div></div></div>`}).join('');
+  const demoRanks={}; if(isViewerMode()){(SQUAD?.members||[]).forEach((m,i)=>demoRanks[m.id]=m.id===ME.id?245:[420,380,315,270,0][i]||0);} const members=(SQUAD?.members||[]).map(m=>({id:m.id,name:m.name,xp:m.id===ME.id?Math.floor(ME.xp||0):(demoRanks[m.id] ?? XP_LEADERBOARD_CACHE[m.id] ?? 0)})).sort((a,b)=>b.xp-a.xp);
+  const board=members.slice(0,10).map((m,i)=>`<div class="glass xp-rank liquid-interactive motion-card"><div class="xp-rank-pos">${i+1}</div><div class="avatar" style="width:34px;height:34px;font-size:12px;">${m.id===ME.id?(ME.photo?`<img src="${ME.photo}" alt="">`:getInitials(m.name)) : getInitials(m.name)}</div><div class="xp-rank-name">${escapeHtml(m.name)}${m.id===ME.id?' (You)':''}</div><div class="xp-rank-value">${m.xp} XP</div></div>`).join('');
+  const panel=tab==='history'?`<div class="stack">${history}</div>`:tab==='missions'?`<div class="stack">${missions}</div>`:tab==='achievements'?`<div class="xp-achievement-grid">${achievements}</div>`:tab==='leaderboard'?`<div class="stack">${board||'<div class="empty-hint glass">No squad members yet.</div>'}</div>`:`${overview}`;
+  return `<div class="screen">
+    <div class="page-title-row">${backBtn()}<h2>XP &amp; Rewards</h2></div>
+    <div class="xp-tabs" id="xp-tabs"><div class="xp-tab-pill" id="xp-tab-pill"></div>${tabs.map(t=>`<button class="xp-tab ${tab===t[0]?'active':''}" data-xp-tab="${t[0]}">${t[1]}</button>`).join('')}</div>
+    ${panel}
   </div>${renderNav('me')}`;
 }
 
@@ -3052,6 +3269,7 @@ function bindEvents(){
   initMotionTabs();
 
   if(byId('viewer-exit-btn')) byId('viewer-exit-btn').onclick = exitViewerMode;
+  if(byId('xp-tabs')){ document.querySelectorAll('[data-xp-tab]').forEach(btn=>{btn.onclick=()=>{currentParams.xpTab=btn.dataset.xpTab;softUpdate();requestAnimationFrame(()=>{const wrap=document.getElementById('xp-tabs'),pill=document.getElementById('xp-tab-pill'),active=wrap?.querySelector('.xp-tab.active');if(wrap&&pill&&active){pill.style.left=active.offsetLeft+'px';pill.style.width=active.offsetWidth+'px';}});};}); if((currentParams.xpTab||'overview')==='leaderboard') hydrateXpLeaderboard(); }
   if(byId('open-xp')) byId('open-xp').onclick = () => goTo('xp');
   if(byId('go-xp')) byId('go-xp').onclick = () => goTo('xp');
   if(byId('xp-shop-btn')) byId('xp-shop-btn').onclick = () => goTo('shop');
@@ -3158,11 +3376,19 @@ function bindEvents(){
         id, name, code: genCode(),
         maxMembers: cap,
         locked: locked,
+      createdAt: Date.now(),
+      groupXp: 50,
+      groupStreak: 1,
+      achievements: ['squad-created'],
+      inviteExpiresAt: null,
+      inviteAdminOnly: false,
+      inviteRegeneratedAt: null,
       groupStyle: {
-        tagline:'', description:'', logo:'', logoUrl:'', bannerUrl:'',
-        accent:'#7C9CFF', accent2:'#9B7CFF', background:'#0B0E1A',
+        tagline:'', description:'', logo:'✦', logoUrl:'', bannerUrl:'', bannerVideoUrl:'',
+        accent:'#7C9CFF', accent2:'#9B7CFF', background:'#0B0E1A', backgroundPreset:'aurora',
         mode:'liquid', radius:18, motion:'ambient', density:'comfortable',
-        showMemberCount:true, showStatusGlow:true
+        showMemberCount:true, showStatusGlow:true, notificationStyle:'glass', soundPack:'subtle',
+        ambientParticles:true
       },
         members: [{ id: ME.id, name: ME.name, tz: ME.tz, photo: ME.photo || '', emoji: ME.emoji || '' }],
         status: { [ME.id]: { avail:'free', icon:'ti-hand-wave', text:'Just joined' } },
@@ -3202,6 +3428,7 @@ function bindEvents(){
         }
       }catch(e){}
       if(!sq){ errEl.textContent = "That code doesn't match a squad."; errEl.style.display='block'; return; }
+      if(!groupInviteValid(sq)){ errEl.textContent = 'This invite has expired. Ask a group admin for a new link.'; errEl.style.display='block'; return; }
       const alreadyMember = sq.members.some(m => m.id === ME.id);
       const cap = sq.maxMembers || 6;
       if(sq.members.length >= cap && !alreadyMember){
@@ -3215,7 +3442,7 @@ function bindEvents(){
           showToast('Request already sent — waiting for approval', 'ti-clock');
           return;
         }
-        sq.joinRequests.push({ id: ME.id, name: ME.name, tz: ME.tz, photo: ME.photo || '', ts: Date.now() });
+        const requestGroupCount=getGroupIds().length; const requestJoinCost=requestGroupCount>=2?XP_CONFIG.extraGroup:0; sq.joinRequests.push({ id: ME.id, name: ME.name, tz: ME.tz, photo: ME.photo || '', ts: Date.now(), joinCost:requestJoinCost, groupCountAtRequest:requestGroupCount });
         sq.updatedAt = Date.now();
         try{
           if(typeof window.fbSet === 'function') await window.fbSet('squads/' + sq.id, sq);
@@ -3231,6 +3458,7 @@ function bindEvents(){
         const joinCost=joinedCount>=2?XP_CONFIG.extraGroup:0;
         if(joinCost>0 && !(await spendXp(joinCost,'Join additional group'))){ errEl.textContent=`You need ${joinCost} XP to join another group.`; errEl.style.display='block'; return; }
         sq.members.push({ id: ME.id, name: ME.name, tz: ME.tz, photo: ME.photo || '', emoji: ME.emoji || '' });
+        sq.groupXp=Number(sq.groupXp||0)+25;
         if(!sq.status) sq.status = {};
         sq.status[ME.id] = { avail:'free', icon:'ti-hand-wave', text:'Just joined' };
         if(!sq.roles) sq.roles = {};
@@ -3258,6 +3486,9 @@ function bindEvents(){
   if(byId('copy-invite-manage')) byId('copy-invite-manage').onclick = () => { navigator.clipboard?.writeText(SQUAD.code).then(()=>showToast('Code copied','ti-copy')); };
 
   if(byId('my-status-btn')) byId('my-status-btn').onclick = () => openStatusEditor(ME.id);
+  if(byId('group-identity-open')) byId('group-identity-open').onclick = () => goTo('group-settings');
+  if(byId('group-manage-btn')) byId('group-manage-btn').onclick = () => goTo('manage');
+  if(byId('group-invite-btn')) byId('group-invite-btn').onclick = () => openGroupInviteDialog();
   if(byId('go-messages-btn')) byId('go-messages-btn').onclick = () => goTo('messages');
   if(byId('home-avatar-group')) byId('home-avatar-group').onclick = openHomeMemberDialog;
   if(byId('home-sync-badge')) byId('home-sync-badge').onclick = e => { e.stopPropagation(); openSyncPopover(byId('home-sync-badge')); };
@@ -3295,6 +3526,18 @@ function bindEvents(){
   document.querySelectorAll('[data-delete-chat]').forEach(btn=>btn.onclick=(e)=>{e.stopPropagation();deleteChatMessage(btn.dataset.deleteChat);});
 
 
+  document.querySelectorAll('[data-chat-pin]').forEach(b=>b.onclick=()=>toggleChatPin(b.dataset.chatPin));
+  document.querySelectorAll('[data-chat-thread]').forEach(b=>b.onclick=()=>openChatThread(b.dataset.chatThread));
+  document.querySelectorAll('[data-chat-react]').forEach(b=>b.onclick=e=>openChatReactionPicker(b.dataset.chatReact,b));
+  document.querySelectorAll('[data-note-pin]').forEach(b=>b.onclick=()=>toggleBoardPin(b.dataset.notePin));
+  document.querySelectorAll('[data-poll-option]').forEach(b=>b.onclick=()=>votePoll(b.dataset.poll,Number(b.dataset.pollOption)));
+  document.querySelectorAll('[data-task-toggle]').forEach(b=>b.onclick=()=>toggleTask(b.dataset.taskToggle));
+  document.querySelectorAll('[data-board-tab]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-board-tab]').forEach(x=>x.classList.toggle('active',x===b));['notes','polls','tasks'].forEach(k=>document.getElementById('board-panel-'+k)?.classList.toggle('hidden',b.dataset.boardTab!==k));const p=byId('board-tab-pill');if(p){p.style.left=b.offsetLeft+'px';p.style.width=b.offsetWidth+'px'}});
+  if(byId('board-add-poll'))byId('board-add-poll').onclick=()=>openSocialPrompt('poll');
+  if(byId('board-add-task'))byId('board-add-task').onclick=()=>openSocialPrompt('task');
+  if(byId('chat-poll-btn'))byId('chat-poll-btn').onclick=()=>openSocialPrompt('poll');
+  if(byId('chat-thread-btn'))byId('chat-thread-btn').onclick=()=>currentParams.replyTo?openChatThread(currentParams.replyTo):showToast('Select Reply on a message first','ti-message');
+  const ci=byId('chat-input');if(ci)ci.addEventListener('input',()=>{const at=ci.value.lastIndexOf('@');const box=byId('mention-picker');if(at<0){box?.classList.add('hidden');return}const q=ci.value.slice(at+1).toLowerCase();const ms=(SQUAD.members||[]).filter(m=>m.name.toLowerCase().includes(q)&&m.id!==ME.id).slice(0,5);if(box&&ms.length){box.classList.remove('hidden');box.innerHTML=ms.map(m=>`<div class="mention-option" data-name="${escapeHtml(m.name)}">${escapeHtml(m.name)}</div>`).join('');box.querySelectorAll('[data-name]').forEach(o=>o.onclick=()=>{ci.value=ci.value.slice(0,at)+'@'+o.dataset.name+' ';box.classList.add('hidden');ci.focus()})}else box?.classList.add('hidden')});
   document.querySelectorAll('.reaction-chip').forEach(chip => {
     chip.onclick = () => toggleReaction(chip.dataset.note, chip.dataset.emoji);
   });
@@ -3324,6 +3567,7 @@ function bindEvents(){
 
   if(byId('leave-squad-btn')){
     byId('leave-squad-btn').onclick = async () => {
+      if(viewerBlocked('Viewer Mode cannot leave the demo squad')) return;
       if(SQUAD && ME){
         SQUAD.members = SQUAD.members.filter(m=>m.id!==ME.id);
         if(SQUAD.status) delete SQUAD.status[ME.id];
@@ -3340,6 +3584,8 @@ function bindEvents(){
   document.querySelectorAll('[data-activity]').forEach(card => {
     card.onclick = () => {
       const a = card.dataset.activity;
+      if(isViewerMode()){ if(a === 'trivia') goTo('activity-trivia'); else if(a === 'tv-board') goTo('tv-board'); return; }
+      incrementMission('activities',1); syncCompletedMissions(); saveMe();
       if(a === 'trivia') goTo('activity-trivia');
       else if(a === 'tv-board') goTo('tv-board');
     };
@@ -3375,7 +3621,7 @@ function bindEvents(){
       const text = input.value;
       if(!text.trim()) return;
       input.value = '';
-      sendChatMessage(text);
+      sendChatMessage(text,currentParams.replyTo||null); currentParams.replyTo=null;
     };
     byId('chat-send-btn').onclick = send;
     if(byId('chat-input')) byId('chat-input').addEventListener('keydown', (e)=>{ if(e.key==='Enter') send(); });
@@ -3421,14 +3667,31 @@ function bindEvents(){
   if(byId('gs-radius')) byId('gs-radius').oninput=()=>byId('gs-radius-value').textContent=byId('gs-radius').value+'px';
   if(byId('gs-save')){
     byId('gs-save').onclick=async()=>{
-      if(!can(ME.id,'editGroupSettings')) return showToast('You cannot edit group settings','ti-ban');
+      if(viewerBlocked() || !can(ME.id,'editGroupSettings')) return;
       const name=byId('gs-name').value.trim(); if(!name) return showToast('Squad name cannot be empty','ti-alert-circle');
       const cap=Math.min(15,Math.max(2,Math.max(parseInt(byId('gs-cap').value,10)||6,SQUAD.members.length)));
-      SQUAD.name=name; SQUAD.maxMembers=cap; if(window.__gsLockedPending!==undefined) SQUAD.locked=window.__gsLockedPending; window.__gsLockedPending=undefined;
-      SQUAD.groupStyle={tagline:byId('gs-tagline').value.trim(),description:byId('gs-description').value.trim(),logo:byId('gs-logo').value.trim(),logoUrl:byId('gs-logo-url').value.trim(),bannerUrl:byId('gs-banner-url').value.trim(),accent:byId('gs-accent').value||'#7C9CFF',accent2:byId('gs-accent2').value||'#9B7CFF',background:byId('gs-background').value||'#0B0E1A',mode:byId('gs-mode').value,radius:Number(byId('gs-radius').value)||18,motion:byId('gs-motion').value,showStatusGlow:byId('gs-status-glow').checked,showMemberCount:byId('gs-member-count').checked};
-      SQUAD.updatedAt=Date.now(); await saveSquad(); applyGroupStyle(); showToast('Group design saved','ti-check'); goTo('manage',{replace:true});
+      if(window.__gsLockedPending!==undefined) SQUAD.locked=window.__gsLockedPending;
+      window.__gsLockedPending=undefined;
+      const expiryMs=Number(byId('gs-invite-expiry')?.value||0);
+      SQUAD.name=name; SQUAD.maxMembers=cap; SQUAD.inviteExpiresAt=expiryMs>0?Date.now()+expiryMs:null;
+      SQUAD.groupStyle={...defaultGroupStyle(),...(SQUAD.groupStyle||{}),tagline:byId('gs-tagline').value.trim(),description:byId('gs-description').value.trim(),logo:byId('gs-logo').value.trim()||'✦',logoUrl:byId('gs-logo-url').value.trim(),bannerUrl:byId('gs-banner-url').value.trim(),bannerVideoUrl:byId('gs-banner-video-url').value.trim(),accent:byId('gs-accent').value||'#7C9CFF',accent2:byId('gs-accent2').value||'#9B7CFF',background:byId('gs-background').value||'#0B0E1A',backgroundPreset:byId('gs-bg-preset').value||'aurora',mode:byId('gs-mode').value,radius:Number(byId('gs-radius').value)||18,motion:byId('gs-motion').value,notificationStyle:byId('gs-notification').value,soundPack:byId('gs-sound').value,ambientParticles:byId('gs-particles').checked,showStatusGlow:byId('gs-status-glow').checked,showMemberCount:byId('gs-member-count').checked};
+      SQUAD.updatedAt=Date.now(); await saveSquad(); applyGroupStyle(); showToast('Group identity saved','ti-check'); goTo('manage',{replace:true});
     };
   }
+  if(byId('gs-copy-invite')) byId('gs-copy-invite').onclick=()=>navigator.clipboard?.writeText(safeInviteLink(SQUAD.code)).then(()=>showToast('Invite link copied','ti-copy'));
+  if(byId('gs-share-invite')) byId('gs-share-invite').onclick=()=>openGroupInviteDialog();
+  if(byId('gs-qr-invite')) byId('gs-qr-invite').onclick=()=>openQrDialog(safeInviteLink(SQUAD.code),SQUAD.name);
+  if(byId('gs-regenerate-invite')) byId('gs-regenerate-invite').onclick=async()=>{
+    if(viewerBlocked() || !can(ME.id,'editGroupSettings')) return;
+    const expiryMs=Number(byId('gs-invite-expiry')?.value||0);
+    SQUAD.code=genCode(); SQUAD.inviteRegeneratedAt=Date.now(); SQUAD.inviteExpiresAt=expiryMs>0?Date.now()+expiryMs:null; SQUAD.updatedAt=Date.now();
+    await saveSquad(); showToast('Invite code regenerated','ti-refresh'); softUpdate();
+  };
+  if(byId('gs-generate-palette')) byId('gs-generate-palette').onclick=()=>{
+    if(viewerBlocked() || !can(ME.id,'editGroupSettings')) return;
+    const [a,b,bg]=groupPaletteFromSeed((byId('gs-logo')?.value||SQUAD.name||'SquadZync').trim());
+    byId('gs-accent').value=a; byId('gs-accent2').value=b; byId('gs-background').value=bg; showToast('Palette generated','ti-palette');
+  };
   document.querySelectorAll('[data-role-select]').forEach(sel => {
     sel.onchange = async () => {
       if(!can(ME.id,'manageRoles')){ showToast('You cannot manage roles', 'ti-ban'); sel.value = roleOf(sel.dataset.roleSelect); return; }
@@ -3541,6 +3804,16 @@ function bindEvents(){
       goTo('login', {replace:true});
     };
   }
+  // Viewer fallback: controls that are not explicitly navigation-safe and are not
+  // already wired with an onclick handler get a clear explanation instead of silently doing nothing.
+  document.querySelectorAll('button, .icon-btn, .fab, .nudge-btn').forEach(el=>{
+    if(el.dataset.viewerFallback==='1') return;
+    el.dataset.viewerFallback='1';
+    const safe = el.id && /^(nav-|.*back$|.*-back$|shop-back$)/.test(el.id) || el.matches('.nav-item,.layout-opt,.social-tab,[data-switch-group],[data-xp-tab]');
+    if(safe) return;
+    if(typeof el.onclick === 'function' || el.dataset.viewerWrite==='1') return;
+    el.addEventListener('click',()=>{ if(isViewerMode()) showToast('Viewer Mode is read-only — sign in to use this action','ti-lock'); });
+  });
 }
 
 function positionLayoutPill(){
@@ -3563,6 +3836,8 @@ function checkFirebaseConfigured(){
     document.body.prepend(b);
   }
 }
+
+(function initSyncAndErrorUX(){if(window.__syncUXBound)return;window.__syncUXBound=true;window.addEventListener('squadzync:firebase-error',e=>{if(typeof showToast==='function')showToast(e.detail?.error?.code==='PERMISSION_DENIED'?'You do not have permission for that action.':'Couldn’t save that change.','ti-alert-triangle')});window.addEventListener('squadzync:sync-state',e=>{const el=document.getElementById('global-sync-state');if(!el)return;const d=e.detail||{};el.textContent=d.state==='offline'?`OFFLINE${d.count?` · ${d.count} queued`:''}`:d.state==='syncing'?'SYNCING…':d.state==='error'?'SYNC ERROR':'LIVE';el.classList.toggle('offline',d.state!=='live')});window.addEventListener('online',()=>{if(window.__pendingMutationCount?.()&&typeof showToast==='function')showToast('Connection restored — syncing changes','ti-refresh');window.__flushFirebaseQueue?.()});window.addEventListener('offline',()=>{if(typeof showToast==='function')showToast('You’re offline — changes will be queued','ti-cloud-off')})})();
 
 function showLoading(){
   document.getElementById('app').innerHTML = `<div class="loading-wrap"><div class="spinner"></div><p style="color:var(--text-lo);font-size:13px;">Loading SquadZync...</p></div>`;
@@ -3589,6 +3864,8 @@ async function bootForUser(user){
   const meInSquad = s.members.find(m=>m.id===ME.id);
   if(meInSquad){ meInSquad.name = ME.name; meInSquad.tz = ME.tz; meInSquad.photo = ME.photo || ''; }
   SQUAD = s;
+  recordSquadSyncBase();
+  await touchGroupStreak();
   if(!SQUAD.groupStyle) SQUAD.groupStyle={tagline:'',description:'',logo:'',logoUrl:'',bannerUrl:'',accent:'#7C9CFF',accent2:'#9B7CFF',background:'#0B0E1A',mode:'liquid',radius:18,motion:'ambient',density:'comfortable',showMemberCount:true,showStatusGlow:true};
   currentScreen = 'home';
   await initXpOnBoot();
@@ -3605,12 +3882,16 @@ function waitForFbBridge(timeoutMs = 4000){
   });
 }
 
+function markPlatform(){const ua=navigator.userAgent||'';if(/Safari/i.test(ua)&&!/Chrome|Chromium|CriOS|Android/i.test(ua))document.documentElement.classList.add('ios-safari')}markPlatform();
+
 async function boot(){
+  try{ const h=location.hash.match(/^#join=(.+)$/); if(h) window.__pendingInviteCode=decodeURIComponent(h[1]); }catch(e){}
   showLoading();
   // Wait for the Firebase bridge module (window.fbSet/fbGet/etc.) to finish
   // attaching before touching anything that calls it — this is what fixes
   // the "window.fbSet is not a function" sync error on cold loads.
   const bridgeOk = await waitForFbBridge();
+  window.__flushFirebaseQueue?.();
   if (!bridgeOk) window.__fbReady = false;
   checkFirebaseConfigured();
   if(!window.__authReady){
