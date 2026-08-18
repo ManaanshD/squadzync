@@ -638,6 +638,12 @@ body[data-group-motion="minimal"] .group-particle-field,body.group-particles-off
 @keyframes dialog-bg-in{from{opacity:0}to{opacity:1}}@keyframes dialog-in{from{opacity:0;transform:translateY(18px) scale(.95) rotateX(-3deg)}to{opacity:1;transform:translateY(0) scale(1) rotateX(0)}}
 @media (prefers-reduced-motion: reduce){.dialog-backdrop,.dialog{animation:none!important}}
 
+
+/* Notification centre */
+.notification-list{display:flex;flex-direction:column;gap:9px}.notification-item{width:100%;display:flex;align-items:center;gap:10px;text-align:left;padding:12px 13px;color:var(--text-hi);cursor:pointer;border:1px solid var(--glass-border);background:linear-gradient(145deg,rgba(255,255,255,.06),rgba(255,255,255,.025));}.notification-item.unread{border-color:rgba(var(--accent-rgb),.24);background:linear-gradient(145deg,rgba(var(--accent-rgb),.12),rgba(255,255,255,.03));}.notification-item:active{transform:scale(.985)}.notification-icon{width:34px;height:34px;border-radius:11px;display:flex;align-items:center;justify-content:center;background:var(--accent-soft);color:var(--accent);flex:0 0 34px}.notification-copy{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}.notification-copy strong{font-size:12.5px}.notification-copy span{font-size:11.5px;color:var(--text-lo);line-height:1.35}.notification-copy small{font-size:9.5px;color:var(--text-faint)}.notification-chevron{color:var(--text-faint);flex:0 0 auto}.notification-bell-wrap{position:relative;display:inline-flex}.notification-dot{position:absolute;right:-2px;top:-3px;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:var(--accent);color:#0B0E1A;font-size:9px;font-weight:900;display:flex;align-items:center;justify-content:center;border:2px solid var(--bg-0);box-shadow:0 4px 12px -6px var(--accent-glow)}
+body.group-scope{background:radial-gradient(circle at 15% 0%,rgba(var(--group-accent-rgb),.23),transparent 42%),radial-gradient(circle at 88% 15%,rgba(var(--group-accent-rgb),.12),transparent 38%),var(--bg-0)}
+body.user-scope{background:radial-gradient(circle at 15% 0%,rgba(var(--accent-rgb),.20),transparent 42%),radial-gradient(circle at 88% 15%,rgba(var(--accent-rgb),.10),transparent 38%),var(--bg-0)}
+.user-theme-page{--accent:var(--user-accent);--accent-2:var(--user-accent-2);--accent-rgb:var(--user-accent-rgb)}
 /* ── Unified surface system ─────────────────────────────────────────────── */
 .liquid-interactive.motion-card{
   transform:translate3d(
@@ -1015,6 +1021,9 @@ const DEFAULT_PERMISSIONS = {
 };
 function normalizeSquadData(sq){
   if(!sq) return sq;
+  // Heal duplicated membership records from older join/approval flows.
+  if(Array.isArray(sq.members)){ const seen=new Set(); sq.members=sq.members.filter(m=>m&&m.id&&!seen.has(m.id)&&(seen.add(m.id),true)); }
+  if(Array.isArray(sq.joinRequests)){ const seenReq=new Set(); sq.joinRequests=sq.joinRequests.filter(r=>r&&r.id&&!seenReq.has(r.id)&&(seenReq.add(r.id),true)); }
   const ownerId = (sq.members||[]).find(m=>m.id && ((sq.roles||{})[m.id]==='owner'))?.id || sq.ownerId || sq.members?.[0]?.id;
   if(!sq.maxMembers) sq.maxMembers=6;
   if(!sq.roles) sq.roles={};
@@ -1065,6 +1074,9 @@ let POLLS=[]; let pollUnsub=null;
 let TASKS=[]; let taskUnsub=null;
 let CHAT_THREADS={}; let threadUnsub=null;
 let activeCallToast = null;
+let notificationUnsub = null;
+let USER_NOTIFICATIONS = {};
+let notificationSeenIds = new Set();
 // Shared-watch runtime: the Firebase record is authoritative, the local player is merely the renderer.
 let watchPlayer = { type:null, instance:null, roomId:null, applying:false, lastCommandTs:0, timer:null };
 let ytApiPromise = null;
@@ -1194,11 +1206,25 @@ function ensureAccountState(){
   ME.groupIds = [...new Set(ME.groupIds)];
 }
 function getGroupIds(){ ensureAccountState(); return ME.groupIds || []; }
+function realGroupCount(){ ensureAccountState(); return [...new Set((ME.groupIds||[]).filter(Boolean))].length; }
+async function verifiedGroupIds(){
+  ensureAccountState();
+  const ids=[...new Set([...(ME.groupIds||[]),...(ME.squadId?[ME.squadId]:[])].filter(Boolean))];
+  if(!ids.length) return [];
+  const good=[];
+  for(const id of ids){
+    try{ const s=await window.fbGet('squads/'+id); if(s?.members?.some(m=>m.id===ME.id)) good.push(id); }catch(e){}
+  }
+  ME.groupIds=[...new Set(good)];
+  if(ME.squadId && !ME.groupIds.includes(ME.squadId)) ME.squadId=ME.groupIds[0]||null;
+  return ME.groupIds;
+}
+async function verifiedGroupCount(){ const ids=await verifiedGroupIds(); return ids.length; }
 function recordXpMetaOnly(delta,reason,type){ensureXpMeta();const entry={id:'xp_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),delta:Number(delta)||0,reason:String(reason||'XP'),type:type||((delta||0)>=0?'earn':'spend'),ts:Date.now()};ME.xpState.history=[entry,...(ME.xpState.history||[])].slice(0,150)}
 async function saveMeFields(fields){if(!ME||isViewerMode())return false;try{await window.fbUpdate('users/'+ME.id,fields);return true}catch(e){return false}}
-async function atomicUserXpDelta(uid,delta){const result=await window.fbTxn('users/'+uid+'/xp',current=>{const cur=Math.max(0,Number(current)||0);const next=cur+Number(delta||0);if(next<0)return;return next});return {ok:!!result.committed,xp:Number(result.snapshot?.val?.()??0)}}
+async function atomicUserXpDelta(uid,delta){const result=await window.fbTxn('users/'+uid+'/xp',current=>{const cur=Math.max(0,Number(current)||0);const next=cur+Number(delta||0);if(next<0)return;return next});const currentXp=Number(result.snapshot?.val?.()??0);return {ok:!!result.committed,xp:currentXp,available:currentXp}}
 async function grantXp(amount,reason='XP'){if(viewerBlocked('Sign in to earn XP'))return false;ensureXpMeta();amount=Math.max(0,Math.floor(Number(amount)||0));if(!amount)return false;const mult=activeXpMultiplier(),effective=mult?Math.round(amount*Number(mult.multiplier||1)):amount;try{const r=await atomicUserXpDelta(ME.id,effective);if(!r.ok)return false;ME.xp=r.xp;recordXpMetaOnly(effective,reason,'earn');await saveMeFields({xpState:ME.xpState});return true}catch(e){showToast('Couldn’t add XP — try again','ti-alert-triangle');return false}}
-async function spendXp(amount,reason='Purchase'){if(viewerBlocked('Sign in to spend XP'))return false;ensureXpMeta();amount=Math.max(0,Math.floor(Number(amount)||0));try{const r=await atomicUserXpDelta(ME.id,-amount);if(!r.ok){showToast(`Need ${amount} XP — you have ${ME.xp}`,'ti-alert-triangle');return false}ME.xp=r.xp;recordXpMetaOnly(-amount,reason,'spend');await saveMeFields({xpState:ME.xpState});return true}catch(e){showToast('Couldn’t spend XP — try again','ti-alert-triangle');return false}}
+async function spendXp(amount,reason='Purchase'){if(viewerBlocked('Sign in to spend XP'))return false;ensureXpMeta();amount=Math.max(0,Math.floor(Number(amount)||0));try{const r=await atomicUserXpDelta(ME.id,-amount);ME.xp=r.xp;if(!r.ok){showToast(`Need ${amount} XP — you have ${r.xp}`,'ti-alert-triangle');return false}recordXpMetaOnly(-amount,reason,'spend');await saveMeFields({xp:ME.xp,xpState:ME.xpState});return true}catch(e){showToast('Couldn’t spend XP — try again','ti-alert-triangle');return false}}
 async function awardDailyXp(){
   if(viewerBlocked('Sign in to claim XP rewards')) return false;
   ensureXpMeta(); cleanXpMultipliers(); recordCheckin();
@@ -1211,7 +1237,7 @@ async function awardDailyXp(){
     recordXp(XP_CONFIG.monthly,'Monthly bonus','monthly'); ME.xpState.monthlyClaim=month; changed=true;
   }
   syncCompletedMissions();
-  if(changed){ await saveMe(); }
+  if(changed){ await saveMe(); if(ME.xpState.dailyClaim===today && !ME.xpState.dailyNotifDate){ ME.xpState.dailyNotifDate=today; await saveMe(); createUserNotification('xp','XP refreshed',`Your daily XP rewards are ready. You now have ${Math.floor(ME.xp||0)} XP.`); } }
   return changed;
 }
 async function awardGroupRoleXp(groupId, role){
@@ -1327,8 +1353,28 @@ async function saveSquad(){
   try{if(Object.keys(patch).length)await window.fbUpdate('squads/'+SQUAD.id,patch);recordSquadSyncBase();return true}catch(e){showToast(navigator.onLine?'Couldn’t sync changes — retrying when possible':'Offline — changes queued for sync','ti-alert-triangle');return false}
 }
 
+function attachUserNotificationListener(){
+  if(notificationUnsub) notificationUnsub();
+  if(!ME?.id || !window.fbListen) return;
+  notificationUnsub=window.fbListen('users/'+ME.id+'/notifications',data=>{
+    USER_NOTIFICATIONS=data||{};
+    const fresh=Object.values(USER_NOTIFICATIONS);
+    for(const n of fresh){
+      if(!n||n.read||notificationSeenIds.has(n.id)) continue;
+      notificationSeenIds.add(n.id);
+      if(n.ts && n.ts>sessionStartTs){
+        showToast(`${n.title}: ${n.body}`,'ti-'+(n.type==='xp'?'sparkles':'bell'));
+        notifyUser(n.title,n.body);
+        if(n.type==='group_accepted' && n.groupId && ['squad-choice','join-squad'].includes(currentScreen)) openNotificationItem(n);
+      }
+    }
+    if(currentScreen==='notifications') renderAll(false);
+    else if(['home','me','xp','squad-choice','join-squad'].includes(currentScreen)) renderAll(false);
+  });
+}
 function attachSquadListener(){
   if (!SQUAD_ID || !window.fbListen) return;
+  attachUserNotificationListener();
   if (squadUnsub) squadUnsub();
   squadUnsub = window.fbListen('squads/' + SQUAD_ID, (data) => {
     if (data) {
@@ -1351,7 +1397,7 @@ function attachSquadListener(){
       // Ignore stale nudges from before this session started, and don't
       // toast our own nudges reflected back.
       if (data.from !== ME.id && data.ts > sessionStartTs) {
-        showToast(`${(data.fromName||'Someone').split(' ')[0]} nudged you 👋`, 'ti-hand-click'); notifyUser('SquadZync nudge', `${(data.fromName||'Someone').split(' ')[0]} nudged you`);
+        showToast(`${(data.fromName||'Someone').split(' ')[0]} nudged you 👋`, 'ti-hand-click'); notifyUser('SquadZync nudge', `${(data.fromName||'Someone').split(' ')[0]} nudged you`); createUserNotification('nudge','New nudge',`${(data.fromName||'Someone').split(' ')[0]} nudged you`,{groupId:SQUAD_ID,screen:'home'});
       }
     }
   });
@@ -1363,7 +1409,7 @@ function attachSquadListener(){
     CHAT = fresh;
     if (currentScreen === 'messages') renderAll(false);
     else if (lastMsg && lastMsg.authorId !== ME.id && lastMsg.ts > sessionStartTs) {
-      showToast(`${(lastMsg.authorName||'Someone').split(' ')[0]}: ${lastMsg.text.slice(0,40)}`, 'ti-message'); notifyUser(`New message from ${(lastMsg.authorName||'Someone').split(' ')[0]}`, lastMsg.text.slice(0,120));
+      showToast(`${(lastMsg.authorName||'Someone').split(' ')[0]}: ${lastMsg.text.slice(0,40)}`, 'ti-message'); notifyUser(`New message from ${(lastMsg.authorName||'Someone').split(' ')[0]}`, lastMsg.text.slice(0,120)); createUserNotification('message',`New message from ${(lastMsg.authorName||'Someone').split(' ')[0]}`,lastMsg.text.slice(0,160),{groupId:SQUAD_ID,screen:'messages'});
     }
   });
   if (callUnsub) callUnsub();
@@ -1371,11 +1417,57 @@ function attachSquadListener(){
     if (!data || !data.active || data.startedBy === ME.id || data.ts <= sessionStartTs) return;
     if (activeCallToast === data.ts) return;
     activeCallToast = data.ts;
-    showToast(`${(data.startedByName||'Someone').split(' ')[0]} started a call \u2014 open Messages to join`, 'ti-phone-incoming');
+    showToast(`${(data.startedByName||'Someone').split(' ')[0]} started a call \u2014 open Messages to join`, 'ti-phone-incoming'); createUserNotification('call','Call started',`${(data.startedByName||'Someone').split(' ')[0]} started a squad call.`,{groupId:SQUAD_ID,screen:'messages'});
   });
   if(pollUnsub) pollUnsub(); pollUnsub=window.fbListen('polls/'+SQUAD_ID,data=>{POLLS=data?Object.values(data):[];if(currentScreen==='board')renderAll(false);});
   if(taskUnsub) taskUnsub(); taskUnsub=window.fbListen('tasks/'+SQUAD_ID,data=>{TASKS=data?Object.values(data):[];if(currentScreen==='board')renderAll(false);});
   if(threadUnsub) threadUnsub(); threadUnsub=window.fbListen('chatThreads/'+SQUAD_ID,data=>{CHAT_THREADS=data||{};if(currentScreen==='messages')renderAll(false);});
+}
+
+async function createUserNotification(type,title,body,opts={}){
+  if(!ME || isViewerMode()) return null;
+  const id=opts.id || ('notif_'+Date.now()+'_'+Math.random().toString(36).slice(2,7));
+  const item={id,type,title,body,ts:Date.now(),read:false,groupId:opts.groupId||null,screen:opts.screen||null,meta:opts.meta||{}};
+  try{ await window.fbUpdate('users/'+ME.id+'/notifications/'+id,item); }catch(e){ console.warn('notification write failed',e); return null; }
+  return item;
+}
+function notificationIcon(type){ return ({nudge:'ti-hand-click',message:'ti-message',call:'ti-phone-incoming',xp:'ti-sparkles',group_request:'ti-clock',group_accepted:'ti-circle-check',group_denied:'ti-x',group_invite:'ti-users-group'}[type]||'ti-bell'); }
+function notificationTime(ts){ return timeAgo(ts); }
+async function markAllNotificationsRead(){
+  if(!ME || isViewerMode()) return;
+  const unread=Object.values(USER_NOTIFICATIONS||{}).filter(n=>n&&!n.read); if(!unread.length) return;
+  const patch={}; unread.forEach(n=>patch[n.id+'/read']=true);
+  try{ await window.fbUpdate('users/'+ME.id+'/notifications',patch); }catch(e){}
+}
+async function openNotificationItem(n){
+  if(!n) return;
+  if(n.groupId){
+    const s=await loadSquad(n.groupId);
+    if(s && s.members?.some(m=>m.id===ME.id)){
+      SQUAD=s; SQUAD_ID=n.groupId; ensureAccountState(); if(!ME.groupIds.includes(n.groupId)) ME.groupIds.push(n.groupId); await saveMySquadId(); attachSquadListener(); goTo(n.screen||'home',{replace:true});
+      return;
+    }
+  }
+  if(n.screen) goTo(n.screen,{replace:true});
+}
+function unreadNotificationCount(){ return Object.values(USER_NOTIFICATIONS||{}).filter(n=>n&&!n.read).length; }
+function renderNotificationBell(){
+  const count=unreadNotificationCount();
+  return `<div class="notification-bell-wrap"><button class="icon-btn liquid-interactive motion-card" id="notification-center-btn" aria-label="Notifications">${icon('ti-bell')}${count?`<span class="notification-dot">${count>9?'9+':count}</span>`:''}</button></div>`;
+}
+function renderNotifications(){
+  const items=Object.values(USER_NOTIFICATIONS||{}).sort((a,b)=>Number(b.ts||0)-Number(a.ts||0));
+  return `<div class="screen user-theme-page"><div class="page-title-row">${backBtn('notifications-back')}<h2>Notifications</h2><button class="btn btn-ghost" id="notifications-readall" style="margin-left:auto;padding:8px 10px;font-size:11px;">Mark all read</button></div><p class="small-note" style="margin:8px 0 18px 48px;">Nudges, messages, calls, XP updates, group requests and approvals.</p><div class="notification-list">${items.length?items.map(n=>`<button class="notification-item glass liquid-interactive motion-card ${n.read?'read':'unread'}" data-notification-id="${escapeHtml(n.id)}"><span class="notification-icon">${icon(notificationIcon(n.type))}</span><span class="notification-copy"><strong>${escapeHtml(n.title||'Notification')}</strong><span>${escapeHtml(n.body||'')}</span><small>${notificationTime(n.ts)}</small></span>${n.groupId?`<span class="ti notification-chevron">${icon('ti-chevron-right')}</span>`:''}</button>`).join(''):`<div class="empty-hint glass liquid-interactive"><div style="font-size:28px;margin-bottom:8px;">${icon('ti-bell')}</div><strong>You're all caught up.</strong><div style="margin-top:6px;">New squad activity will appear here.</div></div>`}</div></div>`;
+}
+
+async function ensureGroupRequestNotification(group, status){
+  if(!ME||!group) return;
+  const key=`group_${status}_${group.id}`;
+  const existing=Object.values(USER_NOTIFICATIONS||{}).find(n=>n&&n.id===key);
+  if(existing) return;
+  const title=status==='accepted'?'Group request accepted':'Group request denied';
+  const body=status==='accepted'?`You joined ${group.name}. Open the group to continue.`:`Your request to join ${group.name} was denied.`;
+  return createUserNotification(status==='accepted'?'group_accepted':'group_denied',title,body,{id:key,groupId:status==='accepted'?group.id:null,screen:status==='accepted'?'home':'squad-choice'});
 }
 
 async function enableNotifications(){
@@ -1421,6 +1513,7 @@ async function resolveJoinRequest(uid, approve){
     SQUAD.joinRequests = (SQUAD.joinRequests || []).filter(r => r.id !== uid);
     SQUAD.updatedAt = Date.now();
     await saveSquad();
+    try{await window.fbUpdate('users/'+uid+'/notifications/'+`group_denied_${SQUAD.id}`,{id:`group_denied_${SQUAD.id}`,type:'group_denied',title:'Group request denied',body:`Your request to join ${SQUAD.name} was denied.`,ts:Date.now(),read:false});await window.fbUpdate('users/'+uid+'/notifications/'+`group_request_${SQUAD.id}`,{read:true});}catch(e){}
     softUpdate();
     showToast(`Denied ${req.name.split(' ')[0]}'s request`, 'ti-x');
     return;
@@ -1457,7 +1550,9 @@ async function resolveJoinRequest(uid, approve){
       if(joinCost>0){const charged=await atomicUserXpDelta(uid,-joinCost);if(!charged.ok){showToast(`${req.name.split(' ')[0]} no longer has ${joinCost} XP`,'ti-alert-triangle');return}requester.xp=charged.xp}
       requester.groupIds=[...new Set([...(requester.groupIds||[]),...(requester.squadId?[requester.squadId]:[]),SQUAD.id])];
       requester.xpState=requester.xpState||{};requester.xpState.groupBonuses=requester.xpState.groupBonuses||{};const bonusKey=`${SQUAD.id}:member`;if(!requester.xpState.groupBonuses[bonusKey])requester.xpState.groupBonuses[bonusKey]=Date.now();
-      await window.fbUpdate('users/'+uid,{groupIds:requester.groupIds,xpState:requester.xpState});
+      await window.fbUpdate('users/'+uid,{groupIds:[...new Set(requester.groupIds)],squadId:requester.squadId||null,xp:requester.xp,xpState:requester.xpState});
+      await window.fbUpdate('users/'+uid+'/notifications/'+`group_accepted_${SQUAD.id}`,{id:`group_accepted_${SQUAD.id}`,type:'group_accepted',title:'You were accepted',body:`You joined ${SQUAD.name}. Open the group — no code needed.`,groupId:SQUAD.id,screen:'home',ts:Date.now(),read:false});
+      await window.fbUpdate('users/'+uid+'/notifications/'+`group_request_${SQUAD.id}` ,{read:true});
     }catch(e){showToast('Could not finalize the join — membership was not committed','ti-alert-triangle');return}
   }
 
@@ -1754,12 +1849,19 @@ function currentScreenHtml(){
   if(currentScreen === 'join-requests') return renderJoinRequests();
   if(currentScreen === 'xp') return renderXp();
   if(currentScreen === 'shop') return renderShop();
+  if(currentScreen === 'notifications') return renderNotifications();
   return renderHome();
 }
 
 function renderAll(pushHistory){
   applyTheme();
   if(SQUAD?.groupStyle) applyGroupStyle();
+  const root=document.documentElement;
+  const userHex=LOCAL.accentHex || (THEMES.find(t=>t.id===LOCAL.theme)?.hex1) || '#7C9CFF';
+  root.style.setProperty('--user-accent',userHex); root.style.setProperty('--user-accent-2',shiftHex(userHex,24)); root.style.setProperty('--user-accent-rgb',hexToRgb(userHex)||'124,156,255');
+  const groupScreens=['home','board','activities','manage','messages','tv-board','group-settings','roles','join-requests'];
+  document.body.classList.toggle('group-scope',groupScreens.includes(currentScreen));
+  document.body.classList.toggle('user-scope',!groupScreens.includes(currentScreen));
   const app = document.getElementById('app');
   const html = currentScreenHtml();
   app.innerHTML = html;
@@ -2102,7 +2204,7 @@ function renderCreateSquad(){
         <div style="display:flex; align-items:center; gap:10px;"><span class="ti" style="color:var(--accent);">${icon('ti-lock')}</span><div><div style="font-size:14px; font-weight:600;">Require approval to join</div><div style="font-size:11.5px; color:var(--text-lo); margin-top:2px;">You'll approve each join request</div></div></div>
         <span class="ti" id="sq-locked-check" style="font-size:22px; color:var(--text-faint);"></span>
       </div>
-      <button class="btn btn-primary btn-block" id="sq-create-submit" style="padding:16px;">Create Squad</button>
+      <div class="small-note" style="margin:0 0 10px 4px;">${realGroupCount()===0?'Your first squad is free.':'Additional squad: '+XP_CONFIG.createGroup+' XP'}</div><button class="btn btn-primary btn-block" id="sq-create-submit" style="padding:16px;">Create Squad</button>
     </div>
   `;
 }
@@ -2163,7 +2265,7 @@ function renderHome(){
           <div class="group-hero-actions"><button class="btn btn-primary liquid-interactive motion-card" id="group-invite-btn">${icon('ti-share-3')} Invite</button><button class="btn btn-ghost liquid-interactive motion-card" id="group-manage-btn">${icon('ti-settings')} Manage</button></div>
         </div>
       </div>
-      <div class="top-row" style="margin-top:14px;"><div class="brand">${groupMarkHtml(g,38)}<div><div class="brand-name">${escapeHtml(SQUAD.name)}</div><div class="sync-badge ${online?'':'offline'}"><span class="ti">${icon(online?'ti-refresh':'ti-cloud-off')}</span> ${online?'Connected live':'Offline — cached view'}</div></div></div>${renderAvatarGroup(others)}<div style="display:flex;align-items:center;gap:7px;margin-left:auto;"><div class="sync-badge" id="home-sync-badge" style="cursor:pointer;">${icon(online?'ti-refresh':'ti-cloud-off')} ${online?'Live':'Offline'}</div><div class="icon-btn liquid-interactive motion-card" id="my-status-btn">${icon('ti-mood-smile')}</div><div class="icon-btn liquid-interactive motion-card" id="go-messages-btn">${icon('ti-message')}</div></div></div>
+      <div class="top-row" style="margin-top:14px;"><div class="brand">${groupMarkHtml(g,38)}<div><div class="brand-name">${escapeHtml(SQUAD.name)}</div><div class="sync-badge ${online?'':'offline'}"><span class="ti">${icon(online?'ti-refresh':'ti-cloud-off')}</span> ${online?'Connected live':'Offline — cached view'}</div></div></div>${renderAvatarGroup(others)}<div style="display:flex;align-items:center;gap:7px;margin-left:auto;"><div class="sync-badge" id="home-sync-badge" style="cursor:pointer;">${icon(online?'ti-refresh':'ti-cloud-off')} ${online?'Live':'Offline'}</div>${renderNotificationBell()}<div class="icon-btn liquid-interactive motion-card" id="my-status-btn">${icon('ti-mood-smile')}</div><div class="icon-btn liquid-interactive motion-card" id="go-messages-btn">${icon('ti-message')}</div></div></div>
       <div class="xp-hero glass liquid-sheen liquid-interactive motion-card" id="open-xp" style="margin-bottom:14px;cursor:pointer;"><div style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><div><div style="font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-lo);font-weight:800;">Your XP</div><div class="xp-number">${Math.floor(ME.xp||0)} <span style="font-size:14px;color:var(--text-lo);font-weight:700;">XP</span></div></div><div style="text-align:right;"><div class="xp-badge">${icon('ti-flame')} Daily +10</div><div style="font-size:10.5px;color:var(--text-faint);margin-top:6px;">Tap for XP &amp; shop</div></div></div></div>
       <div class="layout-switch" id="layout-switch"><div class="layout-pill" id="layout-pill"></div><div class="layout-opt liquid-interactive motion-card ${layout==='grid'?'active':''}" data-layout="grid">Grid</div><div class="layout-opt liquid-interactive motion-card ${layout==='list'?'active':''}" data-layout="list">List</div><div class="layout-opt liquid-interactive motion-card ${layout==='wheel'?'active':''}" data-layout="wheel">Wheel</div></div>
       ${body}
@@ -3156,8 +3258,8 @@ function renderShop(){
 
 function renderMe(){
   return `
-    <div class="screen">
-      <div class="top-row"><div></div><div class="icon-btn" id="me-signout-btn"><span class="ti">${icon('ti-logout')}</span></div></div>
+    <div class="screen user-theme-page">
+      <div class="top-row"><div>${renderNotificationBell()}</div><div class="icon-btn" id="me-signout-btn"><span class="ti">${icon('ti-logout')}</span></div></div>
       <div style="text-align:center; padding:4px 0 20px;">
         <div class="avatar" id="me-avatar-btn" style="width:76px;height:76px;font-size:26px;margin:0 auto 12px; cursor:pointer; position:relative;">${ME.emoji?`<span style="font-size:34px;">${ME.emoji}</span>`:ME.photo?`<img src="${ME.photo}" alt="">`:getInitials(ME.name)}
           <div style="position:absolute; bottom:-2px; right:-2px; width:24px;height:24px;border-radius:50%; background:var(--accent); display:flex; align-items:center; justify-content:center; border:2px solid var(--bg-0);"><span class="ti" style="font-size:12px; color:#0B0E1A;">${icon('ti-pencil')}</span></div>
@@ -3272,6 +3374,10 @@ function bindEvents(){
   if(byId('xp-tabs')){ document.querySelectorAll('[data-xp-tab]').forEach(btn=>{btn.onclick=()=>{currentParams.xpTab=btn.dataset.xpTab;softUpdate();requestAnimationFrame(()=>{const wrap=document.getElementById('xp-tabs'),pill=document.getElementById('xp-tab-pill'),active=wrap?.querySelector('.xp-tab.active');if(wrap&&pill&&active){pill.style.left=active.offsetLeft+'px';pill.style.width=active.offsetWidth+'px';}});};}); if((currentParams.xpTab||'overview')==='leaderboard') hydrateXpLeaderboard(); }
   if(byId('open-xp')) byId('open-xp').onclick = () => goTo('xp');
   if(byId('go-xp')) byId('go-xp').onclick = () => goTo('xp');
+  if(byId('notification-center-btn')) byId('notification-center-btn').onclick=()=>goTo('notifications');
+  if(byId('notifications-back')) byId('notifications-back').onclick=()=>goBack('home');
+  if(byId('notifications-readall')) byId('notifications-readall').onclick=async()=>{await markAllNotificationsRead();softUpdate();};
+  document.querySelectorAll('[data-notification-id]').forEach(el=>el.onclick=async()=>{const n=USER_NOTIFICATIONS[el.dataset.notificationId];if(n&&!n.read&&!isViewerMode()){try{await window.fbUpdate('users/'+ME.id+'/notifications/'+n.id,{read:true});}catch(e){}}await openNotificationItem(n);});
   if(byId('xp-shop-btn')) byId('xp-shop-btn').onclick = () => goTo('shop');
   if(byId('group-create-btn')) byId('group-create-btn').onclick = () => goTo('create-squad');
   if(byId('group-join-btn')) byId('group-join-btn').onclick = () => goTo('join-squad');
@@ -3368,7 +3474,7 @@ function bindEvents(){
       const cap = Math.min(15, Math.max(2, window.__pendingCap || 6));
       const locked = !!window.__pendingLocked;
       ensureAccountState();
-      const groupCount=getGroupIds().length;
+      const groupCount=await verifiedGroupCount();
       if(groupCount>=XP_CONFIG.maxGroups) return showToast('Maximum 5 groups reached','ti-alert-triangle');
       if(groupCount>=1 && !(await spendXp(XP_CONFIG.createGroup,'Create group'))) return;
       const id = 'sq_' + genCode() + Date.now().toString(36);
@@ -3442,18 +3548,24 @@ function bindEvents(){
           showToast('Request already sent — waiting for approval', 'ti-clock');
           return;
         }
-        const requestGroupCount=getGroupIds().length; const requestJoinCost=requestGroupCount>=2?XP_CONFIG.extraGroup:0; sq.joinRequests.push({ id: ME.id, name: ME.name, tz: ME.tz, photo: ME.photo || '', ts: Date.now(), joinCost:requestJoinCost, groupCountAtRequest:requestGroupCount });
+        const requestGroupCount=await verifiedGroupCount(); const requestJoinCost=requestGroupCount>=2?XP_CONFIG.extraGroup:0; sq.joinRequests.push({ id: ME.id, name: ME.name, tz: ME.tz, photo: ME.photo || '', ts: Date.now(), joinCost:requestJoinCost, groupCountAtRequest:requestGroupCount });
         sq.updatedAt = Date.now();
         try{
           if(typeof window.fbSet === 'function') await window.fbSet('squads/' + sq.id, sq);
+          await createUserNotification('group_request','Join request sent',`Your request to join ${sq.name} is waiting for approval.`,{id:`group_request_${sq.id}`,groupId:sq.id,screen:'join-squad'});
         }catch(e){ errEl.textContent = 'Could not send request — check connection.'; errEl.style.display='block'; return; }
         showToast('Request sent — waiting for approval', 'ti-clock');
         goTo('squad-choice', {replace:true});
         return;
       }
+      if(alreadyMember){
+        ensureAccountState();
+        if(!ME.groupIds.includes(sq.id)) ME.groupIds.push(sq.id);
+        SQUAD=sq;SQUAD_ID=sq.id;await saveMySquadId();attachSquadListener();goTo('home',{replace:true});showToast(`You're already in ${sq.name}`,'ti-circle-check');return;
+      }
       if(!alreadyMember){
         ensureAccountState();
-        const joinedCount=getGroupIds().length;
+        const joinedCount=await verifiedGroupCount();
         if(joinedCount>=XP_CONFIG.maxGroups){ errEl.textContent='You can belong to a maximum of 5 groups.'; errEl.style.display='block'; return; }
         const joinCost=joinedCount>=2?XP_CONFIG.extraGroup:0;
         if(joinCost>0 && !(await spendXp(joinCost,'Join additional group'))){ errEl.textContent=`You need ${joinCost} XP to join another group.`; errEl.style.display='block'; return; }
@@ -3466,6 +3578,8 @@ function bindEvents(){
         if(!sq.permissions) sq.permissions = {};
         if(!sq.permissions[ME.id]) sq.permissions[ME.id] = { ...DEFAULT_PERMISSIONS.member };
       }
+      sq.members=(sq.members||[]).filter((m,i,a)=>a.findIndex(x=>x.id===m.id)===i);
+      sq.joinRequests=(sq.joinRequests||[]).filter(r=>r.id!==ME.id);
       sq.updatedAt = Date.now();
       SQUAD = sq;
       SQUAD_ID = sq.id;
@@ -3474,8 +3588,9 @@ function bindEvents(){
       ensureAccountState();
       if(!ME.groupIds.includes(sq.id)) ME.groupIds.push(sq.id);
       await saveMe();
+      try{ await window.fbUpdate('users/'+ME.id+'/notifications/'+`group_request_${sq.id}`,{read:true}); }catch(e){}
       await awardGroupRoleXp(sq.id,'member');
-      attachSquadListener();
+      attachUserNotificationListener(); attachSquadListener();
       showToast(`Joined ${sq.name}`, 'ti-users-group');
       goTo('home', {replace:true});
     };
@@ -3800,6 +3915,7 @@ function bindEvents(){
       if(chatUnsub) chatUnsub();
       if(callUnsub) callUnsub();
       await window.fbSignOut();
+      if(notificationUnsub) notificationUnsub(); notificationUnsub=null; USER_NOTIFICATIONS={}; notificationSeenIds.clear();
       ME = null; SQUAD = null; SQUAD_ID = null; history_stack = [];
       goTo('login', {replace:true});
     };
@@ -3853,6 +3969,7 @@ async function bootForUser(user){
   }
   await loadMe();
   await loadLocal();
+  if(ME) attachUserNotificationListener();
   await loadMySquadId();
   applyTheme();
 
