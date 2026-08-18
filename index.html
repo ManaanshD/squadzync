@@ -1,0 +1,2678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SquadZync</title>
+<link rel="manifest" id="manifest-link">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%237C9CFF'/%3E%3Cpath d='M30 55 L45 68 L72 35' stroke='%230B0E1A' stroke-width='9' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%237C9CFF'/%3E%3Cpath d='M30 55 L45 68 L72 35' stroke='%230B0E1A' stroke-width='9' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<meta name="theme-color" content="#0B0E1A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/2.47.0/iconfont/tabler-icons.min.css">
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+  import {
+    getDatabase, ref, set, get, update, onValue, off
+  } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-database.js";
+  import {
+    getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect,
+    getRedirectResult, onAuthStateChanged, signOut
+  } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyAqJw7ROh1nNU9lPhcU_Rwojbx6XQhcpW8",
+    authDomain: "squadsyncmd.firebaseapp.com",
+    databaseURL: "https://squadsyncmd-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "squadsyncmd",
+    storageBucket: "squadsyncmd.firebasestorage.app",
+    messagingSenderId: "790712054751",
+    appId: "1:790712054751:web:3befeca96a3c336b5e0a6a"
+  };
+
+  let db = null, auth = null;
+  try {
+    const app = initializeApp(firebaseConfig);
+    db = getDatabase(app);
+    auth = getAuth(app);
+  } catch (e) {
+    console.warn('Firebase initialization error:', e);
+  }
+
+  window.__fbReady = !!db;
+  const listeners = {};
+
+  window.fbSet = async (path, value) => {
+    if (!db) throw new Error('Firebase not connected');
+    await set(ref(db, path), value);
+  };
+  window.fbUpdate = async (path, value) => {
+    if (!db) throw new Error('Firebase not connected');
+    await update(ref(db, path), value);
+  };
+  window.fbGet = async (path) => {
+    if (!db) throw new Error('Firebase not connected');
+    const snap = await get(ref(db, path));
+    return snap.exists() ? snap.val() : null;
+  };
+  window.fbListen = (path, cb) => {
+    if (!db) return () => {};
+    if (listeners[path]) { off(ref(db, path)); delete listeners[path]; }
+    const r = ref(db, path);
+    onValue(r, (snap) => cb(snap.exists() ? snap.val() : null));
+    listeners[path] = r;
+    return () => { off(r); delete listeners[path]; };
+  };
+
+  const provider = new GoogleAuthProvider();
+  window.__authReady = !!auth;
+
+  window.fbSignIn = async () => {
+    if (!auth) throw new Error('Auth not connected');
+    try {
+      const result = await signInWithPopup(auth, provider);
+      return result.user;
+    } catch (e) {
+      if (e && (e.code === 'auth/popup-blocked' || e.code === 'auth/cancelled-popup-request' || e.code === 'auth/operation-not-supported-in-this-environment')) {
+        await signInWithRedirect(auth, provider);
+        return null;
+      }
+      throw e;
+    }
+  };
+  window.fbSignOut = async () => { if (auth) await signOut(auth); };
+
+  // Signal that all Firebase bridge functions (fbSet/fbGet/fbUpdate/fbListen/
+  // fbSignIn/fbSignOut) are now attached to window. The main app script waits
+  // on this before booting, which fixes the "window.fbSet is not a function"
+  // race — module scripts execute asynchronously/deferred relative to classic
+  // scripts, so without this explicit gate the app could call window.fbSet
+  // before this module finished running.
+  window.__fbBridgeReady = true;
+  if (window.__onFbBridgeReady) { window.__onFbBridgeReady(); window.__onFbBridgeReady = null; }
+
+  window.__authUser = null;
+  window.__authResolved = false;
+  const authWaiters = [];
+  window.__onAuthReady = (cb) => {
+    if (window.__authResolved) cb(window.__authUser);
+    else authWaiters.push(cb);
+  };
+
+  if (auth) {
+    getRedirectResult(auth).catch(() => {});
+    onAuthStateChanged(auth, (user) => {
+      window.__authUser = user ? {
+        uid: user.uid,
+        name: user.displayName || 'Friend',
+        email: user.email || '',
+        photo: user.photoURL || ''
+      } : null;
+      window.__authResolved = true;
+      if (authWaiters.length) { authWaiters.forEach(cb => cb(window.__authUser)); authWaiters.length = 0; }
+      if (window.__onAuthChange) window.__onAuthChange(window.__authUser);
+    });
+  } else {
+    window.__authResolved = true;
+  }
+</script>
+
+<style>
+:root{
+  --bg-0:#0B0E1A;
+  --glass:rgba(255,255,255,0.06);
+  --glass-strong:rgba(255,255,255,0.10);
+  --glass-border:rgba(255,255,255,0.12);
+  --text-hi:#F5F6FA;
+  --text-lo:#9BA0B4;
+  --text-faint:#6B7086;
+  --accent:#7C9CFF;
+  --accent-2:#9B7CFF;
+  --green:#4ADE80;
+  --amber:#FBBF24;
+  --red:#F87171;
+  --grey:#9CA3AF;
+  --radius-lg:26px;
+  --radius-md:18px;
+  --radius-sm:12px;
+  --font-display:'Manrope',sans-serif;
+  --font-body:'DM Sans',sans-serif;
+  --ease-spring:cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-spring-soft:cubic-bezier(0.32, 1.28, 0.56, 1);
+  --ease-out-ios:cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-sheet:cubic-bezier(0.32, 0.72, 0, 1);
+}
+body.theme-violet{ --accent:#9B7CFF; --accent-2:#C58CFF; }
+body.theme-blue{ --accent:#5B9CFF; --accent-2:#7CC4FF; }
+body.theme-green{ --accent:#4ADE80; --accent-2:#7CFFB2; }
+body.theme-rose{ --accent:#FF7CA3; --accent-2:#FF9B7C; }
+body.theme-amber{ --accent:#FBBF24; --accent-2:#FF9B4A; }
+
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+html{-webkit-text-size-adjust:100%;}
+html,body{margin:0;padding:0;height:100%;overscroll-behavior-y:none;}
+@media (prefers-reduced-motion: reduce){
+  *, *::before, *::after{animation-duration:0.001ms !important; animation-iteration-count:1 !important; transition-duration:0.001ms !important;}
+}
+body{
+  font-family:var(--font-body);
+  color:var(--text-hi);
+  background:
+    radial-gradient(circle at 15% 0%, #1a2140 0%, transparent 45%),
+    radial-gradient(circle at 90% 20%, #241634 0%, transparent 40%),
+    radial-gradient(circle at 50% 100%, #0d1830 0%, transparent 50%),
+    var(--bg-0);
+  background-attachment:fixed;
+  min-height:100vh; min-height:100dvh;
+  overflow-x:hidden;
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+  transition:background .4s ease;
+}
+body::before{
+  content:'';
+  position:fixed; inset:-20%;
+  background:
+    radial-gradient(circle at 30% 20%, rgba(124,156,255,0.10), transparent 55%),
+    radial-gradient(circle at 75% 75%, rgba(155,124,255,0.08), transparent 50%);
+  animation:ambient-drift 18s ease-in-out infinite alternate;
+  pointer-events:none;
+  z-index:0;
+}
+@keyframes ambient-drift{
+  0%{transform:translate(0,0) scale(1);}
+  100%{transform:translate(-2%,2%) scale(1.06);}
+}
+#app{max-width:480px;margin:0 auto;min-height:100vh;min-height:100dvh;position:relative;padding-bottom:calc(100px + env(safe-area-inset-bottom));z-index:1;}
+
+.hidden{display:none !important;}
+.glass{
+  background:var(--glass);
+  backdrop-filter:blur(26px) saturate(160%);
+  -webkit-backdrop-filter:blur(26px) saturate(160%);
+  border:1px solid var(--glass-border);
+  border-radius:var(--radius-md);
+  box-shadow:0 1px 0 rgba(255,255,255,0.05) inset, 0 8px 24px -12px rgba(0,0,0,0.5);
+  transition:transform .38s var(--ease-spring), box-shadow .3s ease, background .3s ease;
+}
+.glass-strong{
+  background:var(--glass-strong);
+  backdrop-filter:blur(32px) saturate(170%);
+  -webkit-backdrop-filter:blur(32px) saturate(170%);
+  border:1px solid var(--glass-border);
+  border-radius:var(--radius-md);
+  box-shadow:0 1px 0 rgba(255,255,255,0.07) inset, 0 12px 32px -14px rgba(0,0,0,0.55);
+}
+.btn{
+  font-family:var(--font-display);
+  font-weight:700;
+  font-size:15px;
+  color:var(--text-hi);
+  background:var(--glass-strong);
+  border:1px solid var(--glass-border);
+  border-radius:16px;
+  padding:15px 20px;
+  cursor:pointer;
+  transition:transform .42s var(--ease-spring), background .18s ease, filter .18s ease, box-shadow .3s ease;
+  display:flex; align-items:center; justify-content:center; gap:8px;
+  -webkit-user-select:none; user-select:none;
+  will-change:transform;
+}
+.btn:active{transform:scale(0.945); background:rgba(255,255,255,0.16); transition:transform .1s var(--ease-out-ios), background .08s ease;}
+.btn-primary{
+  background:linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+  border:none; color:#0B0E1A;
+  box-shadow:0 10px 28px -10px rgba(124,156,255,0.55), 0 1px 0 rgba(255,255,255,0.35) inset;
+  transition:transform .42s var(--ease-spring), filter .18s ease, box-shadow .3s ease, background .4s ease;
+}
+.btn-primary:active{transform:scale(0.945); filter:brightness(1.08); transition:transform .1s var(--ease-out-ios), filter .08s ease;}
+.btn-ghost{background:transparent; border:1px solid var(--glass-border);}
+.btn-block{width:100%;}
+.btn-google{
+  background:#fff; color:#1f1f1f; border:1px solid rgba(0,0,0,0.08);
+}
+.btn-google:active{background:#f1f1f1;}
+.btn[disabled]{opacity:.5; pointer-events:none;}
+
+input[type=text], input[type=tel], input[type=url], input[type=search], select, textarea{
+  width:100%;
+  font-family:var(--font-body);
+  font-size:16px;
+  color:var(--text-hi);
+  background:rgba(255,255,255,0.05);
+  border:1px solid var(--glass-border);
+  border-radius:14px;
+  padding:13px 15px;
+  outline:none;
+  transition:border-color .2s ease, box-shadow .2s ease, background .2s ease;
+}
+input::placeholder, textarea::placeholder{color:var(--text-faint);}
+input:focus, select:focus, textarea:focus{
+  border-color:var(--accent);
+  background:rgba(124,156,255,0.06);
+  box-shadow:0 0 0 4px rgba(124,156,255,0.15);
+}
+label.field-label{font-size:12px; font-weight:600; color:var(--text-lo); text-transform:uppercase; letter-spacing:0.06em; margin:0 0 6px 4px; display:block;}
+.field{margin-bottom:16px;}
+h1,h2,h3{font-family:var(--font-display); margin:0; font-weight:800; letter-spacing:-0.02em;}
+p{margin:0;}
+
+.hero-title{font-size:clamp(28px, 8vw, 36px) !important;}
+.hero-sub{font-size:clamp(14px, 3.6vw, 15.5px) !important;}
+.brand-name{font-size:clamp(15px, 4vw, 17px) !important;}
+.friend-time{font-size:clamp(17px, 5vw, 21px) !important;}
+.invite-code{font-size:clamp(30px, 9vw, 40px) !important;}
+
+.screen{padding:24px 20px 20px; position:relative;}
+.screen.enter-fwd{animation:push-in .38s var(--ease-out-ios) both;}
+.screen.enter-back{animation:pop-in .38s var(--ease-out-ios) both;}
+@keyframes push-in{from{opacity:0; transform:translateX(18px);} to{opacity:1; transform:translateX(0);}}
+@keyframes pop-in{from{opacity:0; transform:translateX(-18px);} to{opacity:1; transform:translateX(0);}}
+
+.top-row{display:flex; align-items:center; justify-content:space-between; margin-bottom:28px; gap:10px;}
+.brand{display:flex; align-items:center; gap:10px;}
+.brand-mark{width:34px;height:34px;border-radius:11px;background:linear-gradient(135deg,var(--accent),var(--accent-2)); display:flex;align-items:center;justify-content:center;font-size:18px; transition:background .4s ease;}
+.brand-name{font-family:var(--font-display); font-weight:800; font-size:17px; letter-spacing:-0.02em;}
+.icon-btn{width:38px;height:38px;border-radius:12px;display:flex;align-items:center;justify-content:center;color:var(--text-lo);cursor:pointer; background:var(--glass); border:1px solid var(--glass-border); transition:transform .3s var(--ease-spring), background .18s ease, color .18s ease; flex-shrink:0;}
+.icon-btn:active{transform:scale(0.86); transition:transform .1s var(--ease-out-ios);}
+.icon-btn.back-btn{margin-right:2px;}
+.page-title-row{display:flex; align-items:center; gap:12px; margin-bottom:6px;}
+.page-title-row h2{font-size:21px;}
+
+.hero-title{font-size:34px; line-height:1.15; margin-bottom:10px; opacity:0; animation:rise-in .55s var(--ease-out-ios) .05s forwards;}
+.hero-sub{font-size:15px; color:var(--text-lo); line-height:1.6; margin-bottom:32px; opacity:0; animation:rise-in .55s var(--ease-out-ios) .12s forwards;}
+.onb-card{padding:20px; margin-bottom:14px; opacity:0; animation:rise-in .5s var(--ease-out-ios) forwards;}
+.stack .onb-card:nth-child(1){animation-delay:.18s;}
+.stack .onb-card:nth-child(2){animation-delay:.26s;}
+.stack .onb-card:nth-child(3){animation-delay:.34s;}
+@keyframes rise-in{from{opacity:0; transform:translateY(14px);} to{opacity:1; transform:translateY(0);}}
+.onb-card-icon{width:42px;height:42px;border-radius:13px;background:rgba(124,156,255,0.15);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:12px; transition:color .3s ease;}
+.onb-card h3{font-size:15px;margin-bottom:4px;}
+.onb-card p{font-size:13px;color:var(--text-lo);line-height:1.5;}
+.stack{display:flex;flex-direction:column;gap:12px;}
+
+.avatar{
+  border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--font-display); font-weight:700;
+  background:linear-gradient(135deg,#3a4570,#2a2f52);
+  color:var(--text-hi);
+  flex-shrink:0;
+  position:relative;
+  overflow:hidden;
+  background-size:cover; background-position:center;
+}
+.avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%;}
+.status-ring{position:absolute; inset:-3px; border-radius:50%; border:2.5px solid transparent; pointer-events:none; transition:border-color .3s ease, box-shadow .3s ease;}
+.ring-free{border-color:var(--green); box-shadow:0 0 12px rgba(74,222,128,0.5); animation:ring-breathe 2.6s ease-in-out infinite;}
+.ring-soon{border-color:var(--amber); box-shadow:0 0 12px rgba(251,191,36,0.4);}
+.ring-dnd{border-color:var(--red); box-shadow:0 0 12px rgba(248,113,113,0.4);}
+.ring-sleep{border-color:var(--grey);}
+@keyframes ring-breathe{0%,100%{box-shadow:0 0 12px rgba(74,222,128,0.5);} 50%{box-shadow:0 0 18px rgba(74,222,128,0.8);}}
+
+.layout-switch{display:flex; gap:6px; background:var(--glass); border:1px solid var(--glass-border); border-radius:14px; padding:4px; margin-bottom:20px; position:relative;}
+.layout-opt{flex:1; text-align:center; padding:9px 0; border-radius:11px; font-size:12px; font-weight:600; color:var(--text-lo); cursor:pointer; transition:color .2s ease; position:relative; z-index:1; -webkit-user-select:none; user-select:none;}
+.layout-opt.active{color:var(--text-hi);}
+.layout-pill{position:absolute; top:4px; bottom:4px; border-radius:11px; background:var(--glass-strong); box-shadow:0 2px 8px rgba(0,0,0,0.25); transition:left .38s var(--ease-spring), width .38s var(--ease-spring); z-index:0;}
+
+.widget-grid{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+.friend-tile{padding:16px 14px; position:relative; overflow:hidden; cursor:pointer; transition:transform .42s var(--ease-spring), box-shadow .38s var(--ease-spring); will-change:transform; opacity:0; animation:tile-in .5s var(--ease-out-ios) forwards;}
+.friend-tile::after{content:'';position:absolute; inset:0; background:linear-gradient(160deg, rgba(255,255,255,0.10) 0%, transparent 35%); pointer-events:none;}
+.friend-tile:active{transform:scale(0.955); transition:transform .1s var(--ease-out-ios);}
+@keyframes tile-in{from{opacity:0; transform:translateY(10px) scale(0.96);} to{opacity:1; transform:translateY(0) scale(1);}}
+.friend-tile .avatar{width:46px;height:46px;font-size:16px; margin-bottom:10px;}
+.friend-name{font-size:14px;font-weight:700;margin-bottom:2px; overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.friend-time{font-size:20px;font-weight:800;font-family:var(--font-display); margin-bottom:6px;}
+.friend-status{font-size:12px;color:var(--text-lo); display:flex; align-items:center; gap:5px; margin-bottom:4px; line-height:1.4;}
+.friend-countdown{font-size:11px; color:var(--text-faint); font-weight:600;}
+.tile-content{position:relative; z-index:1;}
+.widget-grid .friend-tile:nth-child(1){animation-delay:0ms;}
+.widget-grid .friend-tile:nth-child(2){animation-delay:40ms;}
+.widget-grid .friend-tile:nth-child(3){animation-delay:80ms;}
+.widget-grid .friend-tile:nth-child(4){animation-delay:120ms;}
+.widget-grid .friend-tile:nth-child(5){animation-delay:160ms;}
+.widget-grid .friend-tile:nth-child(6){animation-delay:200ms;}
+
+.list-item{padding:14px 16px; margin-bottom:10px; display:flex; align-items:center; justify-content:space-between; cursor:pointer; transition:transform .38s var(--ease-spring); opacity:0; animation:row-in .42s var(--ease-out-ios) forwards;}
+@keyframes row-in{from{opacity:0; transform:translateX(-8px);} to{opacity:1; transform:translateX(0);}}
+.list-item:nth-child(1){animation-delay:0ms;} .list-item:nth-child(2){animation-delay:35ms;}
+.list-item:nth-child(3){animation-delay:70ms;} .list-item:nth-child(4){animation-delay:105ms;}
+.list-item:nth-child(5){animation-delay:140ms;} .list-item:nth-child(6){animation-delay:175ms;}
+.list-item:active{transform:scale(0.97);}
+.list-left{display:flex; align-items:center; gap:12px; min-width:0;}
+.list-item .avatar{width:44px;height:44px;font-size:15px;}
+
+.wheel-wrap{position:relative; width:100%; aspect-ratio:1/1; max-width:340px; margin:20px auto 0; display:flex; align-items:center; justify-content:center;}
+.wheel-center{width:96px;height:96px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;z-index:2; padding:8px;}
+.wheel-center-time{font-family:var(--font-display); font-weight:800; font-size:22px; line-height:1;}
+.wheel-center-sub{font-size:10px; color:var(--text-lo); text-transform:uppercase; letter-spacing:0.06em; margin-top:2px;}
+.wheel-node{position:absolute; width:72px; display:flex; flex-direction:column; align-items:center; gap:4px; transform:translate(-50%,-50%); cursor:pointer; opacity:0; animation:node-pop .48s var(--ease-spring) forwards; transition:transform .3s var(--ease-spring);}
+.wheel-node:active{transform:translate(-50%,-50%) scale(0.92) !important;}
+@keyframes node-pop{from{opacity:0; transform:translate(-50%,-50%) scale(0.6);} to{opacity:1; transform:translate(-50%,-50%) scale(1);}}
+.wheel-node .avatar{width:52px;height:52px;font-size:18px;}
+.wheel-node-name{font-size:11px; font-weight:700; text-align:center; max-width:70px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+
+.bottom-nav{position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:100%; max-width:480px; padding:12px 20px calc(14px + env(safe-area-inset-bottom)); background:rgba(11,14,26,0.85); backdrop-filter:blur(30px); -webkit-backdrop-filter:blur(30px); border-top:1px solid var(--glass-border); display:flex; justify-content:space-around; align-items:center; z-index:90; animation:nav-in .5s var(--ease-out-ios) .05s backwards;}
+@keyframes nav-in{from{opacity:0; transform:translate(-50%, 16px);} to{opacity:1; transform:translate(-50%, 0);}}
+.nav-item{display:flex; flex-direction:column; align-items:center; gap:4px; color:var(--text-faint); font-size:10px; font-weight:600; cursor:pointer; transition:color .2s ease, transform .3s var(--ease-spring); -webkit-user-select:none; user-select:none;}
+.nav-item i{font-size:22px; transition:transform .3s var(--ease-spring);}
+.nav-item.active{color:var(--accent);}
+.nav-item.active i{transform:translateY(-1px) scale(1.08);}
+.nav-item:active{transform:scale(0.88); transition:transform .1s var(--ease-out-ios);}
+
+.sheet-backdrop{position:fixed; inset:0; background:rgba(0,0,0,0); backdrop-filter:blur(0px); -webkit-backdrop-filter:blur(0px); z-index:100; display:flex; align-items:flex-end; transition:background .3s var(--ease-out-ios), backdrop-filter .3s var(--ease-out-ios);}
+.sheet-backdrop.open{background:rgba(0,0,0,0.55); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);}
+.sheet-backdrop.closing{background:rgba(0,0,0,0); backdrop-filter:blur(0px);}
+.sheet{width:100%; max-width:480px; margin:0 auto; background:#14182B; border:1px solid var(--glass-border); border-bottom:none; border-radius:28px 28px 0 0; padding:20px 22px calc(28px + env(safe-area-inset-bottom)); max-height:88vh; overflow-y:auto; transform:translateY(100%); transition:transform .46s var(--ease-sheet); box-shadow:0 -10px 40px rgba(0,0,0,0.6); will-change:transform;}
+.sheet-backdrop.open .sheet{transform:translateY(0);}
+.sheet-backdrop.closing .sheet{transform:translateY(100%); transition:transform .26s var(--ease-out-ios);}
+.sheet-backdrop.dragging .sheet{transition:none;}
+.sheet-handle{width:38px;height:5px;border-radius:3px;background:rgba(255,255,255,0.2);margin:0 auto 16px; cursor:grab;}
+.sheet-title{font-size:19px; font-weight:800; margin-bottom:4px;}
+.sheet-sub{font-size:13px; color:var(--text-lo); margin-bottom:20px;}
+
+.presets{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px;}
+.preset-pill{display:flex; align-items:center; gap:6px; padding:8px 12px; border-radius:12px; background:rgba(255,255,255,0.06); border:1px solid var(--glass-border); font-size:12px; font-weight:600; cursor:pointer; transition:transform .25s var(--ease-spring), background .2s ease, border-color .2s ease;}
+.preset-pill.active{background:rgba(124,156,255,0.18); border-color:var(--accent);}
+.preset-pill:active{transform:scale(0.93); background:rgba(255,255,255,0.15);}
+.preset-pill i{font-size:14px; color:var(--accent);}
+
+.avail-grid{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:18px;}
+.avail-chip{display:flex; align-items:center; justify-content:center; gap:6px; padding:11px 6px; font-size:12.5px; font-weight:700; text-align:center; border-radius:13px; cursor:pointer; border:1.5px solid var(--glass-border); background:var(--glass); color:var(--text-lo); transition:transform .28s var(--ease-spring), background .18s ease, border-color .18s ease, color .18s ease;}
+.avail-chip i{font-size:14px;}
+.avail-chip:active{transform:scale(0.94); transition:transform .1s var(--ease-out-ios);}
+
+.toast{position:fixed; top:calc(20px + env(safe-area-inset-top)); left:50%; transform:translateX(-50%) translateY(-30px) scale(0.92); background:rgba(28,32,56,0.8); backdrop-filter:blur(20px) saturate(160%); -webkit-backdrop-filter:blur(20px) saturate(160%); border:1px solid var(--glass-border); color:var(--text-hi); padding:11px 18px; border-radius:20px; font-size:13px; font-weight:600; box-shadow:0 14px 34px -8px rgba(0,0,0,0.5); opacity:0; pointer-events:none; transition:transform .46s var(--ease-spring), opacity .25s ease; z-index:200; display:flex; align-items:center; gap:8px; max-width:88%;}
+.toast.show{transform:translateX(-50%) translateY(0) scale(1); opacity:1;}
+
+.sync-badge{display:inline-flex; align-items:center; gap:5px; font-size:11px; color:var(--green); font-weight:600;}
+.sync-badge.offline{color:var(--red);}
+.sync-badge i{font-size:12px; animation:spin 3s linear infinite;}
+.sync-badge.offline i{animation:none;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+.login-wrap{min-height:100vh; min-height:100dvh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:32px 24px; text-align:center; position:relative; z-index:1;}
+.login-logo{width:76px;height:76px;border-radius:24px;background:linear-gradient(135deg,var(--accent),var(--accent-2)); display:flex;align-items:center;justify-content:center; margin-bottom:24px; box-shadow:0 20px 50px -18px rgba(124,156,255,0.6); animation:rise-in .6s var(--ease-out-ios) both;}
+.login-logo i{font-size:34px; color:#0B0E1A;}
+
+.board-grid{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+.board-note{padding:14px; position:relative; opacity:0; animation:tile-in .45s var(--ease-out-ios) forwards; min-height:100px; display:flex; flex-direction:column;}
+.board-note-text{font-size:13px; line-height:1.5; flex:1; overflow-wrap:break-word;}
+.board-note-meta{display:flex; align-items:center; gap:6px; margin-top:10px; font-size:10.5px; color:var(--text-faint);}
+.board-note-meta .avatar{width:18px;height:18px;font-size:8px;}
+.fab{position:fixed; bottom:calc(96px + env(safe-area-inset-bottom)); right:calc(50% - 240px + 20px); width:54px;height:54px;border-radius:50%; background:linear-gradient(135deg,var(--accent),var(--accent-2)); display:flex;align-items:center;justify-content:center; box-shadow:0 14px 30px -10px rgba(124,156,255,0.6); cursor:pointer; z-index:80; transition:transform .35s var(--ease-spring);}
+.fab:active{transform:scale(0.9);}
+.fab i{font-size:24px; color:#0B0E1A;}
+@media (max-width:520px){ .fab{right:20px;} }
+
+.theme-swatch-row{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:18px;}
+.theme-swatch{width:40px;height:40px;border-radius:50%; cursor:pointer; border:2.5px solid transparent; transition:transform .28s var(--ease-spring), border-color .2s ease; position:relative;}
+.theme-swatch.active{border-color:#fff;}
+.theme-swatch:active{transform:scale(0.88);}
+.theme-swatch.active::after{content:'';position:absolute;inset:0;border-radius:50%;box-shadow:0 0 0 2px var(--bg-0), 0 0 0 4px rgba(255,255,255,0.4);}
+
+.section-label{font-size:12px; font-weight:700; color:var(--text-faint); text-transform:uppercase; letter-spacing:0.07em; margin:24px 0 12px 4px;}
+.section-label:first-child{margin-top:0;}
+.small-note{font-size:11.5px; color:var(--text-faint); line-height:1.5; margin-top:6px;}
+.empty-hint{text-align:center; padding:40px 20px; color:var(--text-lo); font-size:13.5px; line-height:1.6;}
+.divider{height:1px; background:var(--glass-border); margin:16px 0;}
+.loading-wrap{min-height:100vh; min-height:100dvh; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:14px;}
+.spinner{width:32px;height:32px;border-radius:50%; border:3px solid var(--glass-border); border-top-color:var(--accent); animation:spin 0.8s linear infinite;}
+::-webkit-scrollbar{display:none;}
+
+/* Compact density — tightens paddings/sizes across tiles and list rows */
+body.density-compact .friend-tile{padding:12px 10px !important;}
+body.density-compact .list-item{padding:10px 12px !important; margin-bottom:7px !important;}
+body.density-compact .avatar{width:34px !important;height:34px !important;font-size:12px !important;}
+body.density-compact .list-item .avatar{width:36px !important;height:36px !important;}
+body.density-compact .friend-time{font-size:15px !important;}
+body.density-compact .glass, body.density-compact .glass-strong{border-radius:14px;}
+body.density-compact .board-note{min-height:78px !important; padding:10px !important;}
+body.density-compact .screen{padding:18px 16px 16px;}
+
+body.reduce-motion-pref *, body.reduce-motion-pref *::before, body.reduce-motion-pref *::after{
+  animation-duration:0.001ms !important; animation-iteration-count:1 !important; transition-duration:0.001ms !important;
+}
+
+.color-swatch-custom{width:40px;height:40px;border-radius:50%;cursor:pointer;border:2.5px solid var(--glass-border);display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.05);color:var(--text-lo);font-size:16px;transition:transform .28s var(--ease-spring), border-color .2s ease;}
+.color-swatch-custom:active{transform:scale(0.88);}
+.color-swatch-custom.active{border-color:#fff;}
+#custom-accent-input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;}
+
+.nudge-btn{display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:12px;background:rgba(255,255,255,0.06);border:1px solid var(--glass-border);font-size:12px;font-weight:700;cursor:pointer;color:var(--accent);transition:transform .25s var(--ease-spring), background .2s ease, opacity .2s ease;}
+.nudge-btn:active{transform:scale(0.92);}
+.nudge-btn[disabled]{opacity:.45;pointer-events:none;}
+.nudge-btn i{font-size:14px;}
+
+.reaction-row{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px;}
+.reaction-chip{display:flex;align-items:center;gap:3px;font-size:11.5px;padding:3px 8px;border-radius:10px;background:rgba(255,255,255,0.07);border:1px solid var(--glass-border);cursor:pointer;transition:transform .25s var(--ease-spring), background .2s ease, border-color .2s ease;}
+.reaction-chip:active{transform:scale(0.9);}
+.reaction-chip.mine{background:rgba(124,156,255,0.18);border-color:var(--accent);}
+.reaction-add{font-size:11.5px;padding:3px 7px;border-radius:10px;background:transparent;border:1px dashed var(--glass-border);color:var(--text-faint);cursor:pointer;}
+.reaction-picker{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid var(--glass-border);}
+.reaction-pick-opt{font-size:19px;cursor:pointer;padding:4px 7px;border-radius:10px;transition:transform .25s var(--ease-spring), background .2s ease;}
+.reaction-pick-opt:active{transform:scale(0.85); background:rgba(255,255,255,0.1);}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="toast" class="toast"><span class="ti" id="toast-icon"></span> <span id="toast-msg">Updated</span></div>
+
+<script>
+// ── Inline SVG icon system ──────────────────────────────────────────────
+// Replaces the old external icon-font (Tabler Icons via cdnjs) which could
+// go blank on any network hiccup, ad-blocker, or offline session — that
+// was the "buttons have no icons" bug. Every icon below is drawn with
+// inline SVG using currentColor, so it always renders and always matches
+// text color/size with zero external requests.
+const ICONS = {
+  'alert-circle': '<circle cx="12" cy="12" r="9"/><path d="M12 8v4"/><path d="M12 16h.01"/>',
+  'alert-triangle': '<path d="M12 9v4"/><path d="M10.36 3.5 2.5 18a1 1 0 0 0 .87 1.5h17.26a1 1 0 0 0 .87-1.5L13.64 3.5a1.5 1.5 0 0 0-2.6 0Z"/><path d="M12 16h.01"/>',
+  'arrow-left': '<path d="M5 12h14"/><path d="m11 18-6-6 6-6"/>',
+  'arrow-right': '<path d="M5 12h14"/><path d="m13 6 6 6-6 6"/>',
+  'arrows-diagonal': '<path d="M16 4h4v4"/><path d="m20 4-6 6"/><path d="M8 20H4v-4"/><path d="m4 20 6-6"/>',
+  'arrows-minimize': '<path d="M9 15H4v5"/><path d="M4 20 9 15"/><path d="M15 9h5V4"/><path d="M20 4 15 9"/>',
+  'bolt': '<path d="M13 3 4 14h6l-1 7 9-11h-6l1-7Z"/>',
+  'book': '<path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v16H6.5A2.5 2.5 0 0 0 4 20.5V4.5Z"/><path d="M4 20.5A2.5 2.5 0 0 1 6.5 18H20"/>',
+  'briefcase': '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M3 13h18"/>',
+  'check': '<path d="M5 12.5 10 17.5 19 6.5"/>',
+  'chevron-right': '<path d="m9 6 6 6-6 6"/>',
+  'circle-check': '<circle cx="12" cy="12" r="9"/><path d="m9 12 2 2 4-4"/>',
+  'circle-dot': '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none"/>',
+  'clock': '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>',
+  'clock-hour-4': '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>',
+  'cloud-off': '<path d="M6.5 8a5.5 5.5 0 0 0-1 10.9M17 17H8.5"/><path d="M4 4l16 16"/><path d="M16.9 16.9A5.5 5.5 0 0 0 16 6a5.6 5.6 0 0 0-1.6.2 6.5 6.5 0 0 0-10 4"/>',
+  'coffee': '<path d="M4 9h13v6a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V9Z"/><path d="M17 10h1.5a2.5 2.5 0 0 1 0 5H17"/><path d="M8 3c0 1-1 1-1 2s1 1 1 2M13 3c0 1-1 1-1 2s1 1 1 2"/>',
+  'color-picker': '<path d="m11 7 6 6"/><path d="M4 20l3.5-1L18 8.5a1.5 1.5 0 0 0 0-2L17.5 6a1.5 1.5 0 0 0-2 0L5 16.5 4 20Z"/>',
+  'confetti': '<path d="M4 20 6 6"/><path d="M20 4 6 6"/><path d="M15 4h.01M10 3h.01M4 15h.01M20 10h.01M17 14l3-2M7 18l2.5-2.5"/>',
+  'copy': '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
+  'device-gamepad-2': '<path d="M7 8h10a4 4 0 0 1 4 4.5l-.6 4A2.5 2.5 0 0 1 18 18.5c-.7 0-1.4-.3-1.8-.9L15 15H9l-1.2 2.6a2.2 2.2 0 0 1-1.8.9 2.5 2.5 0 0 1-2.4-2L3 12.5A4 4 0 0 1 7 8Z"/><path d="M9 11v3M7.5 12.5h3"/><circle cx="16" cy="10.5" r=".6" fill="currentColor" stroke="none"/><circle cx="18" cy="12.5" r=".6" fill="currentColor" stroke="none"/>',
+  'grid-dots': '<circle cx="6" cy="6" r="1.4" fill="currentColor" stroke="none"/><circle cx="12" cy="6" r="1.4" fill="currentColor" stroke="none"/><circle cx="18" cy="6" r="1.4" fill="currentColor" stroke="none"/><circle cx="6" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="18" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="6" cy="18" r="1.4" fill="currentColor" stroke="none"/><circle cx="12" cy="18" r="1.4" fill="currentColor" stroke="none"/><circle cx="18" cy="18" r="1.4" fill="currentColor" stroke="none"/>',
+  'hand-click': '<path d="M8 13V6.5a1.5 1.5 0 0 1 3 0V12"/><path d="M11 5.5a1.5 1.5 0 0 1 3 0V12"/><path d="M14 6.5a1.5 1.5 0 0 1 3 0V12"/><path d="M17 10a1.5 1.5 0 0 1 3 0v4a6 6 0 0 1-6 6h-2c-2.5 0-3.5-1-5-3l-2.7-4a1.4 1.4 0 0 1 2-2L8 13"/><path d="M5 4 4 5M4.5 9H3M6 2.5 5.5 4"/>',
+  'hand-stop': '<path d="M8 13V6.5a1.5 1.5 0 0 1 3 0V12"/><path d="M11 5.5a1.5 1.5 0 0 1 3 0V12"/><path d="M14 6.5a1.5 1.5 0 0 1 3 0V12"/><path d="M17 10a1.5 1.5 0 0 1 3 0v4a6 6 0 0 1-6 6h-2c-2.5 0-3.5-1-5-3l-2.7-4a1.4 1.4 0 0 1 2-2L8 13"/>',
+  'hand-wave': '<path d="M8.5 11.5 6 9a1.4 1.4 0 0 0-2 2l4.5 5c1.5 1.5 2.5 2 4.5 2h1.5a5 5 0 0 0 5-5V9a1.4 1.4 0 0 0-2.7-.5"/><path d="M14 9V6.5a1.5 1.5 0 0 0-3 0V6a1.5 1.5 0 0 0-2.8-.7"/><path d="M17 9.2V7.5a1.5 1.5 0 0 0-3-.3"/><path d="M4 5c1.5-2 4-3 6-1"/>',
+  'key': '<circle cx="8" cy="15" r="4"/><path d="M10.8 12.2 19 4"/><path d="M16 8l2 2M19 5l2 2"/>',
+  'layout-grid': '<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>',
+  'list': '<path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1" fill="currentColor" stroke="none"/><circle cx="4.5" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="4.5" cy="18" r="1" fill="currentColor" stroke="none"/>',
+  'logout': '<path d="M9 12h11m0 0-3-3m3 3-3 3"/><path d="M14 7V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-1"/>',
+  'mood-plus': '<circle cx="10" cy="12" r="8"/><path d="M7.5 11h.01M12.5 11h.01"/><path d="M7 14.5c.9.8 2 1.3 3 1.3s2.1-.5 3-1.3"/><path d="M19 3v6M16 6h6"/>',
+  'mood-smile': '<circle cx="12" cy="12" r="9"/><path d="M9 10h.01M15 10h.01"/><path d="M8.5 14a4.5 4.5 0 0 0 7 0"/>',
+  'moon': '<path d="M20 13.5A8.5 8.5 0 1 1 10.5 4a7 7 0 0 0 9.5 9.5Z"/>',
+  'moon-2': '<path d="M20 13.5A8.5 8.5 0 1 1 10.5 4a7 7 0 0 0 9.5 9.5Z"/><path d="M17 3l.7 1.6L19.3 5l-1.6.7L17 7.3l-.7-1.6L14.7 5l1.6-.7Z" fill="currentColor" stroke="none"/>',
+  'note': '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h5"/>',
+  'notes': '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',
+  'palette': '<path d="M12 21a9 9 0 1 1 0-18 8 8 0 0 1 8 8c0 2-1.2 3-3 3h-2a2 2 0 0 0-1 3.7c.3.5-.1 1.3-1 1.3Z"/><circle cx="7.5" cy="10.5" r="1" fill="currentColor" stroke="none"/><circle cx="10.5" cy="7" r="1" fill="currentColor" stroke="none"/><circle cx="15" cy="7.5" r="1" fill="currentColor" stroke="none"/>',
+  'pin': '<path d="M9 4.5h6l-.6 5.5L18 13v2H6v-2l3.6-3Z"/><path d="M12 15v5"/>',
+  'plane': '<path d="M14 9.5 20.5 5a1.7 1.7 0 0 1 2.3 2.3l-4.5 6.7-.8 5.5-2.5-3.5-4-1-3.5-2.5 5.5-.8Z" transform="scale(0.85) translate(1.5,1.5)"/>',
+  'plus': '<path d="M12 5v14M5 12h14"/>',
+  'refresh': '<path d="M4 11a8 8 0 0 1 14.3-4.9M20 13a8 8 0 0 1-14.3 4.9"/><path d="M18 3v4h-4M6 21v-4h4"/>',
+  'toggle-left': '<rect x="2" y="6" width="20" height="12" rx="6"/><circle cx="8" cy="12" r="4" fill="currentColor" stroke="none"/>',
+  'toggle-right': '<rect x="2" y="6" width="20" height="12" rx="6"/><circle cx="16" cy="12" r="4" fill="currentColor" stroke="none"/>',
+  'user': '<circle cx="12" cy="8" r="3.5"/><path d="M5 20c1-3.5 4-5.5 7-5.5s6 2 7 5.5"/>',
+  'users': '<circle cx="9" cy="8" r="3"/><path d="M3.5 19c.8-3 3-4.8 5.5-4.8s4.7 1.8 5.5 4.8"/><path d="M16 8.3a2.7 2.7 0 1 1 .3-5.4"/><path d="M15 14.3c2 .3 3.6 1.9 4.3 4.5"/>',
+  'users-group': '<circle cx="9" cy="7" r="3"/><path d="M3.5 18.5c.7-2.8 2.9-4.5 5.5-4.5s4.8 1.7 5.5 4.5"/><circle cx="17" cy="8" r="2.3"/><path d="M15.5 14c1.7.4 3 1.8 3.6 4"/>',
+  'wave-sine': '<path d="M2 12c1.5-4 3.5-4 5 0s3.5 4 5 0 3.5-4 5-0 3.5 4 5 0"/>',
+  'world': '<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a15 15 0 0 1 0 18a15 15 0 0 1 0-18Z"/>',
+  'zzz': '<path d="M6 7h6l-6 6h6M13 7h5l-5 5h5" stroke-linejoin="round"/>',
+  // ── New icons for expanded feature set ──
+  'crown': '<path d="M4 18h16l1-9-4.5 3-4.5-6-4.5 6L3 9l1 9Z" stroke-linejoin="round"/><path d="M4 21h16"/>',
+  'shield': '<path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6Z" stroke-linejoin="round"/><path d="m9 12 2 2 4-4"/>',
+  'shield-check': '<path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6Z" stroke-linejoin="round"/><path d="m9 12 2 2 4-4"/>',
+  'lock': '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+  'lock-open': '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.5-2"/>',
+  'settings': '<circle cx="12" cy="12" r="3"/><path d="M19.4 13a7.6 7.6 0 0 0 0-2l2-1.5-2-3.4-2.3.9a7.6 7.6 0 0 0-1.7-1L15 3.5h-4l-.4 2.5a7.6 7.6 0 0 0-1.7 1l-2.3-.9-2 3.4L6.6 11a7.6 7.6 0 0 0 0 2l-2 1.5 2 3.4 2.3-.9c.5.4 1.1.8 1.7 1L11 21h4l.4-2.5c.6-.2 1.2-.6 1.7-1l2.3.9 2-3.4Z" stroke-linejoin="round"/>',
+  'device-tv': '<rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 21h8M12 17v4"/>',
+  'trophy': '<path d="M8 4h8v6a4 4 0 0 1-8 0V4Z"/><path d="M8 5H5a2 2 0 0 0 0 4h1M16 5h3a2 2 0 0 1 0 4h-1"/><path d="M12 14v3M9 21h6l-1-4H10Z"/>',
+  'dice': '<rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="8.5" cy="8.5" r="1.1" fill="currentColor" stroke="none"/><circle cx="15.5" cy="8.5" r="1.1" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.1" fill="currentColor" stroke="none"/><circle cx="8.5" cy="15.5" r="1.1" fill="currentColor" stroke="none"/><circle cx="15.5" cy="15.5" r="1.1" fill="currentColor" stroke="none"/>',
+  'brain': '<path d="M9 3.5a3 3 0 0 0-3 3v.3A3 3 0 0 0 4.5 12 3 3 0 0 0 6 17a3 3 0 0 0 3 3 3 3 0 0 0 3-3v-11a3 3 0 0 0-3-2.5Z"/><path d="M15 3.5a3 3 0 0 1 3 3v.3a3 3 0 0 1 1.5 5.2A3 3 0 0 1 18 17a3 3 0 0 1-3 3 3 3 0 0 1-3-3v-11a3 3 0 0 1 3-2.5Z"/>',
+  'sparkles': '<path d="M12 3v4M12 17v4M3 12h4M17 12h4"/><path d="m6 6 2.5 2.5M15.5 15.5 18 18M18 6l-2.5 2.5M8.5 15.5 6 18"/>',
+  'ban': '<circle cx="12" cy="12" r="9"/><path d="m6 6 12 12"/>',
+  'user-plus': '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c1-3.5 3.7-5.5 6.5-5.5s5.5 2 6.5 5.5"/><path d="M18 8v6M15 11h6"/>',
+  'edit': '<path d="M4 16.5V20h3.5L18.5 9 15 5.5 4 16.5Z" stroke-linejoin="round"/><path d="m13.5 7 3.5 3.5"/>',
+  'camera': '<path d="M4 8.5A1.5 1.5 0 0 1 5.5 7h2l1-2h7l1 2h2A1.5 1.5 0 0 1 20 8.5v9A1.5 1.5 0 0 1 18.5 19h-13A1.5 1.5 0 0 1 4 17.5Z" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.3"/>',
+  'sliders': '<path d="M5 6h14M5 12h14M5 18h14"/><circle cx="9" cy="6" r="2" fill="var(--bg-0,#0B0E1A)"/><circle cx="15" cy="12" r="2" fill="var(--bg-0,#0B0E1A)"/><circle cx="7" cy="18" r="2" fill="var(--bg-0,#0B0E1A)"/>',
+  'flame': '<path d="M12 3c1 3-3 4-3 7a3 3 0 0 0 6 0c1 1 1.5 2.5 1.5 4a4.5 4.5 0 0 1-9 0C7.5 9 9 6 12 3Z"/>',
+  'chart-bar': '<path d="M4 20V10M10 20V4M16 20v-7M4 20h16"/>',
+  'question-mark': '<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.7 2.2c-.8.5-1.2 1-1.2 1.8v.3"/><path d="M12 17h.01"/>',
+  'send': '<path d="m3 12 18-8-6.5 18-3-7.5L3 12Z" stroke-linejoin="round"/>',
+  'x': '<path d="m6 6 12 12M18 6 6 18"/>',
+  'dots': '<circle cx="5" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.4" fill="currentColor" stroke="none"/>',
+  // ── Icons added for battery status, TV Board (watch-together), trivia, and messaging/calling ──
+  'bulb': '<path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3Z"/>',
+  'info-circle': '<circle cx="12" cy="12" r="9"/><path d="M12 11v5.5"/><path d="M12 7.5h.01"/>',
+  'maximize': '<path d="M9 4H4v5"/><path d="m4 4 6 6"/><path d="M15 4h5v5"/><path d="m20 4-6 6"/><path d="M9 20H4v-5"/><path d="m4 20 6-6"/><path d="M15 20h5v-5"/><path d="m20 20-6-6"/>',
+  'pencil': '<path d="M4 16.5V20h3.5L18.5 9 15 5.5 4 16.5Z" stroke-linejoin="round"/><path d="m13.5 7 3.5 3.5"/>',
+  'battery': '<rect x="2.5" y="7" width="17" height="10" rx="2"/><path d="M22 10.5v3"/>',
+  'battery-2': '<rect x="2.5" y="7" width="17" height="10" rx="2"/><path d="M22 10.5v3"/><path d="M6 9.5v5" stroke-linecap="butt"/>',
+  'battery-4': '<rect x="2.5" y="7" width="17" height="10" rx="2"/><path d="M22 10.5v3"/><path d="M6 9.5v5M9.5 9.5v5" stroke-linecap="butt"/>',
+  'battery-charging': '<rect x="2.5" y="7" width="17" height="10" rx="2"/><path d="M22 10.5v3"/><path d="m12 9-3 4h3l-1 3.5 3.5-4.5H12l1-3Z" fill="currentColor" stroke="none"/>',
+  'phone': '<path d="M6 3h3l1.5 4-2 1.5a11 11 0 0 0 5 5l1.5-2 4 1.5v3a2 2 0 0 1-2 2.2A16 16 0 0 1 3.8 5 2 2 0 0 1 6 3Z" stroke-linejoin="round"/>',
+  'phone-off': '<path d="M6 3h3l1.5 4-2 1.5a11 11 0 0 0 5 5l1.5-2 4 1.5v3a2 2 0 0 1-2 2.2A16 16 0 0 1 3.8 5 2 2 0 0 1 6 3Z" stroke-linejoin="round"/><path d="M3 3l18 18"/>',
+  'phone-incoming': '<path d="M6 3h3l1.5 4-2 1.5a11 11 0 0 0 5 5l1.5-2 4 1.5v3a2 2 0 0 1-2 2.2A16 16 0 0 1 3.8 5 2 2 0 0 1 6 3Z" stroke-linejoin="round"/><path d="M16 2v5h5M21 2l-5 5"/>',
+  'message': '<path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v8A2.5 2.5 0 0 1 17.5 16H10l-4.5 4v-4H6.5A2.5 2.5 0 0 1 4 13.5Z" stroke-linejoin="round"/>',
+  'message-circle': '<path d="M21 12a8.5 8.5 0 0 1-12.4 7.6L4 21l1.4-4.6A8.5 8.5 0 1 1 21 12Z" stroke-linejoin="round"/>',
+  'video': '<rect x="2.5" y="6.5" width="13" height="11" rx="2"/><path d="m15.5 10.5 5.5-3v9l-5.5-3Z" stroke-linejoin="round"/>',
+  'mic': '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/>',
+  'mic-off': '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/><path d="M3 3l18 18"/>',
+  'device-tv-play': '<rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 21h8M12 17v4"/><path d="m10.5 8.5 4 2.5-4 2.5Z" fill="currentColor" stroke="none"/>',
+  'brand-youtube': '<rect x="2.5" y="6" width="19" height="12" rx="3"/><path d="m10 9.5 5 2.5-5 2.5Z" fill="currentColor" stroke="none"/>',
+};
+
+// Renders "ti ti-<name>" (and legacy "ti-<name>") strings into inline SVG.
+// Kept name-compatible with the old font classes so no other code needs
+// to change — just call icon('hand-wave') or icon('ti-hand-wave').
+function icon(name, cls){
+  const key = String(name||'').replace(/^ti[\s-]?/,'').replace(/^ti-/,'').trim();
+  const body = ICONS[key] || ICONS['circle-dot'];
+  return `<svg class="icon ${cls||''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><g>${body}</g></svg>`;
+}
+
+const TIMEZONES = [
+  { label: 'Auto (Detected)', value: Intl.DateTimeFormat().resolvedOptions().timeZone },
+  { label: 'London (GMT / BST)', value: 'Europe/London' },
+  { label: 'New York (EST / EDT)', value: 'America/New_York' },
+  { label: 'Chicago (CST / CDT)', value: 'America/Chicago' },
+  { label: 'Denver (MST / MDT)', value: 'America/Denver' },
+  { label: 'Los Angeles (PST / PDT)', value: 'America/Los_Angeles' },
+  { label: 'Tokyo (JST)', value: 'Asia/Tokyo' },
+  { label: 'Singapore / HK (SGT / HKT)', value: 'Asia/Singapore' },
+  { label: 'India (IST)', value: 'Asia/Kolkata' },
+  { label: 'Dubai (GST)', value: 'Asia/Dubai' },
+  { label: 'Sydney (AEST)', value: 'Australia/Sydney' },
+  { label: 'Auckland (NZST)', value: 'Pacific/Auckland' }
+];
+
+const STATUS_PRESETS = [
+  { icon:'ti-coffee', text:'Free for a chat' },
+  { icon:'ti-device-gamepad-2', text:'Gaming online' },
+  { icon:'ti-book', text:'Focus mode' },
+  { icon:'ti-moon', text:'Sleeping' },
+  { icon:'ti-briefcase', text:'Working' },
+  { icon:'ti-plane', text:'In transit' },
+];
+
+const AVAIL_STATES = [
+  { id:'free', label:'Free', icon:'ti-circle-check', color:'var(--green)', ring:'ring-free' },
+  { id:'soon', label:'Busy soon', icon:'ti-clock', color:'var(--amber)', ring:'ring-soon' },
+  { id:'dnd', label:'Do not disturb', icon:'ti-moon-2', color:'var(--red)', ring:'ring-dnd' },
+  { id:'sleep', label:'Sleeping', icon:'ti-zzz', color:'var(--grey)', ring:'ring-sleep' },
+];
+
+const THEMES = [
+  { id:'indigo', label:'Indigo', hex1:'#7C9CFF', hex2:'#9B7CFF', cls:'' },
+  { id:'violet', label:'Violet', hex1:'#9B7CFF', hex2:'#C58CFF', cls:'theme-violet' },
+  { id:'blue',   label:'Blue',   hex1:'#5B9CFF', hex2:'#7CC4FF', cls:'theme-blue' },
+  { id:'green',  label:'Green',  hex1:'#4ADE80', hex2:'#7CFFB2', cls:'theme-green' },
+  { id:'rose',   label:'Rose',   hex1:'#FF7CA3', hex2:'#FF9B7C', cls:'theme-rose' },
+  { id:'amber',  label:'Amber',  hex1:'#FBBF24', hex2:'#FF9B4A', cls:'theme-amber' },
+];
+
+// ── Roles & permissions ─────────────────────────────────────────────────
+// Three fixed roles: owner (exactly one — the creator, transferable),
+// admin (promoted by owner/other admins), member (default). Each role has
+// a default permission set that's copied onto the member individually at
+// join/promote time, so an owner/admin can later fine-tune one person's
+// permissions without changing everyone else on that role.
+const ROLES = [
+  { id:'owner', label:'Owner', icon:'ti-crown', color:'var(--amber)' },
+  { id:'admin', label:'Admin', icon:'ti-shield', color:'var(--accent)' },
+  { id:'member', label:'Member', icon:'ti-user', color:'var(--text-lo)' },
+];
+const PERMISSION_DEFS = [
+  { id:'manageMembers', label:'Manage members', desc:'Approve/deny join requests, remove members' },
+  { id:'manageRoles', label:'Manage roles', desc:'Promote or demote admins' },
+  { id:'editGroupSettings', label:'Edit group settings', desc:'Change name, member cap, lock status' },
+  { id:'pinNotes', label:'Pin board notes', desc:'Post to the team board' },
+  { id:'startActivities', label:'Start activities', desc:'Launch games and the TV board for everyone' },
+];
+const DEFAULT_PERMISSIONS = {
+  owner:  { manageMembers:true,  manageRoles:true,  editGroupSettings:true,  pinNotes:true, startActivities:true },
+  admin:  { manageMembers:true,  manageRoles:false, editGroupSettings:true,  pinNotes:true, startActivities:true },
+  member: { manageMembers:false, manageRoles:false, editGroupSettings:false, pinNotes:true, startActivities:true },
+};
+function roleOf(uid){ return (SQUAD && SQUAD.roles && SQUAD.roles[uid]) || 'member'; }
+function permsOf(uid){
+  const role = roleOf(uid);
+  const stored = SQUAD && SQUAD.permissions && SQUAD.permissions[uid];
+  return stored || DEFAULT_PERMISSIONS[role] || DEFAULT_PERMISSIONS.member;
+}
+function can(uid, permId){ return !!(permsOf(uid) || {})[permId]; }
+
+let ME = null;
+let SQUAD = null;
+let SQUAD_ID = null;
+let LOCAL = { links:{}, layout:'grid', theme:'indigo', accentHex:'', density:'comfortable', reduceMotion:false, lastNudge:{} };
+let currentScreen = 'loading';
+let navDirection = 'fwd';
+let history_stack = [];
+let squadUnsub = null;
+let boardUnsub = null;
+let nudgeUnsub = null;
+let lastSeenNudgeTs = 0;
+const sessionStartTs = Date.now();
+let BOARD = [];
+let currentParams = {};
+let CHAT = [];
+let chatUnsub = null;
+let callUnsub = null;
+let activeCallToast = null;
+
+function lsKey(k){ return 'squadsync:' + (window.__authUser ? window.__authUser.uid : 'anon') + ':' + k; }
+
+async function loadMe(){
+  if (!window.__authUser) { ME = null; return; }
+  try {
+    const remote = await window.fbGet('users/' + window.__authUser.uid);
+    if (remote) { ME = remote; localStorage.setItem(lsKey('me'), JSON.stringify(ME)); return; }
+  } catch(e){}
+  try { ME = JSON.parse(localStorage.getItem(lsKey('me')) || 'null'); } catch(e){}
+}
+async function saveMe(){
+  if (!ME) return;
+  localStorage.setItem(lsKey('me'), JSON.stringify(ME));
+  if (typeof window.fbSet !== 'function') { console.warn('profile sync skipped — Firebase bridge not ready'); return; }
+  try { await window.fbSet('users/' + ME.id, ME); } catch(e){ console.warn('profile sync failed', e); }
+}
+async function loadLocal(){
+  const defaults = { links:{}, layout:'grid', theme:'indigo', accentHex:'', density:'comfortable', reduceMotion:false, lastNudge:{} };
+  try { LOCAL = Object.assign({}, defaults, JSON.parse(localStorage.getItem(lsKey('local')) || '{}')); } catch(e){ LOCAL = defaults; }
+  if(!LOCAL.theme) LOCAL.theme = 'indigo';
+  if(!LOCAL.density) LOCAL.density = 'comfortable';
+  if(!LOCAL.lastNudge) LOCAL.lastNudge = {};
+}
+async function saveLocal(){ localStorage.setItem(lsKey('local'), JSON.stringify(LOCAL)); }
+async function loadMySquadId(){
+  if (!window.__authUser) return;
+  try {
+    const remote = await window.fbGet('users/' + window.__authUser.uid + '/squadId');
+    if (remote) { SQUAD_ID = remote; return; }
+  } catch(e){}
+  SQUAD_ID = localStorage.getItem(lsKey('squad_id'));
+}
+async function saveMySquadId(){
+  if (SQUAD_ID) localStorage.setItem(lsKey('squad_id'), SQUAD_ID);
+  else localStorage.removeItem(lsKey('squad_id'));
+  if (ME) { ME.squadId = SQUAD_ID || null; try { await window.fbUpdate('users/' + ME.id, { squadId: SQUAD_ID || null }); } catch(e){} }
+}
+
+async function loadSquad(id){
+  try {
+    const data = await window.fbGet('squads/' + id);
+    if (data) return data;
+  } catch(e){ console.warn('Firebase fetch error:', e); }
+  try {
+    const local = localStorage.getItem('squadsync:squad_cache:' + id);
+    if (local) return JSON.parse(local);
+  } catch(e){}
+  return null;
+}
+async function saveSquad(){
+  if (!SQUAD) return;
+  try { localStorage.setItem('squadsync:squad_cache:' + SQUAD.id, JSON.stringify(SQUAD)); } catch(e){}
+  try { await window.fbSet('squads/' + SQUAD.id, SQUAD); }
+  catch(e){ console.warn('Firebase sync error:', e); showToast('Sync failed — check connection', 'ti-alert-triangle'); }
+}
+
+function attachSquadListener(){
+  if (!SQUAD_ID || !window.fbListen) return;
+  if (squadUnsub) squadUnsub();
+  squadUnsub = window.fbListen('squads/' + SQUAD_ID, (data) => {
+    if (data) {
+      SQUAD = data;
+      if (['home','manage','board','join-requests','group-settings','roles','activity-trivia','tv-board'].includes(currentScreen)) renderAll(false);
+    }
+  });
+  if (boardUnsub) boardUnsub();
+  boardUnsub = window.fbListen('boards/' + SQUAD_ID, (data) => {
+    BOARD = data ? Object.values(data) : [];
+    if (currentScreen === 'board') renderAll(false);
+  });
+  if (nudgeUnsub) nudgeUnsub();
+  nudgeUnsub = window.fbListen('nudges/' + SQUAD_ID + '/' + ME.id, (data) => {
+    if (data && data.ts && data.ts !== lastSeenNudgeTs) {
+      lastSeenNudgeTs = data.ts;
+      // Ignore stale nudges from before this session started, and don't
+      // toast our own nudges reflected back.
+      if (data.from !== ME.id && data.ts > sessionStartTs) {
+        showToast(`${(data.fromName||'Someone').split(' ')[0]} nudged you 👋`, 'ti-hand-click');
+      }
+    }
+  });
+  if (chatUnsub) chatUnsub();
+  chatUnsub = window.fbListen('chats/' + SQUAD_ID, (data) => {
+    const fresh = data ? Object.values(data) : [];
+    const isNewMsg = fresh.length > CHAT.length && CHAT.length > 0;
+    const lastMsg = isNewMsg ? fresh.slice().sort((a,b)=>a.ts-b.ts).pop() : null;
+    CHAT = fresh;
+    if (currentScreen === 'messages') renderAll(false);
+    else if (lastMsg && lastMsg.authorId !== ME.id && lastMsg.ts > sessionStartTs) {
+      showToast(`${(lastMsg.authorName||'Someone').split(' ')[0]}: ${lastMsg.text.slice(0,40)}`, 'ti-message');
+    }
+  });
+  if (callUnsub) callUnsub();
+  callUnsub = window.fbListen('calls/' + SQUAD_ID, (data) => {
+    if (!data || !data.active || data.startedBy === ME.id || data.ts <= sessionStartTs) return;
+    if (activeCallToast === data.ts) return;
+    activeCallToast = data.ts;
+    showToast(`${(data.startedByName||'Someone').split(' ')[0]} started a call \u2014 open Messages to join`, 'ti-phone-incoming');
+  });
+}
+
+function showToast(msg, iconName='ti-check'){
+  const t = document.getElementById('toast');
+  const ic = document.getElementById('toast-icon');
+  document.getElementById('toast-msg').textContent = msg;
+  ic.innerHTML = icon(iconName);
+  t.classList.add('show');
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(()=> t.classList.remove('show'), 2600);
+}
+
+// Approves or denies a pending join request. Only callable by someone with
+// the manageMembers permission (buttons are hidden otherwise, but we also
+// re-check here since Firebase writes aren't otherwise access-controlled
+// client-side). Approving moves the requester into members/status/roles;
+// denying just drops their request entry.
+async function resolveJoinRequest(uid, approve){
+  if(!SQUAD || !can(ME.id, 'manageMembers')){ showToast('You cannot manage members', 'ti-ban'); return; }
+  const req = (SQUAD.joinRequests || []).find(r => r.id === uid);
+  if(!req) return;
+  SQUAD.joinRequests = (SQUAD.joinRequests || []).filter(r => r.id !== uid);
+  if(approve){
+    const cap = SQUAD.maxMembers || 6;
+    if(SQUAD.members.length >= cap){
+      showToast('Squad is full — cannot approve', 'ti-alert-triangle');
+    } else if(!SQUAD.members.some(m => m.id === uid)){
+      SQUAD.members.push({ id: req.id, name: req.name, tz: req.tz, photo: req.photo || '', emoji: '' });
+      if(!SQUAD.status) SQUAD.status = {};
+      SQUAD.status[uid] = { avail:'free', icon:'ti-hand-wave', text:'Just joined' };
+      if(!SQUAD.roles) SQUAD.roles = {};
+      SQUAD.roles[uid] = 'member';
+      if(!SQUAD.permissions) SQUAD.permissions = {};
+      SQUAD.permissions[uid] = { ...DEFAULT_PERMISSIONS.member };
+      showToast(`${req.name.split(' ')[0]} added to squad`, 'ti-check');
+    }
+  } else {
+    showToast(`Denied ${req.name.split(' ')[0]}'s request`, 'ti-x');
+  }
+  SQUAD.updatedAt = Date.now();
+  await saveSquad();
+  softUpdate();
+}
+
+function getInitials(name){
+  if(!name) return '?';
+  const p = name.trim().split(/\s+/);
+  if(p.length >= 2) return (p[0][0] + p[1][0]).toUpperCase();
+  return name.substring(0,2).toUpperCase();
+}
+function getTimeInTz(tzStr){
+  try{
+    return new Intl.DateTimeFormat('en-US', { timeZone: tzStr, hour:'numeric', minute:'2-digit', hour12:true }).format(new Date());
+  }catch(e){ return '--:--'; }
+}
+function friendState(f){
+  if(!SQUAD || !SQUAD.status) return { avail:'free', icon:'ti-hand-stop', text:'Around', freeAt:null };
+  return SQUAD.status[f.id] || { avail:'free', icon:'ti-hand-stop', text:'Around', freeAt:null };
+}
+// ── Battery status ─────────────────────────────────────────────────────
+// Reads the current device's battery via the (Chromium-only) Battery
+// Status API and syncs level/charging state onto the squad record so
+// everyone can see everyone else's battery at a glance. Browsers that
+// don't support the API (Safari, Firefox) simply never publish a value,
+// and their tile just omits the badge rather than showing something wrong.
+let batteryObj = null;
+async function initBatteryTracking(){
+  if(!('getBattery' in navigator)) return;
+  try{
+    batteryObj = await navigator.getBattery();
+    const publish = () => publishBatteryStatus();
+    batteryObj.addEventListener('levelchange', publish);
+    batteryObj.addEventListener('chargingchange', publish);
+    publish();
+  }catch(e){ /* battery API unavailable or blocked */ }
+}
+async function publishBatteryStatus(){
+  if(!batteryObj || !SQUAD || !ME) return;
+  if(!SQUAD.battery) SQUAD.battery = {};
+  SQUAD.battery[ME.id] = { level: Math.round(batteryObj.level * 100), charging: !!batteryObj.charging, ts: Date.now() };
+  SQUAD.updatedAt = Date.now();
+  await saveSquad();
+  softUpdate();
+}
+function batteryOf(uid){
+  return (SQUAD && SQUAD.battery && SQUAD.battery[uid]) || null;
+}
+function batteryIconFor(level, charging){
+  if(charging) return 'battery-charging';
+  if(level == null) return 'battery';
+  if(level <= 25) return 'battery-2';
+  return 'battery-4';
+}
+function batteryColorFor(level, charging){
+  if(charging) return 'var(--green)';
+  if(level == null) return 'var(--text-faint)';
+  if(level <= 15) return 'var(--red)';
+  if(level <= 30) return 'var(--amber)';
+  return 'var(--text-lo)';
+}
+function batteryBadge(uid, size){
+  const b = batteryOf(uid);
+  if(!b) return '';
+  const s = size || 11;
+  return `<span class="battery-badge" style="display:inline-flex; align-items:center; gap:2px; font-size:${s}px; color:${batteryColorFor(b.level,b.charging)};"><span class="ti" style="font-size:${s+3}px;">${icon(batteryIconFor(b.level,b.charging))}</span>${b.level}%</span>`;
+}
+function timeUntil(ts){
+  if(!ts) return null;
+  const diff = ts - Date.now();
+  if(diff <= 0) return null;
+  const mins = Math.ceil(diff / 60000);
+  if(mins < 60) return `free in ${mins}m`;
+  const hrs = Math.floor(mins / 60);
+  return `free in ${hrs}h ${mins%60}m`;
+}
+function genCode(){ return Math.floor(100000 + Math.random() * 900000).toString(); }
+function timeAgo(ts){
+  const diff = Date.now() - ts;
+  const mins = Math.floor(diff/60000);
+  if(mins < 1) return 'just now';
+  if(mins < 60) return mins + 'm ago';
+  const hrs = Math.floor(mins/60);
+  if(hrs < 24) return hrs + 'h ago';
+  return Math.floor(hrs/24) + 'd ago';
+}
+function applyTheme(){
+  const t = THEMES.find(t => t.id === (LOCAL.theme||'indigo')) || THEMES[0];
+  const classes = [t.cls];
+  if (LOCAL.density === 'compact') classes.push('density-compact');
+  if (LOCAL.reduceMotion) classes.push('reduce-motion-pref');
+  document.body.className = classes.filter(Boolean).join(' ');
+
+  if (LOCAL.accentHex) {
+    const hex = LOCAL.accentHex;
+    document.documentElement.style.setProperty('--accent', hex);
+    document.documentElement.style.setProperty('--accent-2', shiftHex(hex, 24));
+  } else {
+    document.documentElement.style.removeProperty('--accent');
+    document.documentElement.style.removeProperty('--accent-2');
+  }
+}
+// Nudges a hex color lighter/darker by `amt` per channel — used to derive
+// a secondary gradient stop from a single custom accent color.
+function shiftHex(hex, amt){
+  try{
+    let h = hex.replace('#','');
+    if(h.length===3) h = h.split('').map(c=>c+c).join('');
+    const num = parseInt(h,16);
+    let r = (num>>16) + amt, g = ((num>>8)&0xff) + amt, b = (num&0xff) + amt;
+    r = Math.max(0,Math.min(255,r)); g = Math.max(0,Math.min(255,g)); b = Math.max(0,Math.min(255,b));
+    return '#' + [r,g,b].map(x=>x.toString(16).padStart(2,'0')).join('');
+  }catch(e){ return hex; }
+}
+
+function mountSheet(wrap){
+  document.body.appendChild(wrap);
+  requestAnimationFrame(()=> requestAnimationFrame(()=> wrap.classList.add('open')));
+  const sheetEl = wrap.querySelector('.sheet');
+  const handle = wrap.querySelector('.sheet-handle');
+  let startY=0, curY=0, dragging=false;
+  let closed = false;
+
+  function close(){
+    if (closed) return;
+    closed = true;
+    wrap.classList.remove('open');
+    wrap.classList.add('closing');
+    // Detach every listener this sheet added — the previous version left
+    // window-level mousemove/mouseup handlers attached forever, which is
+    // what caused settings/menus to glitch: each reopened sheet stacked
+    // another permanent pair of global handlers on top of the last.
+    window.removeEventListener('mousemove', dragMove);
+    window.removeEventListener('mouseup', dragEnd);
+    setTimeout(()=> wrap.remove(), 280);
+  }
+  wrap.addEventListener('click', (e)=>{ if(e.target===wrap) close(); });
+
+  function dragStart(e){ dragging=true; startY=(e.touches?e.touches[0].clientY:e.clientY); wrap.classList.add('dragging'); }
+  function dragMove(e){
+    if(!dragging) return;
+    curY = (e.touches?e.touches[0].clientY:e.clientY) - startY;
+    if(curY<0) curY *= 0.15;
+    sheetEl.style.transform = `translateY(${curY}px)`;
+  }
+  function dragEnd(){
+    if(!dragging) return;
+    dragging=false; wrap.classList.remove('dragging'); sheetEl.style.transform='';
+    if(curY>110) close();
+    curY=0;
+  }
+  if(handle){
+    handle.addEventListener('touchstart', dragStart, {passive:true});
+    handle.addEventListener('touchmove', dragMove, {passive:true});
+    handle.addEventListener('touchend', dragEnd);
+    handle.addEventListener('mousedown', dragStart);
+    window.addEventListener('mousemove', dragMove);
+    window.addEventListener('mouseup', dragEnd);
+  }
+  return close;
+}
+
+function goTo(screen, opts={}){
+  if(!opts.replace && currentScreen && currentScreen !== 'loading'){
+    history_stack.push(currentScreen);
+  }
+  navDirection = 'fwd';
+  currentScreen = screen;
+  renderAll();
+  try{ history.pushState({s:screen}, '', '#'+screen); }catch(e){}
+}
+function goBack(fallback='home'){
+  navDirection = 'back';
+  currentScreen = history_stack.length ? history_stack.pop() : fallback;
+  renderAll();
+  try{ history.replaceState({s:currentScreen}, '', '#'+currentScreen); }catch(e){}
+}
+window.addEventListener('popstate', (e)=>{
+  if(!ME) return;
+  navDirection = 'back';
+  currentScreen = (e.state && e.state.s) || (history_stack.length ? history_stack.pop() : 'home');
+  renderAll();
+});
+
+function currentScreenHtml(){
+  if(currentScreen === 'login') return renderLogin();
+  if(currentScreen === 'onboard') return renderOnboard();
+  if(currentScreen === 'squad-choice') return renderSquadChoice();
+  if(currentScreen === 'create-squad') return renderCreateSquad();
+  if(currentScreen === 'join-squad') return renderJoinSquad();
+  if(currentScreen === 'squad-created') return renderSquadCreated();
+  if(currentScreen === 'home') return renderHome();
+  if(currentScreen === 'manage') return renderSquadManage();
+  if(currentScreen === 'board') return renderBoard();
+  if(currentScreen === 'me') return renderMe();
+  if(currentScreen === 'customize') return renderCustomize();
+  if(currentScreen === 'friend-notes') return renderFriendNotes(currentParams.friendId);
+  if(currentScreen === 'activities') return renderActivities();
+  if(currentScreen === 'activity-trivia') return renderTriviaGame();
+  if(currentScreen === 'tv-board') return renderTvBoard();
+  if(currentScreen === 'messages') return renderMessages();
+  if(currentScreen === 'group-settings') return renderGroupSettings();
+  if(currentScreen === 'roles') return renderRoles();
+  if(currentScreen === 'join-requests') return renderJoinRequests();
+  return renderHome();
+}
+
+function renderAll(pushHistory){
+  applyTheme();
+  const app = document.getElementById('app');
+  const html = currentScreenHtml();
+  app.innerHTML = html;
+  const screenEl = app.querySelector('.screen');
+  if(screenEl) screenEl.classList.add(navDirection === 'back' ? 'enter-back' : 'enter-fwd');
+  bindEvents();
+}
+
+// Soft re-render for in-place toggles (settings switches, theme swatches,
+// reaction taps, etc.) on the *current* screen. Unlike renderAll(), this
+// never replaces the whole subtree and never re-adds the screen entrance
+// animation class, so already-settled elements don't flicker, jump, or
+// restart their CSS animations, and open sheets/pickers aren't disturbed.
+// Only the specific container passed in (or the whole .screen if omitted)
+// gets patched, and only its inner nodes are diffed/swapped.
+function softUpdate(containerSelector){
+  applyTheme();
+  const app = document.getElementById('app');
+  const target = containerSelector ? app.querySelector(containerSelector) : app.querySelector('.screen');
+  if(!target){ renderAll(); return; }
+  const fresh = document.createElement('div');
+  fresh.innerHTML = currentScreenHtml();
+  const freshTarget = containerSelector ? fresh.querySelector(containerSelector) : fresh.querySelector('.screen');
+  if(!freshTarget){ renderAll(); return; }
+  // Preserve entrance-animation classes already on the live node so we
+  // don't restart them, then swap in the freshly rendered inner content.
+  target.innerHTML = freshTarget.innerHTML;
+  bindEvents();
+}
+
+
+function openFriendNotes(friendId){
+  currentParams = { friendId };
+  goTo('friend-notes');
+}
+
+function renderNav(active){
+  return `
+    <div class="bottom-nav">
+      <div class="nav-item ${active==='home'?'active':''}" id="nav-home"><span class="ti">${icon('ti-grid-dots')}</span>Squad</div>
+      <div class="nav-item ${active==='board'?'active':''}" id="nav-board"><span class="ti">${icon('ti-notes')}</span>Board</div>
+      <div class="nav-item ${active==='activities'?'active':''}" id="nav-activities"><span class="ti">${icon('ti-device-gamepad-2')}</span>Play</div>
+      <div class="nav-item ${active==='manage'?'active':''}" id="nav-manage"><span class="ti">${icon('ti-users')}</span>Manage</div>
+      <div class="nav-item ${active==='me'?'active':''}" id="nav-me"><span class="ti">${icon('ti-user')}</span>Me</div>
+    </div>
+  `;
+}
+function backBtn(id='back-btn'){
+  return `<div class="icon-btn back-btn" id="${id}"><span class="ti">${icon('ti-arrow-left')}</span></div>`;
+}
+
+function renderLogin(){
+  return `
+    <div class="login-wrap">
+      <div class="login-logo"><span class="ti">${icon('ti-users-group')}</span></div>
+      <h1 class="hero-title">SquadZync</h1>
+      <p class="hero-sub" style="animation-delay:.16s; margin-bottom:36px;">Live presence and timezone awareness for your inner circle. Sign in to keep your identity and data synced across every device.</p>
+      <button class="btn btn-google btn-block" id="google-signin-btn" style="padding:16px; max-width:340px;">
+        <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 8 3l6-6C34.5 5.5 29.5 3.5 24 3.5 12.7 3.5 3.5 12.7 3.5 24S12.7 44.5 24 44.5 44.5 35.3 44.5 24c0-1.2-.1-2.4-.3-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.7 18.9 13 24 13c3.1 0 5.8 1.1 8 3l6-6C34.5 5.5 29.5 3.5 24 3.5c-7.7 0-14.3 4.4-17.7 10.8z"/><path fill="#4CAF50" d="M24 44.5c5.4 0 10.3-1.8 14-4.9l-6.5-5.5c-2 1.4-4.6 2.4-7.5 2.4-5.2 0-9.6-3.3-11.3-7.9l-6.6 5.1C9.6 40 16.2 44.5 24 44.5z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.3-4.2 5.7l6.5 5.5C41.5 36 44.5 30.6 44.5 24c0-1.2-.1-2.4-.3-3.5z"/></svg>
+        Continue with Google
+      </button>
+      <p class="small-note" style="margin-top:20px; max-width:300px;">Your account is uniquely tied to your Google sign-in — never mixed up with anyone else, even if you share the same name.</p>
+    </div>
+  `;
+}
+
+function renderOnboard(){
+  const tzOptions = TIMEZONES.map(t => `<option value="${t.value}">${t.label}</option>`).join('');
+  const suggested = window.__authUser ? window.__authUser.name : '';
+  return `
+    <div class="screen" style="padding-top:40px;">
+      <div class="brand-mark" style="width:48px;height:48px;border-radius:16px;margin-bottom:24px;"><span class="ti" style="font-size:22px;color:#0B0E1A;">${icon('ti-bolt')}</span></div>
+      <h1 class="hero-title">Stay synced with your inner circle.</h1>
+      <p class="hero-sub">Live presence, timezone awareness, and effortless reachability without social noise.</p>
+      <div class="stack">
+        <div class="onb-card glass">
+          <div class="onb-card-icon"><span class="ti">${icon('ti-clock-hour-4')}</span></div>
+          <h3>Timezone awareness</h3>
+          <p>See exactly what time it is for your friends around the world.</p>
+        </div>
+        <div class="onb-card glass">
+          <div class="onb-card-icon"><span class="ti">${icon('ti-mood-smile')}</span></div>
+          <h3>One-tap statuses</h3>
+          <p>Share if you're free to chat, busy in focus mode, or winding down.</p>
+        </div>
+      </div>
+      <div style="margin-top:28px;">
+        <div class="field">
+          <label class="field-label">Your Name</label>
+          <input type="text" id="ob-name" placeholder="e.g. Alex" maxlength="24" value="${suggested}">
+        </div>
+        <div class="field">
+          <label class="field-label">Your Time Zone</label>
+          <select id="ob-tz">${tzOptions}</select>
+        </div>
+        <button class="btn btn-primary btn-block" id="ob-next" style="padding:16px;">Get Started <span class="ti">${icon('ti-arrow-right')}</span></button>
+      </div>
+    </div>
+  `;
+}
+
+function renderSquadChoice(){
+  return `
+    <div class="screen" style="padding-top:50px; text-align:center;">
+      <div class="brand-mark" style="width:56px;height:56px;border-radius:18px;margin:0 auto 20px;"><span class="ti" style="font-size:26px;color:#0B0E1A;">${icon('ti-users-group')}</span></div>
+      <h2 style="font-size:26px; margin-bottom:8px;">Welcome, ${ME.name}</h2>
+      <p style="color:var(--text-lo); font-size:14px; margin-bottom:36px;">Join an existing squad or create a new one for your group.</p>
+      <div style="display:flex; flex-direction:column; gap:12px;">
+        <button class="btn btn-primary btn-block" id="btn-to-create" style="padding:18px;"><span class="ti">${icon('ti-plus')}</span> Create New Squad</button>
+        <button class="btn btn-ghost btn-block" id="btn-to-join" style="padding:18px;"><span class="ti">${icon('ti-key')}</span> Join with Code</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderCreateSquad(){
+  const cap = window.__pendingCap || 6;
+  return `
+    <div class="screen" style="padding-top:40px;">
+      <div class="page-title-row">${backBtn('create-back')}<h2>Name your Squad</h2></div>
+      <p style="color:var(--text-lo); font-size:14px; margin:8px 0 24px 48px;">Set it up exactly how you want.</p>
+      <div class="field">
+        <label class="field-label">Squad Name</label>
+        <input type="text" id="sq-name" placeholder="e.g. Core Crew, Fam, Devs" maxlength="20">
+      </div>
+      <div class="field">
+        <label class="field-label">Member limit — <span id="cap-value" style="color:var(--accent);">${cap}</span></label>
+        <input type="range" id="sq-cap" min="2" max="15" value="${cap}" style="width:100%; accent-color:var(--accent);">
+        <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-faint); margin-top:4px;"><span>2</span><span>15</span></div>
+      </div>
+      <div class="glass" style="padding:14px 16px; display:flex; align-items:center; justify-content:space-between; cursor:pointer; margin-bottom:20px;" id="sq-locked-toggle">
+        <div style="display:flex; align-items:center; gap:10px;"><span class="ti" style="color:var(--accent);">${icon('ti-lock')}</span><div><div style="font-size:14px; font-weight:600;">Require approval to join</div><div style="font-size:11.5px; color:var(--text-lo); margin-top:2px;">You'll approve each join request</div></div></div>
+        <span class="ti" id="sq-locked-check" style="font-size:22px; color:var(--text-faint);"></span>
+      </div>
+      <button class="btn btn-primary btn-block" id="sq-create-submit" style="padding:16px;">Create Squad</button>
+    </div>
+  `;
+}
+
+function renderJoinSquad(){
+  return `
+    <div class="screen" style="padding-top:40px;">
+      <div class="page-title-row">${backBtn('join-back')}<h2>Join a Squad</h2></div>
+      <p style="color:var(--text-lo); font-size:14px; margin:8px 0 24px 48px;">Enter the 6-digit invite code from your squad leader.</p>
+      <div class="field">
+        <label class="field-label">Invite Code</label>
+        <input type="text" id="join-code" placeholder="6-digit code" maxlength="6" style="font-size:24px; letter-spacing:4px; text-align:center;">
+      </div>
+      <div id="join-error" style="color:var(--red); font-size:13px; margin-bottom:12px; display:none;"></div>
+      <button class="btn btn-primary btn-block" id="sq-join-submit" style="padding:16px;">Join Squad</button>
+    </div>
+  `;
+}
+
+function renderSquadCreated(){
+  return `
+    <div class="screen" style="padding-top:50px; text-align:center;">
+      <div class="brand-mark" style="width:56px;height:56px;border-radius:18px;margin:0 auto 20px;"><span class="ti" style="font-size:26px;color:#0B0E1A;">${icon('ti-confetti')}</span></div>
+      <h2 style="font-size:26px; margin-bottom:8px;">${SQUAD.name} created</h2>
+      <p style="color:var(--text-lo); font-size:14px; margin-bottom:24px;">Share this code with up to ${(SQUAD.maxMembers||6)-1} friends to invite them:</p>
+      <div class="glass-strong invite-code" style="padding:20px; font-weight:800; letter-spacing:6px; color:var(--accent); margin-bottom:28px;">${SQUAD.code}</div>
+      <button class="btn btn-ghost btn-block" id="copy-invite-code" style="padding:14px; margin-bottom:12px;"><span class="ti">${icon('ti-copy')}</span> Copy code</button>
+      <button class="btn btn-primary btn-block" id="sq-created-done" style="padding:16px;">Go to Dashboard</button>
+    </div>
+  `;
+}
+
+function renderHome(){
+  const layout = LOCAL.layout || 'grid';
+  const others = SQUAD.members;
+  let body = '';
+  if(others.length === 0) body = `<div class="empty-hint glass">No one in your squad yet.</div>`;
+  else if(layout === 'grid') body = renderGrid(others);
+  else if(layout === 'list') body = renderList(others);
+  else body = renderWheel(others);
+
+  const online = window.__fbReady;
+
+  return `
+    <div class="screen">
+      <div class="top-row">
+        <div class="brand">
+          <div class="brand-mark"><span class="ti" style="color:#0B0E1A;font-size:16px;">${icon('ti-users-group')}</span></div>
+          <div>
+            <div class="brand-name">${SQUAD.name}</div>
+            <div class="sync-badge ${online?'':'offline'}"><span class="ti">${icon(online?'ti-refresh':'ti-cloud-off')}</span> ${online?'Connected live':'Offline — cached view'}</div>
+          </div>
+        </div>
+        <div class="icon-btn" id="my-status-btn"><span class="ti">${icon('ti-mood-smile')}</span></div>
+        <div class="icon-btn" id="go-messages-btn" style="margin-left:8px;"><span class="ti">${icon('ti-message')}</span></div>
+      </div>
+      <div class="layout-switch" id="layout-switch">
+        <div class="layout-pill" id="layout-pill"></div>
+        <div class="layout-opt ${layout==='grid'?'active':''}" data-layout="grid">Grid</div>
+        <div class="layout-opt ${layout==='list'?'active':''}" data-layout="list">List</div>
+        <div class="layout-opt ${layout==='wheel'?'active':''}" data-layout="wheel">Wheel</div>
+      </div>
+      ${body}
+    </div>
+    ${renderNav('home')}
+  `;
+}
+
+function renderGrid(members){
+  const tiles = members.map(f => {
+    const st = friendState(f);
+    const isMe = f.id === ME.id;
+    const cd = timeUntil(st.freeAt);
+    const a = AVAIL_STATES.find(a=>a.id===st.avail) || AVAIL_STATES[0];
+    return `
+      <div class="friend-tile glass" data-id="${f.id}">
+        <div class="tile-content">
+          <div class="avatar">${f.photo?`<img src="${f.photo}" alt="">`:getInitials(f.name)}<div class="status-ring ${a.ring}"></div></div>
+          <div class="friend-name">${f.name}${isMe?' (You)':''}</div>
+          <div class="friend-time">${getTimeInTz(f.tz)}</div>
+          <div class="friend-status"><span class="ti" style="color:${a.color};font-size:13px;">${icon(st.icon||'ti-hand-stop')}</span><span>${st.text || 'Around'}</span></div>
+          ${cd ? `<div class="friend-countdown">${cd}</div>` : ''}
+          ${batteryBadge(f.id) ? `<div style="margin-top:4px;">${batteryBadge(f.id)}</div>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+  return `<div class="widget-grid">${tiles}</div>`;
+}
+
+function renderList(members){
+  return members.map(f => {
+    const st = friendState(f);
+    const isMe = f.id === ME.id;
+    const a = AVAIL_STATES.find(a=>a.id===st.avail) || AVAIL_STATES[0];
+    return `
+      <div class="list-item glass" data-id="${f.id}">
+        <div class="list-left">
+          <div class="avatar">${f.photo?`<img src="${f.photo}" alt="">`:getInitials(f.name)}<div class="status-ring ${a.ring}"></div></div>
+          <div style="min-width:0;">
+            <div class="friend-name">${f.name}${isMe?' (You)':''}</div>
+            <div style="font-size:12px; color:var(--text-lo); display:flex; align-items:center; gap:5px; overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><span class="ti" style="color:${a.color};font-size:12px;">${icon(st.icon||'ti-hand-stop')}</span>${st.text||'Around'}</div>
+          </div>
+        </div>
+        <div style="text-align:right; flex-shrink:0;">
+          <div class="friend-time" style="font-size:18px;">${getTimeInTz(f.tz)}</div>
+          ${batteryBadge(f.id) ? `<div style="margin-top:2px; justify-content:flex-end; display:flex;">${batteryBadge(f.id)}</div>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderWheel(members){
+  const count = members.length;
+  const radius = 110;
+  const nodes = members.map((f, i) => {
+    const angle = (i / count) * (2 * Math.PI) - (Math.PI / 2);
+    const x = Math.round(170 + radius * Math.cos(angle));
+    const y = Math.round(170 + radius * Math.sin(angle));
+    const st = friendState(f);
+    const a = AVAIL_STATES.find(a=>a.id===st.avail) || AVAIL_STATES[0];
+    return `
+      <div class="wheel-node" style="left:${x}px; top:${y}px;" data-id="${f.id}">
+        <div class="avatar">${f.photo?`<img src="${f.photo}" alt="">`:getInitials(f.name)}<div class="status-ring ${a.ring}"></div></div>
+        <div class="wheel-node-name">${f.name}</div>
+        <div style="font-size:10px; color:var(--text-lo);">${getTimeInTz(f.tz)}</div>
+        ${batteryBadge(f.id,9) ? `<div style="margin-top:1px;">${batteryBadge(f.id,9)}</div>` : ''}
+      </div>
+    `;
+  }).join('');
+
+  return `
+    <div class="wheel-wrap">
+      <div class="wheel-center glass-strong">
+        <div class="wheel-center-time">${getTimeInTz(ME.tz)}</div>
+        <div class="wheel-center-sub">My time</div>
+      </div>
+      ${nodes}
+    </div>
+  `;
+}
+
+function openStatusEditor(friendId){
+  const isMe = friendId === ME.id;
+  const f = SQUAD.members.find(m => m.id === friendId);
+  if(!f) return;
+  const st = friendState(f);
+  const wrap = document.createElement('div');
+  wrap.className = 'sheet-backdrop';
+  wrap.innerHTML = `
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">${isMe ? 'Update your status' : f.name + "'s status"}</div>
+      <div class="sheet-sub">${isMe ? 'Broadcast to your whole squad instantly.' : 'Set privately by them.'}</div>
+      ${isMe ? `
+        <label class="field-label">Availability</label>
+        <div class="avail-grid" id="avail-grid">
+          ${AVAIL_STATES.map(a=>`<div class="avail-chip" data-avail="${a.id}" style="${st.avail===a.id?`background:${a.color}22;border-color:${a.color};color:${a.color};`:''}"><span class="ti">${icon(a.icon)}</span>${a.label}</div>`).join('')}
+        </div>
+        <label class="field-label">Quick presets</label>
+        <div class="presets">
+          ${STATUS_PRESETS.map(p=>`<div class="preset-pill" data-icon="${p.icon}" data-text="${p.text}"><span class="ti">${icon(p.icon)}</span>${p.text}</div>`).join('')}
+        </div>
+        <div class="field">
+          <label class="field-label">Custom status text</label>
+          <input type="text" id="status-text" value="${st.text && !STATUS_PRESETS.find(p=>p.text===st.text) ? st.text : ''}" placeholder="What are you up to?" maxlength="32">
+        </div>
+        <label class="field-label">Free in (minutes, optional)</label>
+        <div class="field"><input type="text" id="free-mins" placeholder="e.g. 45"></div>
+        <button class="btn btn-primary btn-block" id="status-save" style="padding:16px;">Save status</button>
+        <button class="btn btn-block" id="status-notes-btn" style="margin-top:10px; padding:13px; background:transparent; border:1px solid var(--glass-border);"><span class="ti">${icon('ti-notes')}</span> Team board</button>
+      ` : `
+        <p style="color:var(--text-lo); font-size:14px; display:flex; align-items:center; gap:6px;"><span class="ti">${icon('ti-world')}</span> Time zone: <b style="color:var(--text-hi);">${f.tz.replace(/_/g,' ')}</b></p>
+        <p style="color:var(--text-lo); font-size:14px; margin-top:10px; display:flex; align-items:center; gap:6px;"><span class="ti">${icon(st.icon||'ti-hand-stop')}</span> Status: <b style="color:var(--text-hi);">${st.text || 'Around'}</b></p>
+        <button class="btn btn-primary btn-block" id="send-nudge-btn" data-friend="${friendId}" style="padding:15px; margin-top:20px;"><span class="ti">${icon('ti-hand-click')}</span> Nudge ${f.name.split(' ')[0]}</button>
+        <button class="btn btn-block" id="open-friend-notes" style="margin-top:10px; padding:13px; background:transparent; border:1px solid var(--glass-border);"><span class="ti">${icon('ti-note')}</span> Private notes about ${f.name.split(' ')[0]}</button>
+      `}
+    </div>
+  `;
+  const close = mountSheet(wrap);
+
+  if(isMe){
+    let chosenAvail = st.avail || 'free', chosenIcon = st.icon || 'ti-hand-stop';
+    wrap.querySelectorAll('[data-avail]').forEach(chip=>{
+      chip.onclick = ()=>{
+        chosenAvail = chip.dataset.avail;
+        wrap.querySelectorAll('[data-avail]').forEach(c=>{
+          const ca = AVAIL_STATES.find(x=>x.id===c.dataset.avail);
+          const active = c===chip;
+          c.style.background = active ? ca.color+'22' : '';
+          c.style.borderColor = active ? ca.color : '';
+          c.style.color = active ? ca.color : '';
+        });
+      };
+    });
+    wrap.querySelectorAll('.preset-pill').forEach(pill=>{
+      pill.onclick = ()=>{
+        document.getElementById('status-text').value = pill.dataset.text;
+        chosenIcon = pill.dataset.icon;
+        wrap.querySelectorAll('.preset-pill').forEach(p=>p.classList.toggle('active', p===pill));
+      };
+    });
+    document.getElementById('status-save').onclick = async ()=>{
+      const txt = document.getElementById('status-text').value.trim() || 'Around';
+      const minsRaw = document.getElementById('free-mins').value.trim();
+      let freeAt = null;
+      if(minsRaw){ const m = parseInt(minsRaw,10); if(!isNaN(m) && m>0) freeAt = Date.now()+m*60000; }
+      if(!SQUAD.status) SQUAD.status = {};
+      SQUAD.status[ME.id] = { avail: chosenAvail, icon: chosenIcon, text: txt, freeAt };
+      SQUAD.updatedAt = Date.now();
+      await saveSquad();
+      close();
+      renderAll();
+      showToast('Status updated', 'ti-check');
+    };
+    document.getElementById('status-notes-btn').onclick = ()=>{ close(); goTo('board'); };
+  } else {
+    document.getElementById('open-friend-notes').onclick = ()=>{ close(); openFriendNotes(friendId); };
+    const nudgeBtn = document.getElementById('send-nudge-btn');
+    if(nudgeBtn){
+      const cooldownLeft = nudgeCooldownRemaining(friendId);
+      if(cooldownLeft > 0){
+        nudgeBtn.setAttribute('disabled','true');
+        nudgeBtn.innerHTML = `<span class="ti">${icon('ti-clock')}</span> Nudged — wait ${cooldownLeft}m`;
+      }
+      nudgeBtn.onclick = async () => {
+        await sendNudge(friendId, f.name);
+        close();
+      };
+    }
+  }
+}
+
+// ── Emoji avatar picker ─────────────────────────────────────────────────
+// Lets a member set a custom emoji as their avatar instead of a photo.
+// Setting an emoji clears any uploaded photo (and vice versa isn't offered
+// here since photo upload isn't part of this flow) so the avatar always
+// has one clear source of truth. Syncs to the squad member record too.
+const AVATAR_EMOJIS = ['😀','😎','🤠','🥳','🦊','🐼','🐸','🐵','🦁','🐯','🐨','🐶','🐱','🦄','🐙','🦖','👻','🤖','👽','🎃','🌟','🔥','⚡','🌈','🍕','🍩','☕','🎮','🎧','⚽','🏀','🎨','🚀','🌙'];
+
+function openEmojiPicker(){
+  const wrap = document.createElement('div');
+  wrap.className = 'sheet-backdrop';
+  wrap.innerHTML = `
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">Choose your avatar</div>
+      <div class="sheet-sub">Pick an emoji, or clear it to use your initials.</div>
+      <div style="display:grid; grid-template-columns:repeat(6,1fr); gap:8px; margin:16px 0 20px;">
+        ${AVATAR_EMOJIS.map(e => `<div class="glass" data-emoji-choice="${e}" style="aspect-ratio:1; display:flex; align-items:center; justify-content:center; font-size:24px; cursor:pointer; border-radius:14px; ${ME.emoji===e?'border-color:var(--accent); background:rgba(124,156,255,0.18);':''}">${e}</div>`).join('')}
+      </div>
+      ${ME.emoji ? `<button class="btn btn-ghost btn-block" id="emoji-clear-btn" style="padding:13px;"><span class="ti">${icon('ti-x')}</span> Clear emoji avatar</button>` : ''}
+    </div>
+  `;
+  const close = mountSheet(wrap);
+  wrap.querySelectorAll('[data-emoji-choice]').forEach(cell => {
+    cell.onclick = async () => {
+      ME.emoji = cell.dataset.emojiChoice;
+      ME.photo = '';
+      await saveMe();
+      if(SQUAD){
+        const m = SQUAD.members.find(x=>x.id===ME.id);
+        if(m){ m.emoji = ME.emoji; m.photo = ''; SQUAD.updatedAt = Date.now(); await saveSquad(); }
+      }
+      close();
+      renderAll();
+      showToast('Avatar updated', 'ti-check');
+    };
+  });
+  if(wrap.querySelector('#emoji-clear-btn')){
+    wrap.querySelector('#emoji-clear-btn').onclick = async () => {
+      ME.emoji = '';
+      await saveMe();
+      if(SQUAD){
+        const m = SQUAD.members.find(x=>x.id===ME.id);
+        if(m){ m.emoji = ''; SQUAD.updatedAt = Date.now(); await saveSquad(); }
+      }
+      close();
+      renderAll();
+      showToast('Avatar cleared', 'ti-check');
+    };
+  }
+}
+
+// Nudges are rate-limited per-friend to avoid spamming — 15 minute cooldown.
+const NUDGE_COOLDOWN_MS = 15 * 60000;
+function nudgeCooldownRemaining(friendId){
+  const last = (LOCAL.lastNudge || {})[friendId];
+  if(!last) return 0;
+  const left = NUDGE_COOLDOWN_MS - (Date.now() - last);
+  return left > 0 ? Math.ceil(left / 60000) : 0;
+}
+async function sendNudge(friendId, friendName){
+  if(nudgeCooldownRemaining(friendId) > 0){
+    showToast('Already nudged recently', 'ti-clock');
+    return;
+  }
+  if(!LOCAL.lastNudge) LOCAL.lastNudge = {};
+  LOCAL.lastNudge[friendId] = Date.now();
+  await saveLocal();
+  if(typeof window.fbSet === 'function' && SQUAD){
+    try{
+      await window.fbSet('nudges/' + SQUAD.id + '/' + friendId, { from: ME.id, fromName: ME.name, ts: Date.now() });
+    }catch(e){ /* best-effort — local cooldown still applies */ }
+  }
+  showToast(`Nudged ${friendName.split(' ')[0]}`, 'ti-hand-click');
+}
+
+function renderSquadManage(){
+  const cap = SQUAD.maxMembers || 6;
+  const reqCount = (SQUAD.joinRequests || []).length;
+  const iManageMembers = can(ME.id, 'manageMembers');
+  const members = SQUAD.members.map(m => {
+    const isMe = m.id === ME.id;
+    const role = ROLES.find(r => r.id === roleOf(m.id)) || ROLES[2];
+    return `
+    <div class="glass" style="padding:14px 16px; margin-bottom:10px; display:flex; align-items:center; justify-content:space-between; cursor:pointer;" data-manage-member="${m.id}">
+      <div style="display:flex; align-items:center; gap:12px; min-width:0;">
+        <div class="avatar" style="width:38px;height:38px;font-size:13px;">${m.emoji?`<span style="font-size:18px;">${m.emoji}</span>`:m.photo?`<img src="${m.photo}" alt="">`:getInitials(m.name)}</div>
+        <div style="min-width:0;">
+          <div style="font-weight:700; font-size:14.5px; overflow:hidden;text-overflow:ellipsis;white-space:nowrap; display:flex; align-items:center; gap:6px;">${m.name} ${isMe ? '(You)' : ''}
+            <span style="display:inline-flex; align-items:center; gap:3px; font-size:10px; font-weight:700; color:${role.color}; background:rgba(255,255,255,0.06); padding:2px 6px; border-radius:8px; text-transform:uppercase; letter-spacing:.04em;"><span class="ti" style="font-size:10px;">${icon(role.icon)}</span>${role.label}</span>
+          </div>
+          <div style="font-size:11.5px; color:var(--text-lo);">${m.tz.replace(/_/g,' ')}</div>
+        </div>
+      </div>
+      ${!isMe ? `<span class="ti" style="color:var(--text-faint);flex-shrink:0;">${icon('ti-chevron-right')}</span>` : ''}
+    </div>`;
+  }).join('');
+
+  return `
+    <div class="screen">
+      <div class="page-title-row"><h2>${SQUAD.name}</h2></div>
+      <p style="color:var(--text-lo); font-size:13px; margin-bottom:20px;">Invite code: <b style="color:var(--accent);">${SQUAD.code}</b> · ${SQUAD.members.length}/${cap} members ${SQUAD.locked?`· <span class="ti" style="font-size:11px;">${icon('ti-lock')}</span> Locked`:''}</p>
+      <button class="btn btn-ghost btn-block" id="copy-invite-manage" style="margin-bottom:12px; padding:13px;"><span class="ti">${icon('ti-copy')}</span> Copy invite code</button>
+      ${iManageMembers ? `
+      <button class="btn btn-ghost btn-block" id="go-join-requests" style="margin-bottom:12px; padding:13px; display:flex; align-items:center; justify-content:center; gap:8px;">
+        <span class="ti">${icon('ti-user-plus')}</span> Join requests
+        ${reqCount ? `<span style="background:var(--accent); color:#0B0E1A; font-size:11px; font-weight:800; border-radius:10px; padding:1px 7px;">${reqCount}</span>` : ''}
+      </button>` : ''}
+      ${can(ME.id,'editGroupSettings') ? `<button class="btn btn-ghost btn-block" id="go-group-settings" style="margin-bottom:20px; padding:13px;"><span class="ti">${icon('ti-settings')}</span> Group settings</button>` : `<div style="margin-bottom:8px;"></div>`}
+      <div class="section-label">Members</div>
+      <div style="margin-bottom:24px;">${members}</div>
+      <button class="btn btn-ghost btn-block" id="leave-squad-btn" style="color:var(--red); border-color:rgba(248,113,113,0.3);"><span class="ti">${icon('ti-logout')}</span> Leave squad</button>
+    </div>
+    ${renderNav('manage')}
+  `;
+}
+
+function renderJoinRequests(){
+  const reqs = SQUAD.joinRequests || [];
+  const body = reqs.length ? reqs.map(r => `
+    <div class="glass" style="padding:14px 16px; margin-bottom:10px; display:flex; align-items:center; justify-content:space-between; gap:10px;">
+      <div style="display:flex; align-items:center; gap:12px; min-width:0;">
+        <div class="avatar" style="width:38px;height:38px;font-size:13px;">${r.photo?`<img src="${r.photo}" alt="">`:getInitials(r.name)}</div>
+        <div style="min-width:0;">
+          <div style="font-weight:700; font-size:14.5px; overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.name}</div>
+          <div style="font-size:11px; color:var(--text-faint);">Requested ${timeAgo(r.ts)}</div>
+        </div>
+      </div>
+      <div style="display:flex; gap:8px; flex-shrink:0;">
+        <div class="icon-btn" data-approve-req="${r.id}" style="color:var(--green); border-color:rgba(74,222,128,0.3);">${icon('ti-check')}</div>
+        <div class="icon-btn" data-deny-req="${r.id}" style="color:var(--red); border-color:rgba(248,113,113,0.3);">${icon('ti-x')}</div>
+      </div>
+    </div>`).join('') : `<div class="empty-hint glass">No pending requests.</div>`;
+
+  return `
+    <div class="screen">
+      <div class="page-title-row">${backBtn('join-req-back')}<h2>Join requests</h2></div>
+      <p class="small-note" style="margin:8px 0 20px 48px;">Approve to add them to ${SQUAD.name}, or deny to dismiss the request.</p>
+      ${body}
+    </div>
+  `;
+}
+
+function renderGroupSettings(){
+  const cap = SQUAD.maxMembers || 6;
+  return `
+    <div class="screen">
+      <div class="page-title-row">${backBtn('group-settings-back')}<h2>Group settings</h2></div>
+      <p class="small-note" style="margin:8px 0 20px 48px;">Changes sync to everyone in ${SQUAD.name} instantly.</p>
+      <div class="field">
+        <label class="field-label">Squad name</label>
+        <input type="text" id="gs-name" value="${escapeHtml(SQUAD.name)}" maxlength="20">
+      </div>
+      <div class="field">
+        <label class="field-label">Member limit — <span id="gs-cap-value" style="color:var(--accent);">${cap}</span></label>
+        <input type="range" id="gs-cap" min="2" max="15" value="${cap}" style="width:100%; accent-color:var(--accent);">
+        <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-faint); margin-top:4px;"><span>2</span><span>15</span></div>
+        ${SQUAD.members.length > 2 ? `<p class="small-note" style="margin-top:6px;">Can't go below current member count (${SQUAD.members.length}).</p>` : ''}
+      </div>
+      <div class="glass" style="padding:14px 16px; display:flex; align-items:center; justify-content:space-between; cursor:pointer; margin-bottom:24px;" id="gs-locked-toggle">
+        <div style="display:flex; align-items:center; gap:10px;"><span class="ti" style="color:var(--accent);">${icon('ti-lock')}</span><div><div style="font-size:14px; font-weight:600;">Require approval to join</div><div style="font-size:11.5px; color:var(--text-lo); margin-top:2px;">New joins wait for an admin to approve</div></div></div>
+        <span class="ti" style="font-size:24px; color:${SQUAD.locked?'var(--accent)':'var(--text-faint)'};">${icon(SQUAD.locked?'ti-toggle-right':'ti-toggle-left')}</span>
+      </div>
+      <button class="btn btn-primary btn-block" id="gs-save" style="padding:15px; margin-bottom:12px;">Save changes</button>
+      ${can(ME.id,'manageRoles') ? `<button class="btn btn-ghost btn-block" id="go-roles" style="padding:13px;"><span class="ti">${icon('ti-shield')}</span> Manage roles &amp; permissions</button>` : ''}
+    </div>
+  `;
+}
+
+function renderRoles(){
+  const rows = SQUAD.members.map(m => {
+    const role = roleOf(m.id);
+    const roleInfo = ROLES.find(r => r.id === role) || ROLES[2];
+    const isOwner = role === 'owner';
+    const perms = permsOf(m.id);
+    return `
+    <div class="glass" style="padding:14px 16px; margin-bottom:10px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:${m.id===ME.id?'0':'10px'};">
+        <div style="display:flex; align-items:center; gap:10px; min-width:0;">
+          <div class="avatar" style="width:34px;height:34px;font-size:12px;">${m.emoji?`<span style="font-size:16px;">${m.emoji}</span>`:m.photo?`<img src="${m.photo}" alt="">`:getInitials(m.name)}</div>
+          <div style="font-weight:700; font-size:14px; overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${m.name}${m.id===ME.id?' (You)':''}</div>
+        </div>
+        ${!isOwner && m.id!==ME.id ? `
+        <select data-role-select="${m.id}" style="width:auto; padding:7px 10px; font-size:12px; border-radius:10px;">
+          <option value="admin" ${role==='admin'?'selected':''}>Admin</option>
+          <option value="member" ${role==='member'?'selected':''}>Member</option>
+        </select>` : `<span style="display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:700; color:${roleInfo.color};"><span class="ti" style="font-size:12px;">${icon(roleInfo.icon)}</span>${roleInfo.label}</span>`}
+      </div>
+      ${(!isOwner && m.id!==ME.id) ? `
+      <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; padding-top:10px; border-top:1px solid var(--glass-border);">
+        ${PERMISSION_DEFS.map(p => `<div class="preset-pill ${perms[p.id]?'active':''}" data-perm-toggle="${m.id}:${p.id}" title="${p.desc}">${p.label}</div>`).join('')}
+      </div>` : ''}
+    </div>`;
+  }).join('');
+
+  return `
+    <div class="screen">
+      <div class="page-title-row">${backBtn('roles-back')}<h2>Roles &amp; permissions</h2></div>
+      <p class="small-note" style="margin:8px 0 20px 48px;">Tap a permission chip to toggle it for that member.</p>
+      ${rows}
+    </div>
+  `;
+}
+
+
+
+// ── Activities hub ──────────────────────────────────────────────────────
+// Two activity modes: a TV Board (a big-screen-friendly readout of squad
+// status, meant to be cast/mirrored or just viewed full-screen on a phone
+// propped up) and an API-backed trivia game (Open Trivia DB, no key
+// required) that any member can start and everyone can play together.
+const ACTIVITIES = [
+  { id:'tv-board', label:'TV Board', icon:'ti-device-tv', desc:'Start a watch party \u2014 pick a service, share the link, and see who\u2019s watching along with you.' },
+  { id:'trivia', label:'Trivia', icon:'ti-bulb', desc:'Quick-fire trivia questions the whole squad can answer together.' },
+];
+
+function renderActivities(){
+  const iCanStart = can(ME.id, 'startActivities');
+  const cards = ACTIVITIES.map(a => `
+    <div class="glass" style="padding:18px 16px; margin-bottom:12px; display:flex; align-items:center; gap:14px; cursor:pointer;" data-activity="${a.id}">
+      <div class="brand-mark" style="width:44px;height:44px;border-radius:14px;flex-shrink:0;"><span class="ti" style="color:#0B0E1A;font-size:20px;">${icon(a.icon)}</span></div>
+      <div style="min-width:0;">
+        <div style="font-weight:700; font-size:15px;">${a.label}</div>
+        <div style="font-size:12.5px; color:var(--text-lo); margin-top:2px; line-height:1.4;">${a.desc}</div>
+      </div>
+      <span class="ti" style="color:var(--text-faint); margin-left:auto; flex-shrink:0;">${icon('ti-chevron-right')}</span>
+    </div>`).join('');
+
+  return `
+    <div class="screen">
+      <div class="page-title-row"><h2>Activities</h2></div>
+      <p class="small-note" style="margin:8px 0 20px 4px;">Things to do together, right from the squad.</p>
+      ${!iCanStart ? `<div class="empty-hint glass" style="margin-bottom:16px; padding:16px; text-align:left;"><span class="ti" style="color:var(--accent);">${icon('ti-info-circle')}</span> You don't have permission to start activities \u2014 ask an owner or admin.</div>` : ''}
+      ${cards}
+    </div>
+    ${renderNav('activities')}
+  `;
+}
+
+// ── TV Board (watch together) ───────────────────────────────────────────
+// Not a status dashboard — a shared "watch party" room. One squad member
+// hosts (their YouTube/Netflix/Prime/etc. login plays the actual content),
+// shares the link, and everyone else joins the room to see what's
+// playing, who's currently watching, and rough play/pause state the host
+// broadcasts. True frame-level sync isn't possible without a video-relay
+// backend, so this keeps everyone coordinated (same link, same "playing
+// now", live presence) rather than pretending to mirror pixels.
+const WATCH_SERVICES = [
+  { id:'youtube', label:'YouTube', icon:'ti-brand-youtube', color:'#FF4D4D' },
+  { id:'netflix', label:'Netflix', icon:'ti-device-tv-play', color:'#E5504F' },
+  { id:'prime', label:'Prime Video', icon:'ti-device-tv-play', color:'#5B9CFF' },
+  { id:'disney', label:'Disney+', icon:'ti-device-tv-play', color:'#7C9CFF' },
+  { id:'other', label:'Other', icon:'ti-device-tv', color:'#9CA3AF' },
+];
+
+function renderTvBoard(){
+  const room = SQUAD.watchParty;
+  const iCanStart = can(ME.id, 'startActivities');
+  const iAmHost = room && room.hostId === ME.id;
+  const watchers = room ? (room.watchers || {}) : {};
+  const watcherList = Object.values(watchers).sort((a,b)=>a.ts-b.ts);
+  const svc = room ? (WATCH_SERVICES.find(s=>s.id===room.service) || WATCH_SERVICES[4]) : null;
+
+  if(!room){
+    return `
+      <div class="screen">
+        <div class="page-title-row">${backBtn('tv-board-back')}<h2>TV Board</h2></div>
+        <p class="small-note" style="margin:8px 0 20px 48px;">Start a watch party \u2014 pick a service, share the link, and watch together.</p>
+        ${!iCanStart ? `<div class="empty-hint glass" style="padding:16px; text-align:left;"><span class="ti" style="color:var(--accent);">${icon('ti-info-circle')}</span> You don't have permission to start activities.</div>` : `
+        <div class="section-label">Where are you watching?</div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:20px;">
+          ${WATCH_SERVICES.map(s=>`<div class="glass" data-watch-service="${s.id}" style="padding:16px; text-align:center; cursor:pointer;">
+            <span class="ti" style="font-size:22px; color:${s.color};">${icon(s.icon)}</span>
+            <div style="font-size:12.5px; font-weight:700; margin-top:6px;">${s.label}</div>
+          </div>`).join('')}
+        </div>
+        `}
+      </div>
+    `;
+  }
+
+  return `
+    <div class="screen" id="tv-board-screen">
+      <div class="page-title-row">${backBtn('tv-board-back')}<h2>TV Board</h2></div>
+      <div class="glass-strong" style="padding:18px; margin-bottom:16px;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span class="ti" style="font-size:22px; color:${svc.color};">${icon(svc.icon)}</span>
+          <div>
+            <div style="font-weight:800; font-size:15px;">${escapeHtml(room.title || svc.label)}</div>
+            <div style="font-size:12px; color:var(--text-lo);">Hosted by ${escapeHtml((room.hostName||'Someone').split(' ')[0])} on ${svc.label}</div>
+          </div>
+        </div>
+        ${room.link ? `<a href="${escapeHtml(room.link)}" target="_blank" rel="noopener" class="btn btn-primary btn-block" style="margin-top:14px; padding:14px;"><span class="ti">${icon('ti-device-tv-play')}</span> Open &amp; watch</a>` : ''}
+        <div style="display:flex; align-items:center; gap:6px; margin-top:12px; font-size:12.5px; color:${room.playing?'var(--green)':'var(--amber)'}; font-weight:700;">
+          <span class="ti">${icon(room.playing?'ti-device-tv-play':'ti-clock')}</span> ${room.playing ? 'Playing now' : 'Paused / not started'}
+        </div>
+      </div>
+
+      <div class="section-label">Watching now (${watcherList.length})</div>
+      <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:20px;">
+        ${watcherList.map(w=>{
+          const m = SQUAD.members.find(x=>x.id===w.id);
+          return `<div class="glass" style="padding:8px 12px; display:flex; align-items:center; gap:8px;">
+            <div class="avatar" style="width:24px;height:24px;font-size:10px;">${m&&m.emoji?`<span style="font-size:13px;">${m.emoji}</span>`:m&&m.photo?`<img src="${m.photo}" alt="">`:getInitials(w.name)}</div>
+            <span style="font-size:12.5px; font-weight:600;">${w.name.split(' ')[0]}</span>
+          </div>`;
+        }).join('') || `<div class="small-note">No one's joined yet.</div>`}
+      </div>
+
+      ${!watchers[ME.id] ? `<button class="btn btn-primary btn-block" id="watch-join-btn" style="padding:15px; margin-bottom:10px;"><span class="ti">${icon('ti-users-group')}</span> I'm watching too</button>` : `<button class="btn btn-ghost btn-block" id="watch-leave-btn" style="padding:13px; margin-bottom:10px;"><span class="ti">${icon('ti-logout')}</span> Leave watch party</button>`}
+      ${iAmHost ? `
+      <button class="btn btn-ghost btn-block" id="watch-toggle-playing" style="padding:13px; margin-bottom:10px;"><span class="ti">${icon(room.playing?'ti-clock':'ti-device-tv-play')}</span> Mark as ${room.playing?'paused':'playing'}</button>
+      <button class="btn btn-ghost btn-block" id="watch-end-btn" style="padding:13px; color:var(--red); border-color:rgba(248,113,113,0.3);"><span class="ti">${icon('ti-x')}</span> End watch party</button>
+      ` : ''}
+    </div>
+  `;
+}
+
+async function startWatchParty(serviceId){
+  if(!can(ME.id,'startActivities')){ showToast('You cannot start activities', 'ti-ban'); return; }
+  const svc = WATCH_SERVICES.find(s=>s.id===serviceId) || WATCH_SERVICES[4];
+  window.__pendingWatchService = serviceId;
+  openWatchLinkSheet(svc);
+}
+
+function openWatchLinkSheet(svc){
+  const wrap = document.createElement('div');
+  wrap.className = 'sheet-backdrop';
+  wrap.innerHTML = `
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">Set up your watch party</div>
+      <div class="sheet-sub">Paste the link you're watching on ${svc.label} \u2014 your login plays it, everyone else follows along.</div>
+      <div class="field">
+        <label class="field-label">Title (optional)</label>
+        <input type="text" id="watch-title-input" placeholder="e.g. Friday movie night" maxlength="40">
+      </div>
+      <div class="field">
+        <label class="field-label">Link</label>
+        <input type="text" id="watch-link-input" placeholder="https://...">
+      </div>
+      <button class="btn btn-primary btn-block" id="watch-create-submit" style="padding:16px;">Start watch party</button>
+    </div>
+  `;
+  const close = mountSheet(wrap);
+  wrap.querySelector('#watch-create-submit').onclick = async () => {
+    const title = wrap.querySelector('#watch-title-input').value.trim();
+    const link = wrap.querySelector('#watch-link-input').value.trim();
+    SQUAD.watchParty = {
+      service: svc.id, title, link,
+      hostId: ME.id, hostName: ME.name,
+      playing: false,
+      watchers: { [ME.id]: { id: ME.id, name: ME.name, ts: Date.now() } },
+      startedAt: Date.now(),
+    };
+    SQUAD.updatedAt = Date.now();
+    await saveSquad();
+    close();
+    softUpdate();
+    showToast('Watch party started', 'ti-device-tv-play');
+  };
+}
+
+async function joinWatchParty(){
+  if(!SQUAD.watchParty) return;
+  if(!SQUAD.watchParty.watchers) SQUAD.watchParty.watchers = {};
+  SQUAD.watchParty.watchers[ME.id] = { id: ME.id, name: ME.name, ts: Date.now() };
+  SQUAD.updatedAt = Date.now();
+  await saveSquad();
+  softUpdate();
+}
+async function leaveWatchParty(){
+  if(!SQUAD.watchParty || !SQUAD.watchParty.watchers) return;
+  delete SQUAD.watchParty.watchers[ME.id];
+  SQUAD.updatedAt = Date.now();
+  await saveSquad();
+  softUpdate();
+}
+async function toggleWatchPlaying(){
+  if(!SQUAD.watchParty || SQUAD.watchParty.hostId !== ME.id) return;
+  SQUAD.watchParty.playing = !SQUAD.watchParty.playing;
+  SQUAD.updatedAt = Date.now();
+  await saveSquad();
+  softUpdate();
+}
+async function endWatchParty(){
+  if(!SQUAD.watchParty || SQUAD.watchParty.hostId !== ME.id) return;
+  SQUAD.watchParty = null;
+  SQUAD.updatedAt = Date.now();
+  await saveSquad();
+  softUpdate();
+  showToast('Watch party ended', 'ti-check');
+}
+
+// ── Trivia ───────────────────────────────────────────────────────────────
+// Fetches a question from Open Trivia DB (opentdb.com \u2014 free, no API key)
+// and stores the round + everyone's answers on the squad record so the
+// whole group plays the same question together in real time. Falls back
+// to a small local question bank if the API is unreachable.
+const TRIVIA_FALLBACK = [
+  { question:'What planet is known as the Red Planet?', correct:'Mars', options:['Mars','Venus','Jupiter','Saturn'] },
+  { question:'How many continents are there on Earth?', correct:'7', options:['5','6','7','8'] },
+  { question:'What is the largest ocean on Earth?', correct:'Pacific Ocean', options:['Atlantic Ocean','Pacific Ocean','Indian Ocean','Arctic Ocean'] },
+  { question:'Which element has the chemical symbol "O"?', correct:'Oxygen', options:['Gold','Oxygen','Osmium','Silver'] },
+  { question:'What is the smallest prime number?', correct:'2', options:['0','1','2','3'] },
+];
+function shuffleArr(a){ const arr=a.slice(); for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; } return arr; }
+function decodeHtmlEntities(s){ const t = document.createElement('textarea'); t.innerHTML = s; return t.value; }
+
+async function fetchTriviaQuestion(){
+  try{
+    const res = await fetch('https://opentdb.com/api.php?amount=1&type=multiple');
+    if(!res.ok) throw new Error('bad response');
+    const data = await res.json();
+    const q = data.results && data.results[0];
+    if(!q) throw new Error('no question');
+    return {
+      question: decodeHtmlEntities(q.question),
+      correct: decodeHtmlEntities(q.correct_answer),
+      options: shuffleArr([q.correct_answer, ...q.incorrect_answers].map(decodeHtmlEntities)),
+    };
+  }catch(e){
+    const pick = TRIVIA_FALLBACK[Math.floor(Math.random()*TRIVIA_FALLBACK.length)];
+    return { question: pick.question, correct: pick.correct, options: shuffleArr(pick.options) };
+  }
+}
+
+async function startTriviaRound(){
+  if(!can(ME.id,'startActivities')){ showToast('You cannot start activities', 'ti-ban'); return; }
+  const q = await fetchTriviaQuestion();
+  SQUAD.trivia = { ...q, startedBy: ME.id, ts: Date.now(), answers: {} };
+  SQUAD.updatedAt = Date.now();
+  await saveSquad();
+  softUpdate();
+}
+
+async function submitTriviaAnswer(choice){
+  if(!SQUAD.trivia || SQUAD.trivia.answers[ME.id]) return;
+  SQUAD.trivia.answers[ME.id] = { choice, correct: choice === SQUAD.trivia.correct, ts: Date.now() };
+  SQUAD.updatedAt = Date.now();
+  await saveSquad();
+  softUpdate();
+}
+
+function renderTriviaGame(){
+  const t = SQUAD.trivia;
+  const iCanStart = can(ME.id, 'startActivities');
+
+  if(!t){
+    return `
+      <div class="screen">
+        <div class="page-title-row">${backBtn('trivia-back')}<h2>Trivia</h2></div>
+        <div class="empty-hint glass" style="margin-bottom:20px;">No round in progress. ${iCanStart ? 'Start one for the squad!' : 'Ask an owner or admin to start one.'}</div>
+        ${iCanStart ? `<button class="btn btn-primary btn-block" id="trivia-start" style="padding:16px;"><span class="ti">${icon('ti-bulb')}</span> Start a round</button>` : ''}
+      </div>
+    `;
+  }
+
+  const answers = t.answers || {};
+  const myAnswer = answers[ME.id];
+  const answeredCount = Object.keys(answers).length;
+  const totalCount = SQUAD.members.length;
+  const allAnswered = answeredCount >= totalCount;
+  const reveal = !!myAnswer || allAnswered;
+
+  const options = t.options.map(opt => {
+    let style = '';
+    if(reveal){
+      if(opt === t.correct) style = 'background:rgba(74,222,128,0.18); border-color:var(--green); color:var(--green);';
+      else if(myAnswer && myAnswer.choice === opt) style = 'background:rgba(248,113,113,0.18); border-color:var(--red); color:var(--red);';
+    }
+    const attrSafe = escapeHtml(opt).replace(/"/g,'&quot;');
+    return `<div class="glass" style="padding:14px 16px; margin-bottom:10px; cursor:${myAnswer?'default':'pointer'}; font-weight:600; font-size:14px; ${style}" ${myAnswer?'':`data-trivia-answer="${attrSafe}"`}>${escapeHtml(opt)}</div>`;
+  }).join('');
+
+  const scoreboard = reveal ? `
+    <div class="section-label">Results</div>
+    ${SQUAD.members.map(m=>{
+      const a = answers[m.id];
+      const status = !a ? `<span style="color:var(--text-faint);">Hasn't answered</span>` : a.correct ? `<span style="color:var(--green); font-weight:700;">Correct</span>` : `<span style="color:var(--red); font-weight:700;">Wrong</span>`;
+      return `<div class="glass" style="padding:10px 14px; margin-bottom:8px; display:flex; align-items:center; justify-content:space-between;">
+        <div style="display:flex; align-items:center; gap:10px;"><div class="avatar" style="width:28px;height:28px;font-size:11px;">${m.emoji?`<span style="font-size:14px;">${m.emoji}</span>`:m.photo?`<img src="${m.photo}" alt="">`:getInitials(m.name)}</div><span style="font-size:13.5px; font-weight:600;">${m.name.split(' ')[0]}</span></div>
+        <span style="font-size:12.5px;">${status}</span>
+      </div>`;
+    }).join('')}
+  ` : `<p class="small-note" style="margin-top:16px;">${answeredCount}/${totalCount} squad members have answered.</p>`;
+
+  return `
+    <div class="screen">
+      <div class="page-title-row">${backBtn('trivia-back')}<h2>Trivia</h2></div>
+      <div class="glass-strong" style="padding:18px; margin-bottom:16px;">
+        <div style="font-weight:700; font-size:15.5px; line-height:1.4;">${t.question}</div>
+      </div>
+      ${options}
+      ${scoreboard}
+      ${iCanStart ? `<button class="btn btn-ghost btn-block" id="trivia-next" style="margin-top:16px; padding:13px;"><span class="ti">${icon('ti-refresh')}</span> New round</button>` : ''}
+    </div>
+  `;
+}
+
+// ── Messages & Calls ─────────────────────────────────────────────────────
+// A lightweight real-time group chat for the squad (mirrors the board's
+// Firebase pattern) plus a call-signaling layer built the same way nudges
+// work: broadcasting "a call is happening" so members can tap to join.
+// Honest limitation: this app has no audio/video/WebRTC backend, so a
+// "call" here is a live, shared presence list (who's in the call) rather
+// than actual voice/video — it's the coordination layer, not the pipe.
+function renderMessages(){
+  const call = SQUAD.activeCall;
+  const inCall = call && call.participants && call.participants[ME.id];
+  const msgs = (CHAT || []).slice().sort((a,b)=>a.ts-b.ts);
+
+  const callBanner = call && call.active ? `
+    <div class="glass-strong" style="padding:14px 16px; margin-bottom:14px; display:flex; align-items:center; gap:12px;">
+      <span class="ti" style="font-size:20px; color:var(--green);">${icon('ti-phone-incoming')}</span>
+      <div style="flex:1; min-width:0;">
+        <div style="font-weight:700; font-size:13.5px;">Call in progress</div>
+        <div style="font-size:11.5px; color:var(--text-lo);">${Object.values(call.participants||{}).map(p=>p.name.split(' ')[0]).join(', ') || 'No one yet'}</div>
+      </div>
+      ${inCall ? `<button class="btn btn-ghost" id="call-leave-btn" style="padding:9px 14px; font-size:12.5px; color:var(--red); border-color:rgba(248,113,113,0.3);">Leave</button>` : `<button class="btn btn-primary" id="call-join-btn" style="padding:9px 14px; font-size:12.5px;">Join</button>`}
+    </div>` : '';
+
+  const bubbles = msgs.length ? msgs.map(m => {
+    const mine = m.authorId === ME.id;
+    return `
+    <div style="display:flex; ${mine?'justify-content:flex-end;':''} margin-bottom:10px;">
+      <div style="max-width:78%;">
+        ${!mine ? `<div style="font-size:11px; color:var(--text-faint); margin:0 0 3px 4px;">${escapeHtml(m.authorName.split(' ')[0])}</div>` : ''}
+        <div class="glass" style="padding:10px 13px; border-radius:16px; ${mine?'background:rgba(124,156,255,0.18); border-color:var(--accent);':''}">
+          <div style="font-size:13.5px; line-height:1.4; overflow-wrap:break-word;">${escapeHtml(m.text)}</div>
+        </div>
+        <div style="font-size:10px; color:var(--text-faint); margin:3px 4px 0; text-align:${mine?'right':'left'};">${timeAgo(m.ts)}</div>
+      </div>
+    </div>`;
+  }).join('') : `<div class="empty-hint glass">No messages yet. Say hi!</div>`;
+
+  return `
+    <div class="screen" style="padding-bottom:90px;">
+      <div class="top-row">
+        <div class="page-title-row" style="margin:0;">${backBtn('messages-back')}<h2>Messages</h2></div>
+        ${!call || !call.active ? `<div class="icon-btn" id="call-start-btn" title="Start a call"><span class="ti">${icon('ti-phone')}</span></div>` : ''}
+      </div>
+      ${callBanner}
+      <div id="chat-scroll" style="margin-top:10px;">${bubbles}</div>
+    </div>
+    <div class="glass" style="position:fixed; bottom:calc(10px + env(safe-area-inset-bottom)); left:0; right:0; max-width:480px; margin:0 auto; padding:10px; display:flex; gap:8px; z-index:70;">
+      <input type="text" id="chat-input" placeholder="Message the squad\u2026" maxlength="500" style="flex:1; margin:0;">
+      <div class="icon-btn" id="chat-send-btn" style="flex-shrink:0;"><span class="ti">${icon('ti-send')}</span></div>
+    </div>
+  `;
+}
+
+async function sendChatMessage(text){
+  if(!text || !text.trim() || !SQUAD) return;
+  const id = 'msg_' + Date.now() + '_' + Math.floor(Math.random()*1000);
+  try{
+    await window.fbSet('chats/' + SQUAD.id + '/' + id, { id, text: text.trim(), authorId: ME.id, authorName: ME.name, ts: Date.now() });
+  }catch(e){ showToast('Could not send \u2014 check connection', 'ti-alert-triangle'); }
+}
+
+async function startCall(){
+  if(!SQUAD) return;
+  SQUAD.activeCall = { active: true, startedBy: ME.id, startedByName: ME.name, ts: Date.now(), participants: { [ME.id]: { id: ME.id, name: ME.name, ts: Date.now() } } };
+  SQUAD.updatedAt = Date.now();
+  await saveSquad();
+  try{ await window.fbSet('calls/' + SQUAD.id, { active: true, startedBy: ME.id, startedByName: ME.name, ts: Date.now() }); }catch(e){}
+  softUpdate();
+  showToast('Call started \u2014 squad notified', 'ti-phone');
+}
+async function joinCall(){
+  if(!SQUAD.activeCall) return;
+  if(!SQUAD.activeCall.participants) SQUAD.activeCall.participants = {};
+  SQUAD.activeCall.participants[ME.id] = { id: ME.id, name: ME.name, ts: Date.now() };
+  SQUAD.updatedAt = Date.now();
+  await saveSquad();
+  softUpdate();
+}
+async function leaveCall(){
+  if(!SQUAD.activeCall || !SQUAD.activeCall.participants) return;
+  delete SQUAD.activeCall.participants[ME.id];
+  const remaining = Object.keys(SQUAD.activeCall.participants).length;
+  if(remaining === 0){
+    SQUAD.activeCall.active = false;
+    try{ await window.fbSet('calls/' + SQUAD.id, { active: false, ts: Date.now() }); }catch(e){}
+  }
+  SQUAD.updatedAt = Date.now();
+  await saveSquad();
+  softUpdate();
+}
+
+const REACTION_EMOJIS = ['👍','❤️','😂','🎉','😮','🙌'];
+
+function renderBoard(){
+  const notes = (BOARD || []).slice().sort((a,b)=>b.ts-a.ts);
+  const body = notes.length ? `<div class="board-grid">${notes.map(n=>{
+    const author = SQUAD.members.find(m=>m.id===n.authorId);
+    const reactions = n.reactions || {};
+    // Tally reactions by emoji so multiple people reacting the same way collapse into one chip with a count.
+    const tally = {};
+    Object.entries(reactions).forEach(([uid, emoji]) => { if(!tally[emoji]) tally[emoji] = []; tally[emoji].push(uid); });
+    const chips = Object.entries(tally).map(([emoji, uids]) => {
+      const mine = uids.includes(ME.id);
+      return `<div class="reaction-chip ${mine?'mine':''}" data-note="${n.id}" data-emoji="${emoji}">${emoji} ${uids.length}</div>`;
+    }).join('');
+    return `
+    <div class="board-note glass">
+      <div class="board-note-text">${escapeHtml(n.text)}</div>
+      <div class="board-note-meta">
+        <div class="avatar">${author && author.photo ? `<img src="${author.photo}" alt="">` : getInitials(n.authorName)}</div>
+        <span>${n.authorName.split(' ')[0]} · ${timeAgo(n.ts)}</span>
+      </div>
+      <div class="reaction-row">
+        ${chips}
+        <div class="reaction-add" data-note-picker="${n.id}"><span class="ti">${icon('ti-mood-plus')}</span></div>
+      </div>
+    </div>`;
+  }).join('')}</div>` : `<div class="empty-hint glass">No notes yet. Tap + to pin one for the squad.</div>`;
+
+  return `
+    <div class="screen">
+      <div class="top-row">
+        <div class="page-title-row" style="margin:0;"><h2>Team board</h2></div>
+      </div>
+      <p class="small-note" style="margin-bottom:18px;">Shared with everyone in ${SQUAD.name}. Great for reminders, plans, or a running joke.</p>
+      ${body}
+    </div>
+    <div class="fab" id="add-board-note"><span class="ti">${icon('ti-plus')}</span></div>
+    ${renderNav('board')}
+  `;
+}
+function escapeHtml(s){
+  const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML;
+}
+
+// Reactions are stored per-note as { [userId]: emoji } — one reaction per
+// person per note, tapping the same emoji again clears it.
+async function toggleReaction(noteId, emoji){
+  const note = (BOARD || []).find(n => n.id === noteId);
+  if(!note) return;
+  if(!note.reactions) note.reactions = {};
+  if(note.reactions[ME.id] === emoji) delete note.reactions[ME.id];
+  else note.reactions[ME.id] = emoji;
+  renderAll(false);
+  if(typeof window.fbUpdate === 'function' && SQUAD){
+    try{ await window.fbUpdate('boards/' + SQUAD.id + '/' + noteId, { reactions: note.reactions }); }
+    catch(e){ showToast('Could not save reaction', 'ti-alert-triangle'); }
+  }
+}
+function openReactionPicker(noteId, anchorEl){
+  const existing = document.querySelector('.reaction-picker');
+  if(existing){ existing.remove(); if(existing.dataset.note === noteId) return; }
+  const picker = document.createElement('div');
+  picker.className = 'reaction-picker';
+  picker.dataset.note = noteId;
+  picker.innerHTML = REACTION_EMOJIS.map(e => `<div class="reaction-pick-opt" data-pick="${e}">${e}</div>`).join('');
+  anchorEl.closest('.board-note').appendChild(picker);
+  picker.querySelectorAll('[data-pick]').forEach(opt => {
+    opt.onclick = (e) => { e.stopPropagation(); toggleReaction(noteId, opt.dataset.pick); };
+  });
+  const dismiss = (e) => { if(!picker.contains(e.target)) { picker.remove(); document.removeEventListener('click', dismiss); } };
+  setTimeout(() => document.addEventListener('click', dismiss), 0);
+}
+function openAddNote(){
+  const wrap = document.createElement('div');
+  wrap.className = 'sheet-backdrop';
+  wrap.innerHTML = `
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">Pin a note</div>
+      <div class="sheet-sub">Visible to everyone in ${SQUAD.name}.</div>
+      <div class="field"><textarea id="note-text" rows="3" maxlength="200" placeholder="e.g. Movie night Friday 8pm — who's in?"></textarea></div>
+      <button class="btn btn-primary btn-block" id="note-save" style="padding:16px;"><span class="ti">${icon('ti-pin')}</span> Pin note</button>
+    </div>
+  `;
+  const close = mountSheet(wrap);
+  document.getElementById('note-save').onclick = async ()=>{
+    const txt = document.getElementById('note-text').value.trim();
+    if(!txt) return showToast('Write something first', 'ti-alert-triangle');
+    const id = 'note_' + Date.now() + '_' + Math.floor(Math.random()*1000);
+    try{
+      await window.fbSet('boards/' + SQUAD.id + '/' + id, { id, text: txt, authorId: ME.id, authorName: ME.name, ts: Date.now() });
+      showToast('Note pinned', 'ti-check');
+    }catch(e){ showToast('Could not save — check connection', 'ti-alert-triangle'); }
+    close();
+  };
+}
+
+function renderFriendNotes(friendId){
+  const f = (SQUAD && SQUAD.members.find(m=>m.id===friendId)) || { name:'Friend', id:friendId };
+  const notes = (LOCAL.notes && LOCAL.notes[friendId]) || [];
+  const list = notes.length ? notes.slice().reverse().map(n => `
+    <div class="glass" style="padding:12px 14px; margin-bottom:10px;">
+      <div style="font-size:13.5px; line-height:1.5;">${escapeHtml(n.text)}</div>
+      <div style="font-size:10.5px; color:var(--text-faint); margin-top:6px;">${timeAgo(n.ts)}</div>
+    </div>
+  `).join('') : `<div class="empty-hint glass">No private notes yet — only you can see these.</div>`;
+
+  return `
+    <div class="screen">
+      <div class="page-title-row">${backBtn()}<h2>${f.name.split(' ')[0]}'s notes</h2></div>
+      <p class="small-note" style="margin:8px 0 20px 48px;">Private to you — never shared with ${f.name.split(' ')[0]} or the squad.</p>
+      <div class="field" style="display:flex; gap:8px; align-items:flex-start;">
+        <input type="text" id="friend-note-input" placeholder="Add a private note..." maxlength="140" style="flex:1;">
+        <button class="btn btn-primary icon-btn" id="friend-note-add" style="width:48px;height:48px;border-radius:14px;"><span class="ti">${icon('ti-plus')}</span></button>
+      </div>
+      <div class="divider"></div>
+      ${list}
+    </div>
+  `;
+}
+
+function renderMe(){
+  return `
+    <div class="screen">
+      <div class="top-row"><div></div><div class="icon-btn" id="me-signout-btn"><span class="ti">${icon('ti-logout')}</span></div></div>
+      <div style="text-align:center; padding:4px 0 20px;">
+        <div class="avatar" id="me-avatar-btn" style="width:76px;height:76px;font-size:26px;margin:0 auto 12px; cursor:pointer; position:relative;">${ME.emoji?`<span style="font-size:34px;">${ME.emoji}</span>`:ME.photo?`<img src="${ME.photo}" alt="">`:getInitials(ME.name)}
+          <div style="position:absolute; bottom:-2px; right:-2px; width:24px;height:24px;border-radius:50%; background:var(--accent); display:flex; align-items:center; justify-content:center; border:2px solid var(--bg-0);"><span class="ti" style="font-size:12px; color:#0B0E1A;">${icon('ti-pencil')}</span></div>
+        </div>
+        <h2>${ME.name}</h2>
+        <p style="color:var(--text-lo); font-size:13px; margin-top:4px;">${(ME.tz||'').replace(/_/g,' ')}</p>
+        ${ME.email ? `<p style="color:var(--text-faint); font-size:11.5px; margin-top:2px;">${ME.email}</p>` : ''}
+      </div>
+      <div class="section-label">Settings</div>
+      <div class="glass" style="padding:14px 16px; margin-bottom:10px; display:flex; align-items:center; justify-content:space-between; cursor:pointer;" id="go-customize">
+        <div style="display:flex; align-items:center; gap:10px;"><span class="ti" style="color:var(--accent);">${icon('ti-palette')}</span><span style="font-size:14px; font-weight:600;">Customize appearance</span></div>
+        <span class="ti" style="color:var(--text-faint);">${icon('ti-chevron-right')}</span>
+      </div>
+      <div class="field" style="margin-top:20px;">
+        <label class="field-label">Display name</label>
+        <input type="text" id="me-name-input" value="${ME.name}" maxlength="24">
+      </div>
+      <div class="field">
+        <label class="field-label">Time zone</label>
+        <select id="me-tz-input">${TIMEZONES.map(t=>`<option value="${t.value}" ${t.value===ME.tz?'selected':''}>${t.label}</option>`).join('')}</select>
+      </div>
+      <button class="btn btn-primary btn-block" id="me-save-btn" style="padding:15px;">Save profile</button>
+    </div>
+    ${renderNav('me')}
+  `;
+}
+
+function renderCustomize(){
+  const customActive = !!LOCAL.accentHex;
+  return `
+    <div class="screen">
+      <div class="page-title-row">${backBtn()}<h2>Customize</h2></div>
+      <p class="small-note" style="margin:8px 0 24px 48px;">Personal to your account — your squad keeps its own view.</p>
+      <div class="section-label">Accent theme</div>
+      <div class="theme-swatch-row">
+        ${THEMES.map(t=>`<div class="theme-swatch ${!customActive && LOCAL.theme===t.id?'active':''}" data-theme="${t.id}" style="background:linear-gradient(135deg,${t.hex1},${t.hex2});"></div>`).join('')}
+        <div class="color-swatch-custom ${customActive?'active':''}" id="custom-accent-swatch" style="${customActive?`background:${LOCAL.accentHex};`:''}">
+          ${customActive?'':`<span class="ti">${icon('ti-color-picker')}</span>`}
+          <input type="color" id="custom-accent-input" value="${LOCAL.accentHex||'#7C9CFF'}">
+        </div>
+      </div>
+      <p class="small-note" style="margin:-10px 0 4px 4px;">Tap the picker for any color you like.</p>
+
+      <div class="section-label">Widget layout</div>
+      <div class="stack">
+        <div class="glass" style="padding:14px 16px; display:flex; align-items:center; justify-content:space-between; cursor:pointer;" data-layout-choice="grid">
+          <span style="font-size:14px; font-weight:600;"><span class="ti" style="margin-right:8px;color:var(--accent);">${icon('ti-layout-grid')}</span>Grid</span>
+          ${LOCAL.layout==='grid'?`<span class="ti" style="color:var(--accent);">${icon('ti-check')}</span>`:''}
+        </div>
+        <div class="glass" style="padding:14px 16px; display:flex; align-items:center; justify-content:space-between; cursor:pointer;" data-layout-choice="list">
+          <span style="font-size:14px; font-weight:600;"><span class="ti" style="margin-right:8px;color:var(--accent);">${icon('ti-list')}</span>List</span>
+          ${LOCAL.layout==='list'?`<span class="ti" style="color:var(--accent);">${icon('ti-check')}</span>`:''}
+        </div>
+        <div class="glass" style="padding:14px 16px; display:flex; align-items:center; justify-content:space-between; cursor:pointer;" data-layout-choice="wheel">
+          <span style="font-size:14px; font-weight:600;"><span class="ti" style="margin-right:8px;color:var(--accent);">${icon('ti-circle-dot')}</span>Wheel</span>
+          ${LOCAL.layout==='wheel'?`<span class="ti" style="color:var(--accent);">${icon('ti-check')}</span>`:''}
+        </div>
+      </div>
+
+      <div class="section-label">Display density</div>
+      <div class="stack">
+        <div class="glass" style="padding:14px 16px; display:flex; align-items:center; justify-content:space-between; cursor:pointer;" data-density-choice="comfortable">
+          <span style="font-size:14px; font-weight:600;"><span class="ti" style="margin-right:8px;color:var(--accent);">${icon('ti-arrows-diagonal')}</span>Comfortable</span>
+          ${(LOCAL.density||'comfortable')==='comfortable'?`<span class="ti" style="color:var(--accent);">${icon('ti-check')}</span>`:''}
+        </div>
+        <div class="glass" style="padding:14px 16px; display:flex; align-items:center; justify-content:space-between; cursor:pointer;" data-density-choice="compact">
+          <span style="font-size:14px; font-weight:600;"><span class="ti" style="margin-right:8px;color:var(--accent);">${icon('ti-arrows-minimize')}</span>Compact</span>
+          ${LOCAL.density==='compact'?`<span class="ti" style="color:var(--accent);">${icon('ti-check')}</span>`:''}
+        </div>
+      </div>
+
+      <div class="section-label">Motion</div>
+      <div class="glass" style="padding:14px 16px; display:flex; align-items:center; justify-content:space-between; cursor:pointer;" id="reduce-motion-toggle">
+        <span style="font-size:14px; font-weight:600;"><span class="ti" style="margin-right:8px;color:var(--accent);">${icon('ti-wave-sine')}</span>Reduce motion</span>
+        <span class="ti" style="font-size:24px; color:${LOCAL.reduceMotion?'var(--accent)':'var(--text-faint)'};">${icon(LOCAL.reduceMotion?'ti-toggle-right':'ti-toggle-left')}</span>
+      </div>
+    </div>
+  `;
+}
+
+function bindEvents(){
+  const byId = (id) => document.getElementById(id);
+
+  if(byId('google-signin-btn')){
+    byId('google-signin-btn').onclick = async () => {
+      const btn = byId('google-signin-btn');
+      btn.setAttribute('disabled','true');
+      try{
+        await window.fbSignIn();
+      }catch(e){
+        console.error(e);
+        showToast('Sign-in failed — try again', 'ti-alert-triangle');
+        btn.removeAttribute('disabled');
+      }
+    };
+  }
+
+  if(byId('ob-next')){
+    byId('ob-next').onclick = async () => {
+      const name = byId('ob-name').value.trim();
+      if(!name) return showToast('Please enter your name', 'ti-alert-circle');
+      ME = {
+        id: window.__authUser.uid,
+        name,
+        tz: byId('ob-tz').value,
+        photo: window.__authUser.photo || '',
+        email: window.__authUser.email || '',
+        theme: 'indigo'
+      };
+      await saveMe();
+      goTo('squad-choice', {replace:true});
+    };
+  }
+
+  if(byId('btn-to-create')) byId('btn-to-create').onclick = () => goTo('create-squad');
+  if(byId('btn-to-join')) byId('btn-to-join').onclick = () => goTo('join-squad');
+  if(byId('create-back')) byId('create-back').onclick = () => goBack('squad-choice');
+  if(byId('join-back')) byId('join-back').onclick = () => goBack('squad-choice');
+  if(byId('back-btn')) byId('back-btn').onclick = () => goBack('home');
+
+  if(byId('sq-cap')){
+    const slider = byId('sq-cap');
+    slider.oninput = () => { window.__pendingCap = parseInt(slider.value, 10); byId('cap-value').textContent = slider.value; };
+  }
+  if(byId('sq-locked-toggle')){
+    if(window.__pendingLocked === undefined) window.__pendingLocked = false;
+    const paintLock = () => {
+      byId('sq-locked-check').innerHTML = window.__pendingLocked ? icon('ti-check') : '';
+      byId('sq-locked-check').style.color = window.__pendingLocked ? 'var(--accent)' : 'var(--text-faint)';
+    };
+    paintLock();
+    byId('sq-locked-toggle').onclick = () => { window.__pendingLocked = !window.__pendingLocked; paintLock(); };
+  }
+
+  if(byId('sq-create-submit')){
+    byId('sq-create-submit').onclick = async () => {
+      const name = byId('sq-name').value.trim();
+      if(!name) return showToast('Enter squad name', 'ti-alert-circle');
+      const cap = Math.min(15, Math.max(2, window.__pendingCap || 6));
+      const locked = !!window.__pendingLocked;
+      const id = 'sq_' + genCode() + Date.now().toString(36);
+      SQUAD = {
+        id, name, code: genCode(),
+        maxMembers: cap,
+        locked: locked,
+        members: [{ id: ME.id, name: ME.name, tz: ME.tz, photo: ME.photo || '', emoji: ME.emoji || '' }],
+        status: { [ME.id]: { avail:'free', icon:'ti-hand-wave', text:'Just joined' } },
+        // The creator always starts as owner with every permission — roles
+        // and permissions are keyed by user id so they travel with the
+        // squad record and sync to everyone via the same fbSet() write.
+        roles: { [ME.id]: 'owner' },
+        permissions: { [ME.id]: { ...DEFAULT_PERMISSIONS.owner } },
+        joinRequests: [],
+        updatedAt: Date.now()
+      };
+      SQUAD_ID = id;
+      window.__pendingCap = null;
+      window.__pendingLocked = false;
+      await saveSquad();
+      await saveMySquadId();
+      attachSquadListener();
+      goTo('squad-created', {replace:true});
+    };
+  }
+
+  if(byId('sq-join-submit')){
+    byId('sq-join-submit').onclick = async () => {
+      const code = byId('join-code').value.trim();
+      const errEl = byId('join-error');
+      errEl.style.display = 'none';
+      if(!code) return showToast('Enter a code', 'ti-alert-circle');
+      let sq = null;
+      try{
+        const allSquads = await window.fbGet('squads');
+        if(allSquads){
+          sq = Object.values(allSquads).find(s => s.code === code) || null;
+        }
+      }catch(e){}
+      if(!sq){ errEl.textContent = "That code doesn't match a squad."; errEl.style.display='block'; return; }
+      const alreadyMember = sq.members.some(m => m.id === ME.id);
+      const cap = sq.maxMembers || 6;
+      if(sq.members.length >= cap && !alreadyMember){
+        errEl.textContent = `This squad is full (${cap}/${cap} members).`; errEl.style.display='block'; return;
+      }
+      if(!alreadyMember && sq.locked){
+        // Locked squads require owner/admin approval — file a join request
+        // instead of adding the member directly, then bail out early.
+        if(!sq.joinRequests) sq.joinRequests = [];
+        if(sq.joinRequests.some(r => r.id === ME.id)){
+          showToast('Request already sent — waiting for approval', 'ti-clock');
+          return;
+        }
+        sq.joinRequests.push({ id: ME.id, name: ME.name, tz: ME.tz, photo: ME.photo || '', ts: Date.now() });
+        sq.updatedAt = Date.now();
+        try{
+          if(typeof window.fbSet === 'function') await window.fbSet('squads/' + sq.id, sq);
+        }catch(e){ errEl.textContent = 'Could not send request — check connection.'; errEl.style.display='block'; return; }
+        showToast('Request sent — waiting for approval', 'ti-clock');
+        goTo('squad-choice', {replace:true});
+        return;
+      }
+      if(!alreadyMember){
+        sq.members.push({ id: ME.id, name: ME.name, tz: ME.tz, photo: ME.photo || '', emoji: ME.emoji || '' });
+        if(!sq.status) sq.status = {};
+        sq.status[ME.id] = { avail:'free', icon:'ti-hand-wave', text:'Just joined' };
+        if(!sq.roles) sq.roles = {};
+        if(!sq.roles[ME.id]) sq.roles[ME.id] = 'member';
+        if(!sq.permissions) sq.permissions = {};
+        if(!sq.permissions[ME.id]) sq.permissions[ME.id] = { ...DEFAULT_PERMISSIONS.member };
+      }
+      sq.updatedAt = Date.now();
+      SQUAD = sq;
+      SQUAD_ID = sq.id;
+      await saveSquad();
+      await saveMySquadId();
+      attachSquadListener();
+      showToast(`Joined ${sq.name}`, 'ti-users-group');
+      goTo('home', {replace:true});
+    };
+  }
+
+  if(byId('sq-created-done')) byId('sq-created-done').onclick = () => goTo('home', {replace:true});
+  if(byId('copy-invite-code')) byId('copy-invite-code').onclick = () => { navigator.clipboard?.writeText(SQUAD.code).then(()=>showToast('Code copied','ti-copy')); };
+  if(byId('copy-invite-manage')) byId('copy-invite-manage').onclick = () => { navigator.clipboard?.writeText(SQUAD.code).then(()=>showToast('Code copied','ti-copy')); };
+
+  if(byId('my-status-btn')) byId('my-status-btn').onclick = () => openStatusEditor(ME.id);
+  if(byId('go-messages-btn')) byId('go-messages-btn').onclick = () => goTo('messages');
+  if(byId('me-avatar-btn')) byId('me-avatar-btn').onclick = () => openEmojiPicker();
+
+  positionLayoutPill();
+  // Only attach the resize listener once ever, not on every re-render —
+  // otherwise each bindEvents() call (which fires on every renderAll)
+  // stacks another permanent listener, compounding jank over time.
+  if(!window.__layoutPillResizeBound){
+    window.addEventListener('resize', positionLayoutPill);
+    window.__layoutPillResizeBound = true;
+  }
+  document.querySelectorAll('.layout-opt').forEach(opt => {
+    opt.onclick = async () => {
+      LOCAL.layout = opt.dataset.layout;
+      await saveLocal();
+      softUpdate();
+      positionLayoutPill();
+    };
+  });
+
+  document.querySelectorAll('.friend-tile, .list-item, .wheel-node').forEach(el => {
+    el.onclick = () => { if(el.dataset.id) openStatusEditor(el.dataset.id); };
+  });
+
+  if(byId('nav-home')) byId('nav-home').onclick = () => goTo('home', {replace:true});
+  if(byId('nav-board')) byId('nav-board').onclick = () => goTo('board', {replace:true});
+  if(byId('nav-activities')) byId('nav-activities').onclick = () => goTo('activities', {replace:true});
+  if(byId('nav-manage')) byId('nav-manage').onclick = () => goTo('manage', {replace:true});
+  if(byId('nav-me')) byId('nav-me').onclick = () => goTo('me', {replace:true});
+
+  if(byId('add-board-note')) byId('add-board-note').onclick = openAddNote;
+
+  document.querySelectorAll('.reaction-chip').forEach(chip => {
+    chip.onclick = () => toggleReaction(chip.dataset.note, chip.dataset.emoji);
+  });
+  document.querySelectorAll('[data-note-picker]').forEach(btn => {
+    btn.onclick = (e) => { e.stopPropagation(); openReactionPicker(btn.dataset.notePicker, btn); };
+  });
+
+  document.querySelectorAll('[data-manage-member]').forEach(el=>{
+    el.onclick = () => { if(el.dataset.manageMember !== ME.id) openFriendNotes(el.dataset.manageMember); };
+  });
+
+  if(byId('friend-note-add')){
+    const add = async () => {
+      const input = byId('friend-note-input');
+      const txt = input.value.trim();
+      if(!txt) return;
+      if(!LOCAL.notes) LOCAL.notes = {};
+      if(!LOCAL.notes[currentParams.friendId]) LOCAL.notes[currentParams.friendId] = [];
+      LOCAL.notes[currentParams.friendId].push({ text: txt, ts: Date.now() });
+      await saveLocal();
+      renderAll();
+    };
+    byId('friend-note-add').onclick = add;
+    byId('friend-note-input').addEventListener('keydown', (e)=>{ if(e.key==='Enter') add(); });
+  }
+
+  if(byId('leave-squad-btn')){
+    byId('leave-squad-btn').onclick = async () => {
+      if(SQUAD && ME){
+        SQUAD.members = SQUAD.members.filter(m=>m.id!==ME.id);
+        if(SQUAD.status) delete SQUAD.status[ME.id];
+        if(SQUAD.roles) delete SQUAD.roles[ME.id];
+        if(SQUAD.permissions) delete SQUAD.permissions[ME.id];
+        try{ await window.fbSet('squads/' + SQUAD.id, SQUAD); }catch(e){}
+      }
+      SQUAD_ID = null; SQUAD = null;
+      await saveMySquadId();
+      goTo('squad-choice', {replace:true});
+    };
+  }
+
+  document.querySelectorAll('[data-activity]').forEach(card => {
+    card.onclick = () => {
+      const a = card.dataset.activity;
+      if(a === 'trivia') goTo('activity-trivia');
+      else if(a === 'tv-board') goTo('tv-board');
+    };
+  });
+  if(byId('trivia-back')) byId('trivia-back').onclick = () => goBack('activities');
+  if(byId('tv-board-back')) byId('tv-board-back').onclick = () => goBack('activities');
+  if(byId('trivia-start')) byId('trivia-start').onclick = () => startTriviaRound();
+  if(byId('trivia-next')) byId('trivia-next').onclick = () => startTriviaRound();
+  document.querySelectorAll('[data-trivia-answer]').forEach(opt => {
+    opt.onclick = () => submitTriviaAnswer(opt.dataset.triviaAnswer);
+  });
+  if(byId('tv-board-fullscreen')){
+    byId('tv-board-fullscreen').onclick = () => {
+      const el = byId('tv-board-screen');
+      if(el && el.requestFullscreen) el.requestFullscreen().catch(()=>{});
+    };
+  }
+  document.querySelectorAll('[data-watch-service]').forEach(card => {
+    card.onclick = () => startWatchParty(card.dataset.watchService);
+  });
+  if(byId('watch-join-btn')) byId('watch-join-btn').onclick = () => joinWatchParty();
+  if(byId('watch-leave-btn')) byId('watch-leave-btn').onclick = () => leaveWatchParty();
+  if(byId('watch-toggle-playing')) byId('watch-toggle-playing').onclick = () => toggleWatchPlaying();
+  if(byId('watch-end-btn')) byId('watch-end-btn').onclick = () => endWatchParty();
+  if(byId('messages-back')) byId('messages-back').onclick = () => goBack('home');
+  if(byId('chat-send-btn')){
+    const send = () => {
+      const input = byId('chat-input');
+      if(!input) return;
+      const text = input.value;
+      if(!text.trim()) return;
+      input.value = '';
+      sendChatMessage(text);
+    };
+    byId('chat-send-btn').onclick = send;
+    if(byId('chat-input')) byId('chat-input').addEventListener('keydown', (e)=>{ if(e.key==='Enter') send(); });
+  }
+  if(byId('call-start-btn')) byId('call-start-btn').onclick = () => startCall();
+  if(byId('call-join-btn')) byId('call-join-btn').onclick = () => joinCall();
+  if(byId('call-leave-btn')) byId('call-leave-btn').onclick = () => leaveCall();
+  {
+    const scrollEl = byId('chat-scroll');
+    if(scrollEl) scrollEl.scrollTop = scrollEl.scrollHeight;
+  }
+  if(byId('go-join-requests')) byId('go-join-requests').onclick = () => goTo('join-requests');
+  if(byId('join-req-back')) byId('join-req-back').onclick = () => goBack('manage');
+  if(byId('go-group-settings')) byId('go-group-settings').onclick = () => goTo('group-settings');
+  if(byId('group-settings-back')) byId('group-settings-back').onclick = () => goBack('manage');
+  if(byId('roles-back')) byId('roles-back').onclick = () => goBack('group-settings');
+  if(byId('go-roles')) byId('go-roles').onclick = () => goTo('roles');
+
+  document.querySelectorAll('[data-approve-req]').forEach(btn => {
+    btn.onclick = async () => { await resolveJoinRequest(btn.dataset.approveReq, true); };
+  });
+  document.querySelectorAll('[data-deny-req]').forEach(btn => {
+    btn.onclick = async () => { await resolveJoinRequest(btn.dataset.denyReq, false); };
+  });
+
+  if(byId('gs-cap')){
+    const slider = byId('gs-cap');
+    slider.oninput = () => { byId('gs-cap-value').textContent = slider.value; };
+  }
+  if(byId('gs-locked-toggle')){
+    byId('gs-locked-toggle').onclick = () => {
+      window.__gsLockedPending = window.__gsLockedPending === undefined ? !SQUAD.locked : !window.__gsLockedPending;
+      const isOn = window.__gsLockedPending;
+      const el = byId('gs-locked-toggle').querySelector('.ti[style*="font-size:24px"]');
+      if(el){ el.innerHTML = icon(isOn?'ti-toggle-right':'ti-toggle-left'); el.style.color = isOn?'var(--accent)':'var(--text-faint)'; }
+    };
+  }
+  if(byId('gs-save')){
+    byId('gs-save').onclick = async () => {
+      if(!can(ME.id,'editGroupSettings')){ showToast('You cannot edit group settings', 'ti-ban'); return; }
+      const name = byId('gs-name').value.trim();
+      if(!name) return showToast('Squad name cannot be empty', 'ti-alert-circle');
+      const desiredCap = parseInt(byId('gs-cap').value, 10);
+      const cap = Math.min(15, Math.max(2, Math.max(desiredCap, SQUAD.members.length)));
+      SQUAD.name = name;
+      SQUAD.maxMembers = cap;
+      if(window.__gsLockedPending !== undefined) SQUAD.locked = window.__gsLockedPending;
+      SQUAD.updatedAt = Date.now();
+      window.__gsLockedPending = undefined;
+      await saveSquad();
+      showToast('Group settings saved', 'ti-check');
+      goTo('manage', {replace:true});
+    };
+  }
+  document.querySelectorAll('[data-role-select]').forEach(sel => {
+    sel.onchange = async () => {
+      if(!can(ME.id,'manageRoles')){ showToast('You cannot manage roles', 'ti-ban'); sel.value = roleOf(sel.dataset.roleSelect); return; }
+      const uid = sel.dataset.roleSelect;
+      const newRole = sel.value;
+      if(!SQUAD.roles) SQUAD.roles = {};
+      SQUAD.roles[uid] = newRole;
+      if(!SQUAD.permissions) SQUAD.permissions = {};
+      SQUAD.permissions[uid] = { ...DEFAULT_PERMISSIONS[newRole] };
+      SQUAD.updatedAt = Date.now();
+      await saveSquad();
+      softUpdate();
+      showToast(`Role updated`, 'ti-shield');
+    };
+  });
+  document.querySelectorAll('[data-perm-toggle]').forEach(chip => {
+    chip.onclick = async () => {
+      if(!can(ME.id,'manageRoles')){ showToast('You cannot manage permissions', 'ti-ban'); return; }
+      const [uid, permId] = chip.dataset.permToggle.split(':');
+      if(!SQUAD.permissions) SQUAD.permissions = {};
+      if(!SQUAD.permissions[uid]) SQUAD.permissions[uid] = { ...DEFAULT_PERMISSIONS[roleOf(uid)] };
+      SQUAD.permissions[uid][permId] = !SQUAD.permissions[uid][permId];
+      SQUAD.updatedAt = Date.now();
+      await saveSquad();
+      softUpdate();
+    };
+  });
+
+  if(byId('go-customize')) byId('go-customize').onclick = () => goTo('customize');
+  document.querySelectorAll('[data-theme]').forEach(sw=>{
+    sw.onclick = async () => {
+      LOCAL.theme = sw.dataset.theme;
+      LOCAL.accentHex = '';
+      await saveLocal();
+      softUpdate();
+    };
+  });
+  document.querySelectorAll('[data-layout-choice]').forEach(row=>{
+    row.onclick = async () => {
+      LOCAL.layout = row.dataset.layoutChoice;
+      await saveLocal();
+      softUpdate();
+    };
+  });
+  document.querySelectorAll('[data-density-choice]').forEach(row=>{
+    row.onclick = async () => {
+      LOCAL.density = row.dataset.densityChoice;
+      await saveLocal();
+      softUpdate();
+    };
+  });
+  if(byId('reduce-motion-toggle')){
+    byId('reduce-motion-toggle').onclick = async () => {
+      LOCAL.reduceMotion = !LOCAL.reduceMotion;
+      await saveLocal();
+      softUpdate();
+    };
+  }
+  if(byId('custom-accent-swatch')){
+    byId('custom-accent-swatch').onclick = () => byId('custom-accent-input').click();
+    // 'input' fires continuously while dragging inside the native color
+    // picker — apply the live color immediately via CSS vars (cheap, no
+    // re-render) but only persist + soft-update the DOM once the user
+    // actually lets go ('change'), so the screen doesn't rebuild mid-drag.
+    byId('custom-accent-input').addEventListener('input', (e) => {
+      document.documentElement.style.setProperty('--accent', e.target.value);
+      document.documentElement.style.setProperty('--accent-2', shiftHex(e.target.value, 24));
+    });
+    byId('custom-accent-input').addEventListener('change', async (e) => {
+      LOCAL.accentHex = e.target.value;
+      await saveLocal();
+      softUpdate();
+    });
+  }
+
+  if(byId('me-save-btn')){
+    byId('me-save-btn').onclick = async () => {
+      const name = byId('me-name-input').value.trim();
+      if(!name) return showToast('Name cannot be empty', 'ti-alert-circle');
+      ME.name = name;
+      ME.tz = byId('me-tz-input').value;
+      await saveMe();
+      if(SQUAD){
+        const m = SQUAD.members.find(x=>x.id===ME.id);
+        if(m){ m.name = ME.name; m.tz = ME.tz; SQUAD.updatedAt = Date.now(); await saveSquad(); }
+      }
+      showToast('Profile saved', 'ti-check');
+      renderAll();
+    };
+  }
+
+  if(byId('me-signout-btn')){
+    byId('me-signout-btn').onclick = async () => {
+      if(squadUnsub) squadUnsub();
+      if(boardUnsub) boardUnsub();
+      if(nudgeUnsub) nudgeUnsub();
+      if(chatUnsub) chatUnsub();
+      if(callUnsub) callUnsub();
+      await window.fbSignOut();
+      ME = null; SQUAD = null; SQUAD_ID = null; history_stack = [];
+      goTo('login', {replace:true});
+    };
+  }
+}
+
+function positionLayoutPill(){
+  const wrap = document.getElementById('layout-switch');
+  const pill = document.getElementById('layout-pill');
+  if(!wrap || !pill) return;
+  const active = wrap.querySelector('.layout-opt.active');
+  if(!active) return;
+  pill.style.left = active.offsetLeft + 'px';
+  pill.style.width = active.offsetWidth + 'px';
+}
+
+setInterval(()=>{ if(['home','board'].includes(currentScreen)) renderAll(false); }, 30000);
+
+function checkFirebaseConfigured(){
+  if(window.__fbReady === false){
+    const b = document.createElement('div');
+    b.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:999;background:#F87171;color:#1a0000;font-family:sans-serif;font-size:12.5px;font-weight:700;text-align:center;padding:10px 16px;';
+    b.textContent = 'Firebase is not reachable — check your connection or Firebase project settings.';
+    document.body.prepend(b);
+  }
+}
+
+function showLoading(){
+  document.getElementById('app').innerHTML = `<div class="loading-wrap"><div class="spinner"></div><p style="color:var(--text-lo);font-size:13px;">Loading SquadZync...</p></div>`;
+}
+
+async function bootForUser(user){
+  if(!user){
+    ME = null; SQUAD = null; SQUAD_ID = null; history_stack = [];
+    currentScreen = 'login';
+    renderAll();
+    return;
+  }
+  await loadMe();
+  await loadLocal();
+  await loadMySquadId();
+  applyTheme();
+
+  if(!ME){ currentScreen = 'onboard'; renderAll(); return; }
+  if(!SQUAD_ID){ currentScreen = 'squad-choice'; renderAll(); return; }
+
+  const s = await loadSquad(SQUAD_ID);
+  if(!s){ currentScreen = 'squad-choice'; SQUAD_ID = null; renderAll(); return; }
+  const meInSquad = s.members.find(m=>m.id===ME.id);
+  if(meInSquad){ meInSquad.name = ME.name; meInSquad.tz = ME.tz; meInSquad.photo = ME.photo || ''; }
+  SQUAD = s;
+  currentScreen = 'home';
+  renderAll();
+  attachSquadListener();
+  initBatteryTracking();
+}
+
+function waitForFbBridge(timeoutMs = 4000){
+  return new Promise(resolve => {
+    if (window.__fbBridgeReady) return resolve(true);
+    const timer = setTimeout(() => { window.__onFbBridgeReady = null; resolve(false); }, timeoutMs);
+    window.__onFbBridgeReady = () => { clearTimeout(timer); resolve(true); };
+  });
+}
+
+async function boot(){
+  showLoading();
+  // Wait for the Firebase bridge module (window.fbSet/fbGet/etc.) to finish
+  // attaching before touching anything that calls it — this is what fixes
+  // the "window.fbSet is not a function" sync error on cold loads.
+  const bridgeOk = await waitForFbBridge();
+  if (!bridgeOk) window.__fbReady = false;
+  checkFirebaseConfigured();
+  if(!window.__authReady){
+    window.__authUser = { uid: 'local_' + (localStorage.getItem('squadsync:local_uid') || (()=>{ const id='local_'+Math.random().toString(36).slice(2,10); localStorage.setItem('squadsync:local_uid', id); return id; })()), name:'You', email:'', photo:'' };
+    await bootForUser(window.__authUser);
+    return;
+  }
+  window.__onAuthChange = (user) => { bootForUser(user); };
+  window.__onAuthReady((user) => { bootForUser(user); });
+}
+
+boot();
+
+(function(){
+  const manifest = {
+    name: "SquadZync", short_name: "SquadZync", start_url: "./", display: "standalone",
+    background_color: "#0B0E1A", theme_color: "#0B0E1A",
+    icons: [{ src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%237C9CFF'/%3E%3Cpath d='M30 55 L45 68 L72 35' stroke='%230B0E1A' stroke-width='9' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E", sizes:"100x100", type:"image/svg+xml" }]
+  };
+  const blob = new Blob([JSON.stringify(manifest)], {type:'application/json'});
+  document.getElementById('manifest-link').setAttribute('href', URL.createObjectURL(blob));
+})();
+</script>
+</body>
+</html>
