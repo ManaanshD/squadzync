@@ -206,12 +206,12 @@ body.liquid-mode{--glass:rgba(255,255,255,var(--liquid-alpha));--glass-strong:rg
 .liquid-sheen{position:relative;overflow:hidden;}
 .liquid-sheen::after{content:"";position:absolute;top:-40%;left:-30%;width:45%;height:180%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.16),transparent);transform:rotate(22deg) translateX(-120%);animation:liquid-sweep 7s ease-in-out infinite;pointer-events:none;}
 @keyframes liquid-sweep{0%,55%{transform:rotate(22deg) translateX(-140%)}70%,100%{transform:rotate(22deg) translateX(420%)}}
-.parallax-target{transform:translate3d(var(--px,0),var(--py,0),0) rotateX(var(--rx,0)) rotateY(var(--ry,0));transition:transform .16s cubic-bezier(.2,.75,.25,1);will-change:transform;}
+.parallax-target{--px:0px;--py:0px;--rx:0deg;--ry:0deg;transform:translate3d(var(--px),var(--py),0) rotateX(var(--rx)) rotateY(var(--ry));transition:transform .16s cubic-bezier(.2,.75,.25,1);will-change:transform;}
 body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;background:radial-gradient(circle at var(--pointer-x,50%) var(--pointer-y,20%),rgba(255,255,255,.045),transparent 24%);}
 .glass{
   background:var(--glass);
-  backdrop-filter:blur(26px) saturate(160%);
-  -webkit-backdrop-filter:blur(26px) saturate(160%);
+  backdrop-filter:blur(var(--liquid-blur,26px)) saturate(160%);
+  -webkit-backdrop-filter:blur(var(--liquid-blur,26px)) saturate(160%);
   border:1px solid var(--glass-border);
   border-radius:var(--radius-md);
   box-shadow:0 1px 0 rgba(255,255,255,0.05) inset, 0 8px 24px -12px rgba(0,0,0,0.5);
@@ -512,8 +512,8 @@ body.reduce-motion-pref *, body.reduce-motion-pref *::before, body.reduce-motion
   --liq-press:1;
   --liq-light-x:50%;
   --liq-light-y:50%;
-  transform:translate3d(var(--liq-x),var(--liq-y),0)
-    rotate(var(--liq-rot))
+  transform:translate3d(calc(var(--liq-x) + var(--px,0px)),calc(var(--liq-y) + var(--py,0px)),0)
+    perspective(900px) rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg)) rotate(var(--liq-rot))
     skew(var(--liq-skew-x),var(--liq-skew-y))
     scale3d(calc(var(--liq-scale-x) * var(--liq-press)),calc(var(--liq-scale-y) * var(--liq-press)),1);
   transform-origin:center center;
@@ -554,9 +554,28 @@ body.reduce-motion-pref *, body.reduce-motion-pref *::before, body.reduce-motion
   .liquid-interactive::after{transition:none !important;}
 }
 
+
+select,.control-select{appearance:none;-webkit-appearance:none;width:100%;min-height:44px;padding:11px 40px 11px 13px;border-radius:14px;border:1px solid var(--glass-border);color:var(--text-hi);background:rgba(255,255,255,.055);font:600 13px var(--font-body);outline:none;cursor:pointer;background-image:linear-gradient(45deg,transparent 50%,var(--text-lo) 50%),linear-gradient(135deg,var(--text-lo) 50%,transparent 50%);background-position:calc(100% - 18px) 18px,calc(100% - 13px) 18px;background-size:5px 5px,5px 5px;background-repeat:no-repeat;transition:border-color .22s ease,background .22s ease,box-shadow .22s ease;}
+select:focus,.control-select:focus{border-color:var(--accent);background-color:rgba(var(--accent-rgb),.08);box-shadow:0 0 0 4px rgba(var(--accent-rgb),.14);}
+option{background:#171b2e;color:#f5f6fa;}
+.page-wipe{position:fixed;inset:0;z-index:9998;pointer-events:none;opacity:0;background:linear-gradient(115deg,rgba(8,10,18,.98),rgba(20,25,46,.96));transform:scaleX(0);transform-origin:left center;overflow:hidden;}
+.page-wipe::before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 70% 35%,rgba(var(--accent-rgb),.34),transparent 34%),linear-gradient(135deg,rgba(255,255,255,.12),transparent 26%);}
+.page-wipe.in{opacity:1;transform:scaleX(1);transition:transform .22s cubic-bezier(.77,0,.18,1);}
+.page-wipe.out{opacity:1;transform:scaleX(0);transform-origin:right center;transition:transform .36s cubic-bezier(.22,1,.36,1);}
+.motion-card{--tilt-x:0deg;--tilt-y:0deg;--motion-z:0px;--motion-scale:1;transform:translate3d(0,var(--motion-z),0) perspective(900px) rotateX(var(--tilt-x)) rotateY(var(--tilt-y)) scale(var(--motion-scale));transform-style:preserve-3d;will-change:transform;transition:transform .42s var(--ease-spring),filter .25s ease,box-shadow .25s ease;}
+.motion-card:hover{--motion-z:-2px;filter:brightness(1.025) saturate(1.035);}
+.motion-card.motion-pressed{--motion-z:1px;--motion-scale:.975;filter:brightness(1.05) saturate(1.08);}
+.motion-card.motion-holding{box-shadow:0 0 0 1px rgba(var(--accent-rgb),.28),0 18px 44px -20px rgba(var(--accent-rgb),.34)!important;}
+.stagger-in>*{opacity:0;transform:translateY(10px) scale(.985);animation:stagger-in .46s var(--ease-out-ios) forwards;}
+@keyframes stagger-in{to{opacity:1;transform:translateY(0) scale(1)}}
+.hold-progress{position:absolute;left:0;bottom:0;height:3px;width:0;background:linear-gradient(90deg,var(--accent),var(--accent-2));border-radius:3px;pointer-events:none;}
+.hold-confirming{position:relative;overflow:hidden;}
+body.parallax-off .parallax-target{transform:none!important;}
+@media (prefers-reduced-motion: reduce){.page-wipe{display:none!important}.motion-card{transform:none!important;transition:none!important}.stagger-in>*{animation:none!important;opacity:1!important;transform:none!important}}
 </style>
 </head>
 <body>
+<div id="page-wipe" class="page-wipe"></div>
 <div id="app"></div>
 <div id="toast" class="toast"><span class="ti" id="toast-icon"></span> <span id="toast-msg">Updated</span></div>
 
@@ -767,7 +786,7 @@ function can(uid, permId){ return !!(permsOf(uid) || {})[permId]; }
 let ME = null;
 let SQUAD = null;
 let SQUAD_ID = null;
-let LOCAL = { links:{}, layout:'grid', theme:'indigo', accentHex:'', density:'comfortable', reduceMotion:false, lastNudge:{}, notifications:false, homescreenWidget:true, parallax:true };
+let LOCAL = { links:{}, layout:'grid', theme:'indigo', accentHex:'', density:'comfortable', reduceMotion:false, lastNudge:{}, notifications:false, homescreenWidget:true, parallax:true, parallaxStrength:'medium', glassBlur:26, tilt:true, buttonStretch:true, pageTransitions:true, hoverGlow:true };
 let currentScreen = 'loading';
 let navDirection = 'fwd';
 let history_stack = [];
@@ -923,7 +942,7 @@ async function performDailySpin(){
   return reward;
 }
 async function loadLocal(){
-  const defaults = { links:{}, layout:'grid', theme:'indigo', accentHex:'', density:'comfortable', reduceMotion:false, lastNudge:{} };
+  const defaults = { links:{}, layout:'grid', theme:'indigo', accentHex:'', density:'comfortable', reduceMotion:false, lastNudge:{}, notifications:false, homescreenWidget:true, parallax:true, parallaxStrength:'medium', glassBlur:26, tilt:true, buttonStretch:true, pageTransitions:true, hoverGlow:true };
   try { LOCAL = Object.assign({}, defaults, JSON.parse(localStorage.getItem(lsKey('local')) || '{}')); } catch(e){ LOCAL = defaults; }
   if(!LOCAL.theme) LOCAL.theme = 'indigo';
   if(!LOCAL.density) LOCAL.density = 'comfortable';
@@ -1223,7 +1242,9 @@ function applyTheme(){
   const classes = [t.cls];
   if (LOCAL.density === 'compact') classes.push('density-compact');
   if (LOCAL.reduceMotion) classes.push('reduce-motion-pref');
+  if (LOCAL.parallax===false) classes.push('parallax-off');
   document.body.className = classes.filter(Boolean).join(' ');
+  document.documentElement.style.setProperty('--liquid-blur',((Number(LOCAL.glassBlur)||26)+'px'));
   applyGroupStyle();
 
   if (LOCAL.accentHex) {
@@ -1297,21 +1318,10 @@ function mountSheet(wrap){
   return close;
 }
 
-function goTo(screen, opts={}){
-  if(!opts.replace && currentScreen && currentScreen !== 'loading'){
-    history_stack.push(currentScreen);
-  }
-  navDirection = 'fwd';
-  currentScreen = screen;
-  renderAll();
-  try{ history.pushState({s:screen}, '', '#'+screen); }catch(e){}
-}
-function goBack(fallback='home'){
-  navDirection = 'back';
-  currentScreen = history_stack.length ? history_stack.pop() : fallback;
-  renderAll();
-  try{ history.replaceState({s:currentScreen}, '', '#'+currentScreen); }catch(e){}
-}
+function goTo(screen, opts={}){ const commit=()=>{if(!opts.replace&&currentScreen&&currentScreen!=='loading')history_stack.push(currentScreen);navDirection='fwd';currentScreen=screen;renderAll();try{history.pushState({s:screen},'', '#'+screen);}catch(e){}};playPageWipe(commit);}
+
+function goBack(fallback='home'){ const commit=()=>{navDirection='back';currentScreen=history_stack.length?history_stack.pop():fallback;renderAll();try{history.replaceState({s:currentScreen},'', '#'+currentScreen);}catch(e){}};playPageWipe(commit);}
+
 window.addEventListener('popstate', (e)=>{
   if(!ME) return;
   navDirection = 'back';
@@ -1396,14 +1406,14 @@ function initLiquidInteractions(){
   const selector = [
     '.friend-tile', '.list-item', '.xp-hero', '.glass-strong',
     '.shop-card', '.board-note', '.xp-rule', '[data-activity]',
-    '[data-watch-service]', '.icon-btn', '.btn', '.layout-switch',
+    '[data-watch-service]', '.icon-btn', '.btn',
     '.preset-pill', '.avail-chip', '.reaction-chip', '.theme-swatch',
     '.color-swatch-custom', '.nudge-btn', '.wheel-center', '.spin-wheel'
   ].join(',');
 
   document.querySelectorAll(selector).forEach(el=>{
-    if(el.classList.contains('parallax-target')) return;
-    if(el.closest('.bottom-nav')) return;
+    if(el.closest('.bottom-nav') || el.matches('.layout-switch, .layout-opt, select, input, textarea')) return;
+    if(LOCAL.buttonStretch===false && el.matches('.btn, .icon-btn, .nudge-btn, .reaction-chip, .preset-pill, .avail-chip')) return;
     if(el.dataset.liquidBound === '1') return;
     if(getComputedStyle(el).display === 'none') return;
 
@@ -1548,6 +1558,9 @@ function initLiquidInteractions(){
 }
 
 
+function playPageWipe(cb){ if(LOCAL.reduceMotion||LOCAL.pageTransitions===false){cb();return;} const w=document.getElementById('page-wipe'); if(!w){cb();return;} w.className='page-wipe'; requestAnimationFrame(()=>{w.classList.add('in'); setTimeout(()=>{cb();requestAnimationFrame(()=>{w.classList.remove('in');w.classList.add('out');setTimeout(()=>w.className='page-wipe',380);});},190);}); }
+function initMotionCards(){ document.querySelectorAll('.motion-card').forEach(el=>{ if(el.dataset.motionBound==='1')return;el.dataset.motionBound='1';let active=false;const reset=()=>{el.style.setProperty('--tilt-x','0deg');el.style.setProperty('--tilt-y','0deg');el.classList.remove('motion-pressed');};el.addEventListener('pointerenter',()=>{active=true},{passive:true});el.addEventListener('pointermove',e=>{if(!active||!LOCAL.tilt||LOCAL.reduceMotion)return;const r=el.getBoundingClientRect(),nx=(e.clientX-r.left)/r.width-.5,ny=(e.clientY-r.top)/r.height-.5;el.style.setProperty('--tilt-x',(-ny*5.2).toFixed(2)+'deg');el.style.setProperty('--tilt-y',(nx*6.5).toFixed(2)+'deg');},{passive:true});el.addEventListener('pointerdown',()=>el.classList.add('motion-pressed'),{passive:true});el.addEventListener('pointerup',()=>el.classList.remove('motion-pressed'),{passive:true});el.addEventListener('pointerleave',()=>{active=false;reset();},{passive:true});el.addEventListener('pointercancel',reset,{passive:true});}); }
+function initHoldToConfirm(){ document.querySelectorAll('[data-hold-confirm]').forEach(btn=>{if(btn.dataset.holdBound==='1')return;btn.dataset.holdBound='1';const dur=900;let start=0,timer=0,raf=0,ok=false;const bar=document.createElement('span');bar.className='hold-progress';btn.appendChild(bar);const reset=()=>{clearTimeout(timer);cancelAnimationFrame(raf);start=0;bar.style.width='0%';btn.classList.remove('motion-holding');};const loop=()=>{if(!start)return;const p=Math.min(1,(performance.now()-start)/dur);bar.style.width=(p*100)+'%';if(p<1)raf=requestAnimationFrame(loop);};btn.addEventListener('pointerdown',e=>{if(e.button!==undefined&&e.button!==0)return;ok=false;start=performance.now();btn.classList.add('motion-holding');raf=requestAnimationFrame(loop);timer=setTimeout(()=>{ok=true;btn.dataset.holdConfirmed='1';bar.style.width='100%';btn.click();setTimeout(reset,80);},dur);},{passive:true});btn.addEventListener('pointerup',()=>{if(!ok)reset();},{passive:true});btn.addEventListener('pointercancel',reset,{passive:true});btn.addEventListener('click',e=>{if(btn.dataset.holdConfirmed==='1'){delete btn.dataset.holdConfirmed;return;}e.preventDefault();e.stopImmediatePropagation();showToast('Hold to confirm','ti-hand-stop');},{capture:true});}); }
 function openFriendNotes(friendId){
   currentParams = { friendId };
   goTo('friend-notes');
@@ -1610,7 +1623,7 @@ function renderOnboard(){
         </div>
         <div class="field">
           <label class="field-label">Your Time Zone</label>
-          <select id="ob-tz">${tzOptions}</select>
+          <select class="control-select" id="ob-tz">${tzOptions}</select>
         </div>
         <button class="btn btn-primary btn-block" id="ob-next" style="padding:16px;">Get Started <span class="ti">${icon('ti-arrow-right')}</span></button>
       </div>
@@ -1720,9 +1733,9 @@ function renderHome(){
       </div>
       <div class="layout-switch" id="layout-switch">
         <div class="layout-pill" id="layout-pill"></div>
-        <div class="layout-opt ${layout==='grid'?'active':''}" data-layout="grid">Grid</div>
-        <div class="layout-opt ${layout==='list'?'active':''}" data-layout="list">List</div>
-        <div class="layout-opt ${layout==='wheel'?'active':''}" data-layout="wheel">Wheel</div>
+        <div class="layout-opt motion-card ${layout==='grid'?'active':''}" data-layout="grid">Grid</div>
+        <div class="layout-opt motion-card ${layout==='list'?'active':''}" data-layout="list">List</div>
+        <div class="layout-opt motion-card ${layout==='wheel'?'active':''}" data-layout="wheel">Wheel</div>
       </div>
       ${body}
     </div>
@@ -2026,7 +2039,7 @@ function renderSquadManage(){
       ${can(ME.id,'editGroupSettings') ? `<button class="btn btn-ghost btn-block" id="go-group-settings" style="margin-bottom:20px; padding:13px;"><span class="ti">${icon('ti-settings')}</span> Group settings</button>` : `<div style="margin-bottom:8px;"></div>`}
       <div class="section-label">Members</div>
       <div style="margin-bottom:24px;">${members}</div>
-      <button class="btn btn-ghost btn-block" id="leave-squad-btn" style="color:var(--red); border-color:rgba(248,113,113,0.3);"><span class="ti">${icon('ti-logout')}</span> Leave squad</button>
+      <button class="btn btn-ghost btn-block hold-confirm" data-hold-confirm="Leave squad" id="leave-squad-btn" style="color:var(--red); border-color:rgba(248,113,113,0.3);"><span class="ti">${icon('ti-logout')}</span> Leave squad</button>
     </div>
     ${renderNav('manage')}
   `;
@@ -2069,9 +2082,9 @@ function renderGroupSettings(){
   <div class="section-label">Membership</div><div class="field"><label class="field-label">Member limit — <span id="gs-cap-value" style="color:var(--accent);">${cap}</span></label><input type="range" id="gs-cap" min="2" max="15" value="${cap}" style="width:100%;accent-color:var(--accent);"><div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-faint);margin-top:4px;"><span>2</span><span>15</span></div></div>
   <div class="glass" style="padding:14px 16px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;margin-bottom:12px;" id="gs-locked-toggle"><div style="display:flex;align-items:center;gap:10px;">${icon('ti-lock')}<div><div style="font-size:14px;font-weight:700;">Require approval to join</div><div style="font-size:11.5px;color:var(--text-lo);">New joins wait for an admin</div></div></div><span class="ti" id="gs-locked-icon" style="font-size:24px;color:${SQUAD.locked?'var(--accent)':'var(--text-faint)'};">${icon(SQUAD.locked?'ti-toggle-right':'ti-toggle-left')}</span></div>
   <div class="section-label">Visual system</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">${sw('Accent','gs-accent',g.accent,'text','type="color"')}${sw('Accent 2','gs-accent2',g.accent2,'text','type="color"')}</div>${sw('Background','gs-background',g.background,'text','type="color"')}
-  <div class="field"><label class="field-label">Surface</label><select id="gs-mode"><option value="liquid" ${g.mode==='liquid'?'selected':''}>Liquid glass</option><option value="crystal" ${g.mode==='crystal'?'selected':''}>Crystal glass</option></select></div>
+  <div class="field"><label class="field-label">Surface</label><select class="control-select" id="gs-mode"><option value="liquid" ${g.mode==='liquid'?'selected':''}>Liquid glass</option><option value="crystal" ${g.mode==='crystal'?'selected':''}>Crystal glass</option></select></div>
   <div class="field"><label class="field-label">Corner radius — <span id="gs-radius-value" style="color:var(--accent);">${g.radius}px</span></label><input type="range" id="gs-radius" min="10" max="34" value="${g.radius}" style="width:100%;accent-color:var(--accent);"></div>
-  <div class="field"><label class="field-label">Ambient motion</label><select id="gs-motion"><option value="ambient" ${g.motion==='ambient'?'selected':''}>Ambient + parallax</option><option value="waves" ${g.motion==='waves'?'selected':''}>Slow waves</option><option value="minimal" ${g.motion==='minimal'?'selected':''}>Minimal</option></select></div>
+  <div class="field"><label class="field-label">Ambient motion</label><select class="control-select" id="gs-motion"><option value="ambient" ${g.motion==='ambient'?'selected':''}>Ambient + parallax</option><option value="waves" ${g.motion==='waves'?'selected':''}>Slow waves</option><option value="minimal" ${g.motion==='minimal'?'selected':''}>Minimal</option></select></div>
   <div class="stack"><div class="glass" style="padding:13px 15px;display:flex;align-items:center;justify-content:space-between;"><span style="font-size:13px;font-weight:600;">Glow status rings</span><input type="checkbox" id="gs-status-glow" ${g.showStatusGlow!==false?'checked':''}></div><div class="glass" style="padding:13px 15px;display:flex;align-items:center;justify-content:space-between;"><span style="font-size:13px;font-weight:600;">Show member count</span><input type="checkbox" id="gs-member-count" ${g.showMemberCount!==false?'checked':''}></div></div>
   <button class="btn btn-primary btn-block" id="gs-save" style="padding:15px;margin-top:18px;">Save group design</button>${can(ME.id,'manageRoles')?`<button class="btn btn-ghost btn-block" id="go-roles" style="padding:13px;margin-top:10px;">${icon('ti-shield')} Manage roles &amp; permissions</button>`:''}
   </div>`;
@@ -2091,7 +2104,7 @@ function renderRoles(){
           <div style="font-weight:700; font-size:14px; overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${m.name}${m.id===ME.id?' (You)':''}</div>
         </div>
         ${!isOwner && m.id!==ME.id ? `
-        <select data-role-select="${m.id}" style="width:auto; padding:7px 10px; font-size:12px; border-radius:10px;">
+        <select class="control-select" data-role-select="${m.id}" style="width:auto; padding:7px 10px; font-size:12px; border-radius:10px;">
           <option value="admin" ${role==='admin'?'selected':''}>Admin</option>
           <option value="member" ${role==='member'?'selected':''}>Member</option>
         </select>` : `<span style="display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:700; color:${roleInfo.color};"><span class="ti" style="font-size:12px;">${icon(roleInfo.icon)}</span>${roleInfo.label}</span>`}
@@ -2687,7 +2700,11 @@ function renderXp(){
           ${active?`<span class="xp-badge">Active</span>`:`<span class="ti" style="color:var(--text-faint);">${icon('ti-chevron-right')}</span>`}
         </div>`;
       }).join(''):'<div class="small-note">No groups yet.</div>'}
-      <button class="btn btn-ghost btn-block" id="xp-shop-btn" style="padding:12px;margin-top:10px;">${icon('ti-trophy')} Open XP shop</button>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;">
+        <button class="btn btn-ghost" id="group-create-btn" style="padding:11px 10px;">${icon('ti-plus')} New group</button>
+        <button class="btn btn-ghost" id="group-join-btn" style="padding:11px 10px;">${icon('ti-key')} Join group</button>
+      </div>
+      <button class="btn btn-ghost btn-block" id="xp-shop-btn" style="padding:12px;margin-top:8px;">${icon('ti-trophy')} Open XP shop</button>
     </div>
 
     <div class="section-label">Costs</div>
@@ -2742,6 +2759,11 @@ function renderMe(){
       <div class="glass" style="padding:14px 16px; margin-bottom:10px; display:flex; align-items:center; justify-content:space-between; cursor:pointer;" id="go-xp">
         <div style="display:flex;align-items:center;gap:10px;"><span class="ti" style="color:var(--accent);">${icon('ti-trophy')}</span><div><div style="font-size:14px;font-weight:700;">XP &amp; Rewards</div><div style="font-size:11px;color:var(--text-lo);">${Math.floor(ME.xp||0)} XP · daily spin &amp; groups</div></div></div><span class="ti" style="color:var(--text-faint);">${icon('ti-chevron-right')}</span>
       </div>
+      <div class="section-label">Groups</div>
+      <div class="glass group-actions-card motion-card" style="padding:14px 16px;margin-bottom:10px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;"><span class="ti" style="color:var(--accent);">${icon('ti-users-group')}</span><div><div style="font-size:14px;font-weight:700;">Manage your groups</div><div style="font-size:11px;color:var(--text-lo);">${getGroupIds().length}/${XP_CONFIG.maxGroups} joined · switch, create or join</div></div></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"><button class="btn btn-ghost" id="me-create-group" style="padding:11px 10px;">${icon('ti-plus')} Create</button><button class="btn btn-ghost" id="me-join-group" style="padding:11px 10px;">${icon('ti-key')} Join</button></div>
+      </div>
       <div class="section-label">Settings</div>
       <div class="glass" style="padding:14px 16px; margin-bottom:10px; display:flex; align-items:center; justify-content:space-between; cursor:pointer;" id="go-customize">
         <div style="display:flex; align-items:center; gap:10px;"><span class="ti" style="color:var(--accent);">${icon('ti-palette')}</span><span style="font-size:14px; font-weight:600;">Customize appearance</span></div>
@@ -2753,7 +2775,7 @@ function renderMe(){
       </div>
       <div class="field">
         <label class="field-label">Time zone</label>
-        <select id="me-tz-input">${TIMEZONES.map(t=>`<option value="${t.value}" ${t.value===ME.tz?'selected':''}>${t.label}</option>`).join('')}</select>
+        <select class="control-select" id="me-tz-input">${TIMEZONES.map(t=>`<option value="${t.value}" ${t.value===ME.tz?'selected':''}>${t.label}</option>`).join('')}</select>
       </div>
       <button class="btn btn-primary btn-block" id="me-save-btn" style="padding:15px;">Save profile</button>
     </div>
@@ -2762,65 +2784,34 @@ function renderMe(){
 }
 
 function renderCustomize(){
-  const customActive = !!LOCAL.accentHex;
-  return `
-    <div class="screen">
-      <div class="page-title-row">${backBtn()}<h2>Customize</h2></div>
-      <p class="small-note" style="margin:8px 0 24px 48px;">Personal to your account — your squad keeps its own view.</p>
-      <div class="section-label">Accent theme</div>
-      <div class="theme-swatch-row">
-        ${THEMES.map(t=>`<div class="theme-swatch ${!customActive && LOCAL.theme===t.id?'active':''}" data-theme="${t.id}" style="background:linear-gradient(135deg,${t.hex1},${t.hex2});"></div>`).join('')}
-        <div class="color-swatch-custom ${customActive?'active':''}" id="custom-accent-swatch" style="${customActive?`background:${LOCAL.accentHex};`:''}">
-          ${customActive?'':`<span class="ti">${icon('ti-color-picker')}</span>`}
-          <input type="color" id="custom-accent-input" value="${LOCAL.accentHex||'#7C9CFF'}">
-        </div>
-      </div>
-      <p class="small-note" style="margin:-10px 0 4px 4px;">Tap the picker for any color you like.</p>
-
-      <div class="section-label">Widget layout</div>
-      <div class="stack">
-        <div class="glass" style="padding:14px 16px; display:flex; align-items:center; justify-content:space-between; cursor:pointer;" data-layout-choice="grid">
-          <span style="font-size:14px; font-weight:600;"><span class="ti" style="margin-right:8px;color:var(--accent);">${icon('ti-layout-grid')}</span>Grid</span>
-          ${LOCAL.layout==='grid'?`<span class="ti" style="color:var(--accent);">${icon('ti-check')}</span>`:''}
-        </div>
-        <div class="glass" style="padding:14px 16px; display:flex; align-items:center; justify-content:space-between; cursor:pointer;" data-layout-choice="list">
-          <span style="font-size:14px; font-weight:600;"><span class="ti" style="margin-right:8px;color:var(--accent);">${icon('ti-list')}</span>List</span>
-          ${LOCAL.layout==='list'?`<span class="ti" style="color:var(--accent);">${icon('ti-check')}</span>`:''}
-        </div>
-        <div class="glass" style="padding:14px 16px; display:flex; align-items:center; justify-content:space-between; cursor:pointer;" data-layout-choice="wheel">
-          <span style="font-size:14px; font-weight:600;"><span class="ti" style="margin-right:8px;color:var(--accent);">${icon('ti-circle-dot')}</span>Wheel</span>
-          ${LOCAL.layout==='wheel'?`<span class="ti" style="color:var(--accent);">${icon('ti-check')}</span>`:''}
-        </div>
-      </div>
-
-      <div class="section-label">Display density</div>
-      <div class="stack">
-        <div class="glass" style="padding:14px 16px; display:flex; align-items:center; justify-content:space-between; cursor:pointer;" data-density-choice="comfortable">
-          <span style="font-size:14px; font-weight:600;"><span class="ti" style="margin-right:8px;color:var(--accent);">${icon('ti-arrows-diagonal')}</span>Comfortable</span>
-          ${(LOCAL.density||'comfortable')==='comfortable'?`<span class="ti" style="color:var(--accent);">${icon('ti-check')}</span>`:''}
-        </div>
-        <div class="glass" style="padding:14px 16px; display:flex; align-items:center; justify-content:space-between; cursor:pointer;" data-density-choice="compact">
-          <span style="font-size:14px; font-weight:600;"><span class="ti" style="margin-right:8px;color:var(--accent);">${icon('ti-arrows-minimize')}</span>Compact</span>
-          ${LOCAL.density==='compact'?`<span class="ti" style="color:var(--accent);">${icon('ti-check')}</span>`:''}
-        </div>
-      </div>
-
-      <div class="section-label">Motion</div>
-      <div class="glass" style="padding:14px 16px; display:flex; align-items:center; justify-content:space-between; cursor:pointer;" id="reduce-motion-toggle">
-        <span style="font-size:14px; font-weight:600;"><span class="ti" style="margin-right:8px;color:var(--accent);">${icon('ti-wave-sine')}</span>Reduce motion</span>
-        <span class="ti" style="font-size:24px; color:${LOCAL.reduceMotion?'var(--accent)':'var(--text-faint)'};">${icon(LOCAL.reduceMotion?'ti-toggle-right':'ti-toggle-left')}</span>
-      </div>
-    </div>
-  `;
+  const customActive=!!LOCAL.accentHex;
+  const sel=(label,id,value,opts)=>`<div class="field"><label class="field-label">${label}</label><select id="${id}" class="control-select">${opts.map(o=>`<option value="${o.v}" ${String(value)===o.v?'selected':''}>${o.l}</option>`).join('')}</select></div>`;
+  return `<div class="screen">
+    <div class="page-title-row">${backBtn()}<h2>Customize</h2></div>
+    <p class="small-note" style="margin:8px 0 24px 48px;">Tune your personal visual system without changing the group identity.</p>
+    <div class="section-label">Accent theme</div><div class="theme-swatch-row">${THEMES.map(t=>`<div class="theme-swatch motion-card ${!customActive&&LOCAL.theme===t.id?'active':''}" data-theme="${t.id}" title="${t.label}" style="background:linear-gradient(135deg,${t.hex1},${t.hex2});"></div>`).join('')}<div class="color-swatch-custom motion-card ${customActive?'active':''}" id="custom-accent-swatch" style="${customActive?`background:${LOCAL.accentHex};`:''}">${customActive?'':`<span class="ti">${icon('ti-color-picker')}</span>`}<input type="color" id="custom-accent-input" value="${LOCAL.accentHex||'#7C9CFF'}"></div></div>
+    <div class="section-label">Widget layout</div><div class="stack stagger-in">${[['grid','layout-grid','Grid'],['list','list','List'],['wheel','circle-dot','Wheel']].map(([v,ic,l])=>`<div class="glass motion-card" style="padding:14px 16px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;" data-layout-choice="${v}"><span style="font-size:14px;font-weight:600;"><span class="ti" style="margin-right:8px;color:var(--accent);">${icon('ti-'+ic)}</span>${l}</span>${LOCAL.layout===v?`<span class="ti" style="color:var(--accent);">${icon('ti-check')}</span>`:''}</div>`).join('')}</div>
+    <div class="section-label">Display</div><div class="glass" style="padding:14px 16px;">${sel('Density','custom-density',LOCAL.density,[{v:'comfortable',l:'Comfortable'},{v:'compact',l:'Compact'}])}${sel('Glass blur','custom-glass-blur',LOCAL.glassBlur,[{v:'14',l:'Low blur'},{v:'26',l:'Balanced'},{v:'36',l:'High blur'}])}${sel('Parallax strength','custom-parallax-strength',LOCAL.parallaxStrength,[{v:'subtle',l:'Subtle'},{v:'medium',l:'Balanced'},{v:'strong',l:'Strong'}])}${sel('Interaction','custom-interaction',LOCAL.buttonStretch,[{v:'true',l:'Fluid + stretchy'},{v:'false',l:'Simple press'}])}</div>
+    <div class="section-label">Motion</div><div class="stack stagger-in">
+      <div class="glass motion-card" style="padding:13px 15px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;" id="parallax-toggle"><span style="font-size:14px;font-weight:600;">Pointer parallax</span><span class="ti" style="font-size:24px;color:${LOCAL.parallax!==false?'var(--accent)':'var(--text-faint)'};">${icon(LOCAL.parallax!==false?'ti-toggle-right':'ti-toggle-left')}</span></div>
+      <div class="glass motion-card" style="padding:13px 15px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;" id="tilt-toggle"><span style="font-size:14px;font-weight:600;">3D tilt on hover</span><span class="ti" style="font-size:24px;color:${LOCAL.tilt!==false?'var(--accent)':'var(--text-faint)'};">${icon(LOCAL.tilt!==false?'ti-toggle-right':'ti-toggle-left')}</span></div>
+      <div class="glass motion-card" style="padding:13px 15px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;" id="page-transitions-toggle"><span style="font-size:14px;font-weight:600;">Lightbox page transitions</span><span class="ti" style="font-size:24px;color:${LOCAL.pageTransitions!==false?'var(--accent)':'var(--text-faint)'};">${icon(LOCAL.pageTransitions!==false?'ti-toggle-right':'ti-toggle-left')}</span></div>
+      <div class="glass motion-card" style="padding:13px 15px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;" id="reduce-motion-toggle"><span style="font-size:14px;font-weight:600;">Reduce motion</span><span class="ti" style="font-size:24px;color:${LOCAL.reduceMotion?'var(--accent)':'var(--text-faint)'};">${icon(LOCAL.reduceMotion?'ti-toggle-right':'ti-toggle-left')}</span></div>
+    </div></div>`;
 }
-
 function bindEvents(){
   const byId = (id) => document.getElementById(id);
   initLiquidInteractions();
+  initMotionCards();
+  initHoldToConfirm();
 
   if(byId('open-xp')) byId('open-xp').onclick = () => goTo('xp');
   if(byId('go-xp')) byId('go-xp').onclick = () => goTo('xp');
   if(byId('xp-shop-btn')) byId('xp-shop-btn').onclick = () => goTo('shop');
+  if(byId('group-create-btn')) byId('group-create-btn').onclick = () => goTo('create-squad');
+  if(byId('group-join-btn')) byId('group-join-btn').onclick = () => goTo('join-squad');
+  if(byId('me-create-group')) byId('me-create-group').onclick = () => goTo('create-squad');
+  if(byId('me-join-group')) byId('me-join-group').onclick = () => goTo('join-squad');
   if(byId('shop-back')) byId('shop-back').onclick = () => goBack('xp');
   document.querySelectorAll('[data-switch-group]').forEach(el=>{
     el.onclick = async ()=>{ await switchSquad(el.dataset.switchGroup); if(currentScreen!=='home') goTo('home',{replace:true}); };
@@ -3015,12 +3006,11 @@ function bindEvents(){
     window.__layoutPillResizeBound = true;
   }
   document.querySelectorAll('.layout-opt').forEach(opt => {
-    opt.onclick = async () => {
-      LOCAL.layout = opt.dataset.layout;
-      await saveLocal();
-      softUpdate();
-      positionLayoutPill();
-    };
+    if(opt.dataset.layoutBound==='1') return;
+    opt.dataset.layoutBound='1';
+    const choose=async e=>{ e.preventDefault(); e.stopPropagation(); if(LOCAL.layout===opt.dataset.layout) return; LOCAL.layout=opt.dataset.layout; await saveLocal(); softUpdate(); requestAnimationFrame(positionLayoutPill); };
+    opt.addEventListener('pointerup',choose,{passive:false});
+    opt.addEventListener('click',choose,{passive:false});
   });
 
   document.querySelectorAll('.friend-tile, .list-item, .wheel-node').forEach(el => {
@@ -3224,6 +3214,13 @@ function bindEvents(){
       softUpdate();
     };
   });
+  if(byId('custom-density')) byId('custom-density').onchange=async e=>{LOCAL.density=e.target.value;await saveLocal();softUpdate();};
+  if(byId('custom-glass-blur')) byId('custom-glass-blur').onchange=async e=>{LOCAL.glassBlur=Number(e.target.value)||26;await saveLocal();applyTheme();};
+  if(byId('custom-parallax-strength')) byId('custom-parallax-strength').onchange=async e=>{LOCAL.parallaxStrength=e.target.value;await saveLocal();};
+  if(byId('custom-interaction')) byId('custom-interaction').onchange=async e=>{LOCAL.buttonStretch=e.target.value==='true';await saveLocal();};
+  if(byId('parallax-toggle')) byId('parallax-toggle').onclick=async()=>{LOCAL.parallax=LOCAL.parallax===false;await saveLocal();softUpdate();};
+  if(byId('tilt-toggle')) byId('tilt-toggle').onclick=async()=>{LOCAL.tilt=LOCAL.tilt===false;await saveLocal();softUpdate();};
+  if(byId('page-transitions-toggle')) byId('page-transitions-toggle').onclick=async()=>{LOCAL.pageTransitions=LOCAL.pageTransitions===false;await saveLocal();};
   if(byId('reduce-motion-toggle')){
     byId('reduce-motion-toggle').onclick = async () => {
       LOCAL.reduceMotion = !LOCAL.reduceMotion;
