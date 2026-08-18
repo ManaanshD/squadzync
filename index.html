@@ -1205,28 +1205,47 @@ async function loadMe(){
   try { ME = JSON.parse(localStorage.getItem(lsKey('me')) || 'null'); } catch(e){}
 }
 async function reconcileUserXpBalance(){
-  if(!ME || isViewerMode() || typeof window.fbGet !== 'function') return;
+  if(!ME || isViewerMode() || typeof window.fbGet !== 'function') return false;
   const localXp=Math.max(0,Math.floor(Number(ME.xp)||0));
   try{
-    const remoteRaw=await window.fbGet('users/'+ME.id+'/xp');
-    const remoteXp=remoteRaw==null ? null : Math.max(0,Math.floor(Number(remoteRaw)||0));
+    // IMPORTANT: the canonical XP value is the xp field on the Firebase user
+    // record. Older builds also used users/<uid>/xp, which could drift from
+    // the profile object and make spending appear to have 0 XP. We deliberately
+    // ignore that legacy mirror here.
+    const remote=await window.fbGet('users/'+ME.id);
+    const remoteXp=remote==null ? null : Math.max(0,Math.floor(Number(remote.xp)||0));
     if(remoteXp===null){
-      if(localXp>0) await window.fbSet('users/'+ME.id+'/xp',localXp);
-      return;
-    }
-    // XP is monotonic for reconciliation: never let a stale client snapshot
-    // erase a newer balance. If this device has a higher locally-held balance
-    // (including older accounts whose XP field was never initialized), promote
-    // Firebase to that balance. If Firebase is higher, adopt the authoritative
-    // remote value locally.
-    if(localXp>remoteXp){
-      const r=await window.fbTxn('users/'+ME.id+'/xp',current=>Math.max(0,Math.max(Number(current)||0,localXp)));
-      ME.xp=Math.max(localXp,Math.floor(Number(r.snapshot?.val?.()??localXp)||0));
-    }else if(remoteXp>localXp){
+      // No remote profile yet: preserve the local balance and create the field.
+      if(localXp>0){
+        const r=await window.fbTxn('users/'+ME.id,current=>{
+          const obj=(current && typeof current==='object')?{...current}:{};
+          const cur=Math.max(0,Math.floor(Number(obj.xp)||0));
+          obj.xp=Math.max(cur,localXp);
+          return obj;
+        });
+        const data=r.snapshot?.val?.();
+        ME.xp=Math.max(localXp,Math.floor(Number(data?.xp)||0));
+      }
+    }else if(localXp>remoteXp){
+      // Promote a locally-held newer balance without ever decreasing Firebase.
+      const r=await window.fbTxn('users/'+ME.id,current=>{
+        const obj=(current && typeof current==='object')?{...current}:{};
+        const cur=Math.max(0,Math.floor(Number(obj.xp)||0));
+        obj.xp=Math.max(cur,localXp);
+        return obj;
+      });
+      const data=r.snapshot?.val?.();
+      ME.xp=Math.max(localXp,Math.floor(Number(data?.xp)||0));
+    }else{
+      // Firebase is authoritative when it is newer/equal.
       ME.xp=remoteXp;
     }
     localStorage.setItem(lsKey('me'),JSON.stringify(ME));
-  }catch(e){ console.warn('XP balance reconciliation skipped',e); }
+    return true;
+  }catch(e){
+    console.warn('XP balance reconciliation skipped',e);
+    return false;
+  }
 }
 
 async function saveMe(){
@@ -1351,7 +1370,20 @@ async function verifiedGroupIds(){
 async function verifiedGroupCount(){ const ids=await verifiedGroupIds(); return ids.length; }
 function recordXpMetaOnly(delta,reason,type){ensureXpMeta();const entry={id:'xp_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),delta:Number(delta)||0,reason:String(reason||'XP'),type:type||((delta||0)>=0?'earn':'spend'),ts:Date.now()};ME.xpState.history=[entry,...(ME.xpState.history||[])].slice(0,150)}
 async function saveMeFields(fields){if(!ME||isViewerMode())return false;try{await window.fbUpdate('users/'+ME.id,fields);return true}catch(e){return false}}
-async function atomicUserXpDelta(uid,delta){const result=await window.fbTxn('users/'+uid+'/xp',current=>{const cur=Math.max(0,Number(current)||0);const next=cur+Number(delta||0);if(next<0)return;return next});const currentXp=Number(result.snapshot?.val?.()??0);return {ok:!!result.committed,xp:currentXp,available:currentXp}}
+async function atomicUserXpDelta(uid,delta){
+  const result=await window.fbTxn('users/'+uid,current=>{
+    const obj=(current && typeof current==='object')?{...current}:{};
+    const cur=Math.max(0,Math.floor(Number(obj.xp)||0));
+    const next=cur+Math.floor(Number(delta)||0);
+    // Returning undefined aborts the transaction without changing Firebase.
+    if(next<0) return;
+    obj.xp=next;
+    return obj;
+  });
+  const data=result.snapshot?.val?.();
+  const currentXp=Math.max(0,Math.floor(Number(data?.xp)||0));
+  return {ok:!!result.committed,xp:currentXp,available:currentXp};
+}
 async function grantXp(amount,reason='XP'){if(viewerBlocked('Sign in to earn XP'))return false;ensureXpMeta();amount=Math.max(0,Math.floor(Number(amount)||0));if(!amount)return false;const mult=activeXpMultiplier(),effective=mult?Math.round(amount*Number(mult.multiplier||1)):amount;try{const r=await atomicUserXpDelta(ME.id,effective);if(!r.ok)return false;ME.xp=r.xp;recordXpMetaOnly(effective,reason,'earn');await saveMeFields({xpState:ME.xpState});return true}catch(e){showToast('Couldn’t add XP — try again','ti-alert-triangle');return false}}
 async function spendXp(amount,reason='Purchase'){
   if(viewerBlocked('Sign in to spend XP'))return false;
@@ -3824,14 +3856,14 @@ function bindEvents(){
   if(byId('notifications-back')) byId('notifications-back').onclick=()=>goBack('home');
   if(byId('notifications-readall')) byId('notifications-readall').onclick=async()=>{await markAllNotificationsRead();softUpdate();};
   document.querySelectorAll('[data-notification-id]').forEach(el=>el.onclick=async()=>{const n=USER_NOTIFICATIONS[el.dataset.notificationId];if(n&&!n.read&&!isViewerMode()){try{await window.fbUpdate('users/'+ME.id+'/notifications/'+n.id,{read:true});}catch(e){}}await openNotificationItem(n);});
-  if(byId('xp-shop-btn')) byId('xp-shop-btn').onclick = () => goTo('shop');
+  if(byId('xp-shop-btn')) byId('xp-shop-btn').onclick = async () => { await reconcileUserXpBalance(); goTo('shop'); };
   document.querySelectorAll('[data-avatar-buy]').forEach(btn=>{
     btn.onclick=async()=>{ if(btn.dataset.busy==='1') return; btn.dataset.busy='1'; try{ await buyAvatarShopItem(btn.dataset.avatarBuy); } finally { btn.dataset.busy=''; } };
   });
-  if(byId('group-create-btn')) byId('group-create-btn').onclick = () => goTo('create-squad');
-  if(byId('group-join-btn')) byId('group-join-btn').onclick = () => goTo('join-squad');
-  if(byId('me-create-group')) byId('me-create-group').onclick = () => goTo('create-squad');
-  if(byId('me-join-group')) byId('me-join-group').onclick = () => goTo('join-squad');
+  if(byId('group-create-btn')) byId('group-create-btn').onclick = async () => { await reconcileUserXpBalance(); goTo('create-squad'); };
+  if(byId('group-join-btn')) byId('group-join-btn').onclick = async () => { await reconcileUserXpBalance(); goTo('join-squad'); };
+  if(byId('me-create-group')) byId('me-create-group').onclick = async () => { await reconcileUserXpBalance(); goTo('create-squad'); };
+  if(byId('me-join-group')) byId('me-join-group').onclick = async () => { await reconcileUserXpBalance(); goTo('join-squad'); };
   if(byId('shop-back')) byId('shop-back').onclick = () => goBack('xp');
   document.querySelectorAll('[data-switch-group]').forEach(el=>{
     el.onclick = async ()=>{ await switchSquad(el.dataset.switchGroup); if(currentScreen!=='home') goTo('home',{replace:true}); };
