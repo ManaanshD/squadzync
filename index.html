@@ -409,11 +409,23 @@ p{margin:0;}
 .sheet-backdrop{position:fixed; inset:0; background:rgba(0,0,0,0); backdrop-filter:blur(0px); -webkit-backdrop-filter:blur(0px); z-index:100; display:flex; align-items:flex-end; transition:background .3s var(--ease-out-ios), backdrop-filter .3s var(--ease-out-ios);}
 .sheet-backdrop.open{background:rgba(0,0,0,0.55); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);}
 .sheet-backdrop.closing{background:rgba(0,0,0,0); backdrop-filter:blur(0px);}
-.sheet{width:100%; max-width:480px; margin:0 auto; background:#14182B; border:1px solid var(--glass-border); border-bottom:none; border-radius:28px 28px 0 0; padding:20px 22px calc(28px + env(safe-area-inset-bottom)); max-height:88vh; overflow-y:auto; transform:translateY(100%); transition:transform .46s var(--ease-sheet); box-shadow:0 -10px 40px rgba(0,0,0,0.6); will-change:transform;}
+.sheet{width:100%; max-width:480px; margin:0 auto; border:1px solid var(--glass-border); border-bottom:none; border-radius:28px 28px 0 0; padding:20px 22px calc(28px + env(safe-area-inset-bottom)); max-height:88vh; overflow-y:auto; transform:translateY(100%); transition:transform .46s var(--ease-sheet); box-shadow:0 -10px 40px rgba(0,0,0,0.6); will-change:transform;}
 .sheet-backdrop.open .sheet{transform:translateY(0);}
 .sheet-backdrop.closing .sheet{transform:translateY(100%); transition:transform .26s var(--ease-out-ios);}
 .sheet-backdrop.dragging .sheet{transition:none;}
 .sheet-handle{width:38px;height:5px;border-radius:3px;background:rgba(255,255,255,0.2);margin:0 auto 16px; cursor:grab;}
+.sheet-backdrop::before{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle at 22% 12%,rgba(var(--accent-rgb),.18),transparent 28%),radial-gradient(circle at 78% 70%,rgba(255,255,255,.05),transparent 30%);}
+.sheet{position:relative;background:linear-gradient(145deg,rgba(31,37,64,.72),rgba(12,16,31,.72));backdrop-filter:blur(26px) saturate(170%);-webkit-backdrop-filter:blur(26px) saturate(170%);border:1px solid rgba(255,255,255,.14);box-shadow:0 -18px 60px -24px rgba(0,0,0,.82),inset 0 1px 0 rgba(255,255,255,.11);}
+.sheet::before{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;background:linear-gradient(135deg,rgba(255,255,255,.11),transparent 24%,transparent 70%,rgba(255,255,255,.035));}
+.sheet > *{position:relative;z-index:1;}
+.liquid-popup{overflow:hidden;}
+.dialog,.motion-dialog,.motion-popover{background:linear-gradient(145deg,rgba(31,37,64,.74),rgba(12,16,31,.74))!important;backdrop-filter:blur(26px) saturate(170%);-webkit-backdrop-filter:blur(26px) saturate(170%);border-color:rgba(255,255,255,.14)!important;box-shadow:0 30px 80px -30px rgba(0,0,0,.82),inset 0 1px 0 rgba(255,255,255,.11)!important;}
+.dialog::before,.motion-dialog::before{content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit;background:linear-gradient(135deg,rgba(255,255,255,.10),transparent 24%,transparent 72%,rgba(255,255,255,.035));}
+.motion-dialog > *,.dialog > *{position:relative;z-index:1;}
+.motion-popover::before{content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit;background:linear-gradient(135deg,rgba(255,255,255,.10),transparent 28%,transparent 74%,rgba(255,255,255,.03));}
+.motion-popover > *{position:relative;z-index:1;}
+#watch-autoplay-hint.show{display:flex!important;}
+
 .sheet-title{font-size:19px; font-weight:800; margin-bottom:4px;}
 .sheet-sub{font-size:13px; color:var(--text-lo); margin-bottom:20px;}
 
@@ -2728,33 +2740,28 @@ function renderActivities(){
 }
 
 // ── TVBox / synchronized watch room ────────────────────────────────────────
-// A real shared player is used for sources the browser is allowed to embed:
-// YouTube via the official IFrame Player API and direct browser-playable media
-// (mp4/webm/ogg). Protected services such as Netflix/Prime/Disney+ cannot be
-// framed into an arbitrary third-party page because their DRM/session policies
-// prevent that. Those sources remain provider links with shared room presence.
+// TVBox is intentionally YouTube-only for now. The official YouTube IFrame Player API
+// provides the shared player while Firebase carries the authoritative room timeline,
+// host commands, watcher presence, and drift correction.
 const WATCH_SERVICES = [
   { id:'youtube', label:'YouTube', icon:'ti-brand-youtube', color:'#FF4D4D', mode:'youtube' },
-  { id:'netflix', label:'Netflix', icon:'ti-device-tv-play', color:'#E5504F', mode:'protected' },
-  { id:'prime', label:'Prime Video', icon:'ti-device-tv-play', color:'#5B9CFF', mode:'protected' },
-  { id:'disney', label:'Disney+', icon:'ti-device-tv-play', color:'#7C9CFF', mode:'protected' },
-  { id:'other', label:'Direct video / URL', icon:'ti-device-tv', color:'#9CA3AF', mode:'auto' },
 ];
 
-function getWatchSource(url, serviceId){
-  const s = WATCH_SERVICES.find(x=>x.id===serviceId) || WATCH_SERVICES[4];
+function getWatchSource(url){
   const raw = String(url||'').trim();
   let youtubeId = '';
   try {
     const u = new URL(raw);
-    if(u.hostname.includes('youtu.be')) youtubeId = u.pathname.slice(1).split('/')[0];
-    if(u.hostname.includes('youtube.com')) youtubeId = u.searchParams.get('v') || (u.pathname.match(/\/embed\/([^/?]+)/)||[])[1] || (u.pathname.match(/\/shorts\/([^/?]+)/)||[])[1] || '';
+    const host = u.hostname.toLowerCase();
+    if(host === 'youtu.be' || host.endsWith('.youtu.be')) youtubeId = u.pathname.split('/').filter(Boolean)[0] || '';
+    if(host === 'youtube.com' || host.endsWith('.youtube.com')) {
+      youtubeId = u.searchParams.get('v') ||
+        (u.pathname.match(/\/embed\/([^/?]+)/)||[])[1] ||
+        (u.pathname.match(/\/shorts\/([^/?]+)/)||[])[1] ||
+        (u.pathname.match(/\/live\/([^/?]+)/)||[])[1] || '';
+    }
   } catch(e){}
-  if(s.mode==='youtube' && youtubeId) return {type:'youtube', id:youtubeId, url:raw};
-  if(s.mode==='protected') return {type:'protected', url:raw};
-  if(/^https?:\/\/.+\.(mp4|webm|ogg|m4v)(\?.*)?$/i.test(raw)) return {type:'video', url:raw};
-  if(youtubeId) return {type:'youtube', id:youtubeId, url:raw};
-  return {type:'iframe', url:raw};
+  return youtubeId ? {type:'youtube', id:youtubeId, url:raw} : {type:'invalid', url:raw};
 }
 function estimateWatchPosition(room){
   let pos = Number(room?.position || 0);
@@ -2773,66 +2780,117 @@ function loadYouTubeAPI(){
 }
 function destroyWatchPlayer(){
   clearInterval(watchPlayer.timer); watchPlayer.timer=null;
+  clearInterval(watchPlayer.hostTimer); watchPlayer.hostTimer=null;
   try{ if(watchPlayer.instance && watchPlayer.type==='youtube') watchPlayer.instance.destroy(); }catch(e){}
   const host=document.getElementById('watch-player-host'); if(host) host.innerHTML='';
-  watchPlayer={type:null,instance:null,roomId:null,applying:false,lastCommandTs:0,timer:null};
+  watchPlayer={type:null,instance:null,roomId:null,applying:false,lastCommandTs:0,timer:null,hostTimer:null,lastObserved:0,lastObservedTs:0,lastBroadcastTs:0};
 }
 function watchPlayerPosition(){
   try{
     if(!watchPlayer.instance) return 0;
     if(watchPlayer.type==='youtube') return Number(watchPlayer.instance.getCurrentTime()||0);
-    return Number(watchPlayer.instance.currentTime||0);
+    return 0;
   }catch(e){ return 0; }
 }
+async function publishWatchPatch(fields={}){
+  if(!SQUAD?.watchParty || SQUAD.watchParty.hostId!==ME.id || isViewerMode()) return;
+  const now=Date.now();
+  Object.assign(SQUAD.watchParty, fields, {updatedAt:now});
+  SQUAD.updatedAt=now;
+  try{
+    await window.fbUpdate('squads/'+SQUAD.id+'/watchParty', {...fields, updatedAt:now});
+  }catch(e){ console.warn('Watch party sync failed',e); }
+}
 async function publishWatchCommand(action, position, extra={}){
-  if(!SQUAD?.watchParty || SQUAD.watchParty.hostId!==ME.id) return;
-  const room=SQUAD.watchParty;
-  room.action=action; room.playing=action==='play';
-  room.position=Math.max(0,Number(position)||0); room.positionTs=Date.now(); room.updatedAt=Date.now();
-  Object.assign(room, extra);
-  SQUAD.updatedAt=room.updatedAt;
-  await saveSquad();
+  if(!SQUAD?.watchParty || SQUAD.watchParty.hostId!==ME.id || isViewerMode()) return;
+  const pos=Math.max(0,Number(position)||0);
+  const patch={action,playing:action==='play',position:pos,positionTs:Date.now(),...extra};
+  await publishWatchPatch(patch);
 }
 async function initWatchPlayer(room){
   const host=document.getElementById('watch-player-host');
   if(!host || !room) return;
-  const source=getWatchSource(room.link, room.service);
-  if(source.type==='protected') return;
-  if(watchPlayer.roomId===room.startedAt && watchPlayer.instance) { reconcileWatchPlayer(room); return; }
+  const source=getWatchSource(room.link);
+  if(source.type!=='youtube') return;
+  if(watchPlayer.roomId===room.startedAt && watchPlayer.instance){ reconcileWatchPlayer(room); return; }
   destroyWatchPlayer();
   watchPlayer.roomId=room.startedAt;
-  if(source.type==='youtube'){
-    host.innerHTML='<div id="watch-yt-player"></div>';
-    try{
-      await loadYouTubeAPI();
-      if(!document.getElementById('watch-yt-player')) return;
-      watchPlayer.type='youtube';
-      watchPlayer.instance=new YT.Player('watch-yt-player',{width:'100%',height:'100%',videoId:source.id,playerVars:{autoplay:0,controls:1,playsinline:1,rel:0,modestbranding:1},events:{
-        onReady:()=>{ reconcileWatchPlayer(SQUAD.watchParty); },
+  watchPlayer.lastObserved=0;
+  watchPlayer.lastObservedTs=Date.now();
+  host.innerHTML='<div id="watch-yt-player"></div>';
+  try{
+    await loadYouTubeAPI();
+    if(!document.getElementById('watch-yt-player')) return;
+    watchPlayer.type='youtube';
+    watchPlayer.instance=new YT.Player('watch-yt-player',{
+      width:'100%',height:'100%',videoId:source.id,
+      playerVars:{autoplay:0,controls:1,playsinline:1,rel:0,modestbranding:1,enablejsapi:1,origin:location.origin},
+      events:{
+        onReady:()=>{
+          reconcileWatchPlayer(SQUAD.watchParty);
+          try{ watchPlayer.instance.setVolume(100); }catch(e){}
+        },
         onStateChange:(e)=>{
-          if(watchPlayer.applying || !SQUAD?.watchParty || SQUAD.watchParty.hostId!==ME.id) return;
-          if(e.data===YT.PlayerState.PLAYING) publishWatchCommand('play', watchPlayerPosition());
-          else if(e.data===YT.PlayerState.PAUSED) publishWatchCommand('pause', watchPlayerPosition());
+          if(watchPlayer.applying || !SQUAD?.watchParty || SQUAD.watchParty.hostId!==ME.id || isViewerMode()) return;
+          const pos=watchPlayerPosition();
+          if(e.data===YT.PlayerState.PLAYING) publishWatchCommand('play',pos);
+          else if(e.data===YT.PlayerState.PAUSED) publishWatchCommand('pause',pos);
+          else if(e.data===YT.PlayerState.ENDED) publishWatchCommand('pause',0,{ended:true});
         }
-      }});
-    }catch(e){ showToast('YouTube player could not load','ti-alert-triangle'); }
-  }else if(source.type==='video'){
-    const v=document.createElement('video'); v.src=source.url; v.controls=true; v.playsInline=true; v.preload='metadata'; v.style.cssText='width:100%;height:100%;display:block;object-fit:contain;background:#05070d;'; host.appendChild(v);
-    watchPlayer.type='video'; watchPlayer.instance=v;
-    v.addEventListener('play',()=>{if(!watchPlayer.applying) publishWatchCommand('play',v.currentTime);});
-    v.addEventListener('pause',()=>{if(!watchPlayer.applying) publishWatchCommand('pause',v.currentTime);});
-    v.addEventListener('seeked',()=>{if(!watchPlayer.applying) publishWatchCommand(v.paused?'pause':'play',v.currentTime,{action:'seek'});});
-    v.addEventListener('loadedmetadata',()=>reconcileWatchPlayer(SQUAD.watchParty));
-  }else{
-    host.innerHTML=`<iframe src="${escapeHtml(source.url)}" style="width:100%;height:100%;border:0;background:#05070d;" allow="autoplay; fullscreen; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin"></iframe>`;
-    watchPlayer.type='iframe'; watchPlayer.instance=host.querySelector('iframe');
-  }
+      }
+    });
+  }catch(e){ showToast('YouTube player could not load — check the network connection','ti-alert-triangle'); return; }
   watchPlayer.timer=setInterval(()=>reconcileWatchPlayer(SQUAD?.watchParty),900);
+  watchPlayer.hostTimer=setInterval(async()=>{
+    const r=SQUAD?.watchParty;
+    if(!r || r.hostId!==ME.id || isViewerMode() || !watchPlayer.instance) return;
+    const now=Date.now(),pos=watchPlayerPosition(),last=watchPlayer.lastObserved,dt=Math.max(1,now-watchPlayer.lastObservedTs);
+    const state=watchPlayer.instance.getPlayerState?.();
+    const delta=pos-last;
+    if(state===YT.PlayerState.PLAYING){
+      const expected=dt/1000;
+      const seeked=Math.abs(delta-expected)>2.2;
+      if(seeked) await publishWatchCommand('seek',pos);
+      else if(now-watchPlayer.lastBroadcastTs>1400) {
+        await publishWatchPatch({position:pos,positionTs:now});
+        watchPlayer.lastBroadcastTs=now;
+      }
+    }
+    watchPlayer.lastObserved=pos;watchPlayer.lastObservedTs=now;
+  },500);
 }
 async function reconcileWatchPlayer(room){
-  if(!room||watchPlayer.roomId!==room.startedAt||!watchPlayer.instance||watchPlayer.type==='iframe')return;const target=estimateWatchPosition(room),cur=watchPlayerPosition(),delta=target-cur,hard=Math.abs(delta)>2.25,soft=Math.abs(delta)>0.65;watchPlayer.applying=true;try{if(watchPlayer.type==='youtube'){if(hard)watchPlayer.instance.seekTo(target,true);const state=watchPlayer.instance.getPlayerState();if(room.playing&&state!==YT.PlayerState.PLAYING){try{await watchPlayer.instance.playVideo()}catch(e){room.autoplayBlocked=true}}if(!room.playing&&state===YT.PlayerState.PLAYING)watchPlayer.instance.pauseVideo()}else if(watchPlayer.type==='video'){if(hard)watchPlayer.instance.currentTime=target;if(room.playing&&watchPlayer.instance.paused){try{await watchPlayer.instance.play()}catch(e){room.autoplayBlocked=true}}if(!room.playing&&!watchPlayer.instance.paused)watchPlayer.instance.pause()}if(typeof window.updateWatchSyncBadge==='function')window.updateWatchSyncBadge(soft?'resyncing':'synced',Math.abs(delta))}catch(e){if(typeof window.updateWatchSyncBadge==='function')window.updateWatchSyncBadge('error',Math.abs(delta))}finally{setTimeout(()=>watchPlayer.applying=false,120)}}
-
-window.updateWatchSyncBadge=(state,drift=0)=>{const el=document.getElementById('watch-sync-badge');if(!el)return;el.textContent=state==='synced'?'SYNCED':state==='resyncing'?`RESYNCING · ${Math.abs(drift).toFixed(2)}s`:state==='error'?'SYNC ERROR':'SYNCING…'};
+  if(!room||room.service!=='youtube'||watchPlayer.roomId!==room.startedAt||!watchPlayer.instance)return;
+  const target=estimateWatchPosition(room),cur=watchPlayerPosition(),delta=target-cur,hard=Math.abs(delta)>1.8,soft=Math.abs(delta)>0.35;
+  watchPlayer.applying=true;
+  try{
+    if(hard) watchPlayer.instance.seekTo(target,true);
+    const state=watchPlayer.instance.getPlayerState();
+    if(room.playing && state!==YT.PlayerState.PLAYING){
+      try{ await watchPlayer.instance.playVideo(); }catch(e){
+        const badge=document.getElementById('watch-autoplay-hint'); if(badge) badge.classList.add('show');
+      }
+    }
+    if(!room.playing && state===YT.PlayerState.PLAYING) watchPlayer.instance.pauseVideo();
+    updateWatchSyncBadge(soft?'resyncing':'synced',Math.abs(delta));
+    watchPlayer.lastCommandTs=room.updatedAt||Date.now();
+  }catch(e){ updateWatchSyncBadge('error',Math.abs(delta)); }
+  finally{ setTimeout(()=>watchPlayer.applying=false,140); }
+}
+async function enableWatchPlayback(){
+  if(!SQUAD?.watchParty || !watchPlayer.instance || watchPlayer.type!=='youtube') return;
+  try{
+    const target=estimateWatchPosition(SQUAD.watchParty);
+    watchPlayer.instance.seekTo(target,true);
+    if(SQUAD.watchParty.playing) await watchPlayer.instance.playVideo();
+    const hint=document.getElementById('watch-autoplay-hint'); if(hint) hint.classList.remove('show');
+  }catch(e){ showToast('Tap the YouTube player once to enable playback','ti-hand-click'); }
+}
+window.updateWatchSyncBadge=(state,drift=0)=>{
+  const el=document.getElementById('watch-sync-badge');if(!el)return;
+  el.textContent=state==='synced'?'SYNCED':state==='resyncing'?`RESYNCING · ${Math.abs(drift).toFixed(2)}s`:state==='error'?'SYNC ERROR':'SYNCING…';
+  el.style.color=state==='error'?'var(--red)':state==='resyncing'?'var(--amber)':'var(--green)';
+};
 
 function renderTvBoard(){
   const room=SQUAD.watchParty;
@@ -2840,27 +2898,49 @@ function renderTvBoard(){
   const iAmHost=room && room.hostId===ME.id;
   const watchers=room?(room.watchers||{}):{};
   const watcherList=Object.values(watchers).sort((a,b)=>a.ts-b.ts);
-  const svc=room?(WATCH_SERVICES.find(s=>s.id===room.service)||WATCH_SERVICES[4]):null;
-  if(!room){ destroyWatchPlayer(); return `<div class="screen"><div class="page-title-row">${backBtn('tv-board-back')}<h2>TVBox</h2></div><p class="small-note" style="margin:8px 0 20px 48px;">A synchronized room. YouTube and direct browser-playable video use the shared player; protected streaming services open in their own apps/sites.</p>${!iCanStart?`<div class="empty-hint glass">You don't have permission to start activities.</div>`:`<div class="section-label">Choose a source</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">${WATCH_SERVICES.map(s=>`<div class="glass liquid-sheen parallax-target" data-watch-service="${s.id}" style="padding:17px;text-align:center;cursor:pointer;"><span class="ti" style="font-size:24px;color:${s.color};">${icon(s.icon)}</span><div style="font-size:12.5px;font-weight:700;margin-top:7px;">${s.label}</div><div style="font-size:10px;color:var(--text-faint);margin-top:3px;">${s.mode==='protected'?'Provider window':'Shared player'}</div></div>`).join('')}</div>`}</div>`; }
-  const source=getWatchSource(room.link,room.service);
-  const protectedMode=source.type==='protected';
+  if(!room){
+    destroyWatchPlayer();
+    return `<div class="screen"><div class="page-title-row">${backBtn('tv-board-back')}<h2>TVBox</h2></div>
+      <p class="small-note" style="margin:8px 0 20px 48px;">Watch YouTube together in sync. One host controls playback and everyone follows the same timeline.</p>
+      ${!iCanStart?`<div class="empty-hint glass">You don't have permission to start activities.</div>`:
+      `<button class="glass liquid-sheen parallax-target motion-card" data-watch-service="youtube" style="width:100%;padding:20px;text-align:left;cursor:pointer;border:1px solid rgba(255,77,77,.22);">
+        <div style="display:flex;align-items:center;gap:14px;"><div class="brand-mark" style="width:48px;height:48px;border-radius:15px;background:linear-gradient(135deg,#FF4D4D,#FF7C66);"><span class="ti" style="font-size:22px;color:#fff;">${icon('ti-brand-youtube')}</span></div><div><div style="font-weight:800;font-size:15px;">Start a YouTube watch party</div><div style="font-size:12px;color:var(--text-lo);margin-top:3px;">Shared play, pause, seek and live drift correction.</div></div><span class="ti" style="margin-left:auto;color:var(--text-faint);">${icon('ti-chevron-right')}</span></div>
+      </button>`}</div>`;
+  }
+  const source=getWatchSource(room.link);
+  if(source.type!=='youtube') return `<div class="screen"><div class="page-title-row">${backBtn('tv-board-back')}<h2>TVBox</h2></div><div class="empty-hint glass">This watch room contains an unsupported source. End it and start a new YouTube room.</div></div>`;
   const position=Math.floor(estimateWatchPosition(room));
-  const mm=String(Math.floor(position/60)).padStart(2,'0'), ss=String(position%60).padStart(2,'0');
+  const mm=String(Math.floor(position/60)).padStart(2,'0'),ss=String(position%60).padStart(2,'0');
   return `<div class="screen" id="tv-board-screen"><div class="page-title-row">${backBtn('tv-board-back')}<h2>TVBox</h2><button class="icon-btn" id="tvbox-fullscreen" style="margin-left:auto;">${icon('ti-maximize')}</button></div>
-  <div class="glass-strong liquid-sheen watch-hero" style="padding:14px;margin-bottom:12px;"><div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;"><span class="ti" style="font-size:22px;color:${svc.color};">${icon(svc.icon)}</span><div style="min-width:0;flex:1;"><div style="font-weight:800;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(room.title||svc.label)}</div><div style="font-size:11.5px;color:var(--text-lo);display:flex;gap:7px;align-items:center;">${room.playing?'Live now':'Paused'} · ${watcherList.length} watching <span id="watch-sync-badge" style="padding:3px 6px;border-radius:999px;background:rgba(255,255,255,.05);border:1px solid var(--glass-border);font-size:8px;font-weight:800;color:var(--green);">SYNCED</span></div></div></div>
-  <div id="watch-player-shell" style="aspect-ratio:16/9;border-radius:18px;overflow:hidden;background:#05070d;border:1px solid rgba(255,255,255,.11);position:relative;"><div id="watch-player-host" style="width:100%;height:100%;"></div>${protectedMode?`<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:26px;background:radial-gradient(circle at 50% 30%,rgba(255,255,255,.08),transparent 55%),rgba(5,7,13,.96);"><div class="brand-mark" style="width:54px;height:54px;border-radius:18px;margin-bottom:12px;">${icon('ti-device-tv-play')}</div><div style="font-weight:800;font-size:16px;">${svc.label} is protected</div><div style="font-size:12px;line-height:1.5;color:var(--text-lo);max-width:300px;margin-top:6px;">The service does not allow its protected player to be embedded here. The room can still synchronize the session state, but each member must play the title in the provider.</div><a href="${escapeHtml(room.link)}" target="_blank" rel="noopener" class="btn btn-primary" style="margin-top:14px;padding:11px 15px;">Open ${svc.label}</a></div>`:''}</div>
-  <div style="display:flex;align-items:center;gap:8px;margin-top:10px;"><span class="glass" style="padding:7px 10px;font-size:11px;font-weight:700;">${mm}:${ss}</span><div style="flex:1;height:5px;background:rgba(255,255,255,.08);border-radius:99px;overflow:hidden;"><div style="width:${Math.min(100,Math.max(4,(position%600)/6))}%;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-2));"></div></div><span style="font-size:10px;color:var(--text-faint);">${source.type==='youtube'?'YouTube sync':source.type==='video'?'Direct sync':'Room sync'}</span></div></div>
-  ${room.link?`<div style="display:flex;gap:8px;margin-bottom:14px;"><a href="${escapeHtml(room.link)}" target="_blank" rel="noopener" class="btn btn-ghost" style="flex:1;padding:12px;">${icon('ti-device-tv-play')} Open source</a>${iAmHost?`<button class="btn btn-ghost" id="watch-sync-now" style="padding:12px;">${icon('ti-refresh')} Sync</button>`:''}</div>`:''}
-  <div class="section-label">Watching now (${watcherList.length})</div><div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;">${watcherList.map(w=>`<div class="glass" style="padding:7px 10px;display:flex;align-items:center;gap:7px;"><div class="avatar" style="width:24px;height:24px;font-size:10px;">${getInitials(w.name)}</div><span style="font-size:12px;font-weight:600;">${escapeHtml(w.name.split(' ')[0])}</span></div>`).join('')||`<div class="small-note">No one has joined yet.</div>`}</div>
-  ${!watchers[ME.id]?`<button class="btn btn-primary btn-block" id="watch-join-btn" style="padding:14px;margin-bottom:9px;">${icon('ti-users-group')} Join watch party</button>`:`<button class="btn btn-ghost btn-block" id="watch-leave-btn" style="padding:12px;margin-bottom:9px;">${icon('ti-logout')} Leave watch party</button>`}
-  ${iAmHost?`<div class="glass" style="padding:10px;margin-bottom:9px;"><div style="font-size:11px;color:var(--text-faint);margin-bottom:6px;">Host controls the shared timeline</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"><button class="btn btn-primary" id="watch-toggle-playing" style="padding:12px;">${icon(room.playing?'ti-pause':'ti-play')} ${room.playing?'Pause all':'Play all'}</button><button class="btn btn-ghost" id="watch-capture-position" style="padding:12px;">${icon('ti-pin')} Broadcast position</button></div></div><button class="btn btn-ghost btn-block" id="watch-end-btn" style="padding:12px;color:var(--red);border-color:rgba(248,113,113,.3);">${icon('ti-x')} End watch party</button>`:''}
+    <div class="glass-strong liquid-sheen watch-hero" style="padding:14px;margin-bottom:12px;"><div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;"><span class="ti" style="font-size:22px;color:#FF4D4D;">${icon('ti-brand-youtube')}</span><div style="min-width:0;flex:1;"><div style="font-weight:800;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(room.title||'YouTube watch party')}</div><div style="font-size:11.5px;color:var(--text-lo);display:flex;gap:7px;align-items:center;">${room.playing?'Playing':'Paused'} · ${watcherList.length} watching <span id="watch-sync-badge" style="padding:3px 6px;border-radius:999px;background:rgba(255,255,255,.05);border:1px solid var(--glass-border);font-size:8px;font-weight:800;color:var(--green);">SYNCED</span></div></div></div>
+    <div id="watch-player-shell" style="aspect-ratio:16/9;border-radius:18px;overflow:hidden;background:#05070d;border:1px solid rgba(255,255,255,.11);position:relative;cursor:${iAmHost?'default':'pointer'};"><div id="watch-player-host" style="width:100%;height:100%;"></div><button id="watch-autoplay-hint" class="glass" onclick="enableWatchPlayback()" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:12px 16px;border-radius:999px;display:none;align-items:center;gap:8px;color:var(--text-hi);z-index:3;">${icon('ti-play')} Tap to sync playback</button></div>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:10px;"><span class="glass" style="padding:7px 10px;font-size:11px;font-weight:700;">${mm}:${ss}</span><div style="flex:1;height:5px;background:rgba(255,255,255,.08);border-radius:99px;overflow:hidden;"><div style="width:${Math.min(100,Math.max(4,(position%600)/6))}%;height:100%;background:linear-gradient(90deg,#FF4D4D,var(--accent-2));"></div></div><span style="font-size:10px;color:var(--text-faint);">YouTube sync</span></div></div>
+    <div style="display:flex;gap:8px;margin-bottom:14px;"><a href="${escapeHtml(room.link)}" target="_blank" rel="noopener" class="btn btn-ghost" style="flex:1;padding:12px;">${icon('ti-brand-youtube')} Open in YouTube</a>${iAmHost?`<button class="btn btn-ghost" id="watch-sync-now" style="padding:12px;">${icon('ti-refresh')} Sync</button>`:''}</div>
+    <div class="section-label">Watching now (${watcherList.length})</div><div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;">${watcherList.map(w=>`<div class="glass" style="padding:7px 10px;display:flex;align-items:center;gap:7px;"><div class="avatar" style="width:24px;height:24px;font-size:10px;">${getInitials(w.name)}</div><span style="font-size:12px;font-weight:600;">${escapeHtml(w.name.split(' ')[0])}</span></div>`).join('')||`<div class="small-note">No one has joined yet.</div>`}</div>
+    ${!watchers[ME.id]?`<button class="btn btn-primary btn-block" id="watch-join-btn" style="padding:14px;margin-bottom:9px;">${icon('ti-users-group')} Join watch party</button>`:`<button class="btn btn-ghost btn-block" id="watch-leave-btn" style="padding:12px;margin-bottom:9px;">${icon('ti-logout')} Leave watch party</button>`}
+    ${iAmHost?`<div class="glass" style="padding:10px;margin-bottom:9px;"><div style="font-size:11px;color:var(--text-faint);margin-bottom:6px;">Host controls the shared timeline</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"><button class="btn btn-primary" id="watch-toggle-playing" style="padding:12px;">${icon(room.playing?'ti-pause':'ti-play')} ${room.playing?'Pause all':'Play all'}</button><button class="btn btn-ghost" id="watch-capture-position" style="padding:12px;">${icon('ti-pin')} Broadcast position</button></div></div><button class="btn btn-ghost btn-block" id="watch-end-btn" style="padding:12px;color:var(--red);border-color:rgba(248,113,113,.3);">${icon('ti-x')} End watch party</button>`:''}
   </div>`;
 }
 
-async function startWatchParty(serviceId){ if(!can(ME.id,'startActivities')) return showToast('You cannot start activities','ti-ban'); const svc=WATCH_SERVICES.find(s=>s.id===serviceId)||WATCH_SERVICES[4]; window.__pendingWatchService=serviceId; openWatchLinkSheet(svc); }
-function openWatchLinkSheet(svc){
-  const wrap=document.createElement('div'); wrap.className='sheet-backdrop'; wrap.innerHTML=`<div class="sheet"><div class="sheet-handle"></div><div class="sheet-title">Create a TVBox room</div><div class="sheet-sub">Use a YouTube URL or a direct video URL for true shared playback. ${svc.mode==='protected'?'For '+svc.label+', the room will synchronize presence/state around the provider window.':''}</div><div class="field"><label class="field-label">Title</label><input type="text" id="watch-title-input" placeholder="Friday movie night" maxlength="50"></div><div class="field"><label class="field-label">Source URL</label><input type="url" id="watch-link-input" placeholder="https://youtu.be/..." autocomplete="off"></div><button class="btn btn-primary btn-block" id="watch-create-submit" style="padding:16px;">Create room</button></div>`;
-  const close=mountSheet(wrap); wrap.querySelector('#watch-create-submit').onclick=async()=>{const title=wrap.querySelector('#watch-title-input').value.trim();const link=wrap.querySelector('#watch-link-input').value.trim();if(!/^https?:\/\//i.test(link)) return showToast('Enter a valid http(s) URL','ti-alert-circle'); const src=getWatchSource(link,svc.id); SQUAD.watchParty={service:svc.id,title,link,sourceType:src.type,sourceId:src.id||'',hostId:ME.id,hostName:ME.name,playing:false,position:0,positionTs:Date.now(),action:'pause',watchers:{[ME.id]:{id:ME.id,name:ME.name,ts:Date.now()}},startedAt:Date.now(),updatedAt:Date.now()}; await saveSquad(); close(); softUpdate(); showToast('TVBox room started','ti-device-tv-play');};
+async function startWatchParty(){
+  if(!can(ME.id,'startActivities')) return showToast('You cannot start activities','ti-ban');
+  openWatchLinkSheet(WATCH_SERVICES[0]);
+}
+function openWatchLinkSheet(){
+  const wrap=document.createElement('div');
+  wrap.className='sheet-backdrop';
+  wrap.innerHTML=`<div class="sheet liquid-popup"><div class="sheet-handle"></div><div class="sheet-title">Create a TVBox room</div><div class="sheet-sub">YouTube only. Everyone joins the same room and follows the host's playback timeline.</div><div class="field"><label class="field-label">Title</label><input type="text" id="watch-title-input" placeholder="Friday movie night" maxlength="50"></div><div class="field"><label class="field-label">YouTube URL</label><input type="url" id="watch-link-input" placeholder="https://youtu.be/... or https://youtube.com/watch?v=..." autocomplete="off"></div><button class="btn btn-primary btn-block liquid-interactive motion-card" id="watch-create-submit" style="padding:16px;">${icon('ti-brand-youtube')} Create YouTube room</button></div>`;
+  const close=mountSheet(wrap);
+  wrap.querySelector('#watch-create-submit').onclick=async()=>{
+    if(isViewerMode()) return viewerBlocked('Sign in to start a watch party');
+    const title=wrap.querySelector('#watch-title-input').value.trim() || 'YouTube watch party';
+    const link=wrap.querySelector('#watch-link-input').value.trim();
+    const src=getWatchSource(link);
+    if(src.type!=='youtube') return showToast('Enter a valid YouTube URL','ti-brand-youtube');
+    const now=Date.now();
+    SQUAD.watchParty={service:'youtube',title,link,sourceType:'youtube',sourceId:src.id,hostId:ME.id,hostName:ME.name,playing:false,position:0,positionTs:now,action:'pause',watchers:{[ME.id]:{id:ME.id,name:ME.name,ts:now}},startedAt:now,updatedAt:now,version:1};
+    await saveSquad(); close(); softUpdate(); showToast('YouTube watch party started','ti-device-tv-play');
+  };
 }
 async function joinWatchParty(){if(!SQUAD?.watchParty)return;if(!SQUAD.watchParty.watchers)SQUAD.watchParty.watchers={};SQUAD.watchParty.watchers[ME.id]={id:ME.id,name:ME.name,ts:Date.now()};SQUAD.updatedAt=Date.now();await saveSquad();softUpdate();}
 async function leaveWatchParty(){if(!SQUAD?.watchParty?.watchers)return;delete SQUAD.watchParty.watchers[ME.id];SQUAD.updatedAt=Date.now();await saveSquad();softUpdate();}
@@ -3725,9 +3805,11 @@ function bindEvents(){
   if(byId('watch-leave-btn')) byId('watch-leave-btn').onclick = () => leaveWatchParty();
   if(byId('watch-toggle-playing')) byId('watch-toggle-playing').onclick = () => toggleWatchPlaying();
   if(byId('watch-capture-position')) byId('watch-capture-position').onclick = () => captureWatchPosition();
+  if(byId('watch-sync-now')) byId('watch-sync-now').onclick = () => captureWatchPosition();
   if(byId('watch-end-btn')) byId('watch-end-btn').onclick = () => endWatchParty();
   if(byId('tvbox-fullscreen')) byId('tvbox-fullscreen').onclick=()=>{const el=byId('watch-player-shell');if(el?.requestFullscreen)el.requestFullscreen().catch(()=>{});};
   if(currentScreen==='tv-board' && SQUAD?.watchParty) initWatchPlayer(SQUAD.watchParty);
+  if(byId('watch-player-shell') && SQUAD?.watchParty && SQUAD.watchParty.playing && SQUAD.watchParty.hostId!==ME.id){ byId('watch-player-shell').addEventListener('click',e=>{ if(e.target.closest('button')) return; enableWatchPlayback(); },{passive:true}); }
   if(byId('messages-back')) byId('messages-back').onclick = () => goBack('home');
   if(byId('chat-send-btn')){
     const send = () => {
