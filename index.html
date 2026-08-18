@@ -642,6 +642,38 @@ body.parallax-off .parallax-target{transform:none!important;}
 @keyframes group-orb-a{0%,100%{transform:translate3d(0,0,0) scale(.8);opacity:.35}50%{transform:translate3d(24px,30px,0) scale(1.3);opacity:.75}}
 .group-hero-actions{display:flex;gap:8px;margin-top:15px}.group-hero-actions .btn{min-height:42px;padding:11px 14px}
 body[data-group-motion="minimal"] .group-particle-field,body.group-particles-off .group-particle-field{display:none;}
+body[data-group-motion="minimal"]::before{animation:none!important;opacity:.45;}
+body[data-group-motion="waves"]::before{animation:group-wave-drift 11s ease-in-out infinite alternate;}
+body[data-group-motion="waves"] .group-particle-field::before{animation-duration:10s;}
+@keyframes group-wave-drift{0%{transform:translate3d(-1%,-1%,0) scale(1)}50%{transform:translate3d(2%,1%,0) scale(1.04)}100%{transform:translate3d(-2%,3%,0) scale(1.08)}}
+body.crystal-mode .glass,body.crystal-mode .glass-strong{backdrop-filter:blur(4px) saturate(185%);-webkit-backdrop-filter:blur(4px) saturate(185%);background:linear-gradient(145deg,rgba(255,255,255,.095),rgba(255,255,255,.025));box-shadow:0 1px 0 rgba(255,255,255,.18) inset,0 16px 36px -22px rgba(0,0,0,.7);}
+body.crystal-mode .glass::before,body.crystal-mode .glass-strong::before{background:linear-gradient(120deg,rgba(255,255,255,.28),transparent 28%,transparent 68%,rgba(255,255,255,.08));}
+body.status-glow-off .status-ring{border-color:transparent!important;box-shadow:none!important;animation:none!important;}
+body.member-count-off .group-meta-member-count{display:none;}
+body[data-group-notification="minimal"] .notification-item{background:rgba(255,255,255,.025);backdrop-filter:none;-webkit-backdrop-filter:none;border-color:rgba(255,255,255,.08);}
+body[data-group-notification="minimal"] .notification-item.unread{background:rgba(var(--accent-rgb),.06);border-left:3px solid var(--accent);}
+body[data-group-notification="minimal"] .notification-icon{background:transparent;border:1px solid var(--glass-border);}
+body[data-group-notification="cinematic"] .notification-item{background:linear-gradient(120deg,rgba(var(--accent-rgb),.17),rgba(19,22,40,.76) 55%,rgba(255,255,255,.035));border-color:rgba(var(--accent-rgb),.24);box-shadow:0 18px 42px -24px rgba(var(--accent-rgb),.35);}
+body[data-group-notification="cinematic"] .notification-item.unread{box-shadow:0 0 0 1px rgba(var(--accent-rgb),.22),0 20px 50px -26px rgba(var(--accent-rgb),.55);}
+body[data-group-notification="cinematic"] .notification-icon{width:38px;height:38px;border-radius:13px;box-shadow:0 0 22px -10px var(--accent-glow);}
+body[data-group-notification="minimal"] #toast{backdrop-filter:none;-webkit-backdrop-filter:none;background:rgba(23,27,46,.96);border-radius:12px;}
+body[data-group-notification="cinematic"] #toast{background:linear-gradient(120deg,rgba(var(--accent-rgb),.23),rgba(23,27,46,.94));border-color:rgba(var(--accent-rgb),.32);box-shadow:0 18px 46px -16px rgba(var(--accent-rgb),.42);}
+.avatar-shop-icon{position:relative;display:flex;align-items:center;justify-content:center;width:100%;height:100%;line-height:1;}
+.avatar-shop-icon.animated{animation:avatar-icon-float 2.4s ease-in-out infinite;filter:drop-shadow(0 0 8px rgba(var(--accent-rgb),.55));}
+.avatar-shop-icon.rare{filter:drop-shadow(0 0 9px rgba(var(--accent-rgb),.72));}
+.avatar-shop-icon.rare::after{content:'';position:absolute;inset:4px;border-radius:50%;border:1px solid rgba(255,255,255,.28);animation:avatar-icon-ring 1.8s linear infinite;}
+@keyframes avatar-icon-float{0%,100%{transform:translateY(0) rotate(-2deg) scale(1)}50%{transform:translateY(-3px) rotate(2deg) scale(1.06)}}
+@keyframes avatar-icon-ring{from{transform:scale(.8);opacity:.7}to{transform:scale(1.35);opacity:0}}
+.shop-tier{padding:15px 16px;margin-bottom:10px;border:1px solid var(--glass-border);background:linear-gradient(145deg,rgba(255,255,255,.055),rgba(255,255,255,.02));}
+.shop-tier-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;}
+.shop-item-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
+.avatar-shop-card{display:flex;align-items:center;gap:10px;padding:10px;border-radius:15px;border:1px solid var(--glass-border);background:rgba(255,255,255,.035);min-width:0;}
+.avatar-shop-preview{width:48px;height:48px;border-radius:50%;flex:0 0 48px;background:linear-gradient(135deg,#344064,#20263e);display:flex;align-items:center;justify-content:center;font-size:23px;position:relative;overflow:hidden;}
+.avatar-shop-meta{min-width:0;flex:1;}
+.avatar-shop-name{font-size:12px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.avatar-shop-badge{display:inline-flex;margin-top:3px;font-size:9px;font-weight:800;color:var(--text-lo);padding:3px 6px;border-radius:999px;background:rgba(255,255,255,.06);}
+.avatar-shop-buy{margin-top:7px;width:100%;padding:7px 8px;border-radius:10px;font-size:10px;font-weight:800;}
+@media(max-width:390px){.shop-item-grid{grid-template-columns:1fr}.avatar-shop-card{padding:11px}.avatar-shop-preview{width:44px;height:44px;flex-basis:44px;font-size:21px;}}
 @media (max-width:520px){.group-hero{min-height:360px}.group-hero-top h1{font-size:23px}.group-hero-content{padding:16px}}
 .dialog-backdrop{position:fixed;inset:0;z-index:500;background:rgba(3,5,12,.58);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:center;padding:16px;animation:dialog-bg-in .24s ease both}
 .dialog{border:1px solid var(--glass-border);box-shadow:0 28px 70px -34px rgba(0,0,0,.85);animation:dialog-in .42s var(--ease-spring) both}
@@ -653,8 +685,16 @@ body[data-group-motion="minimal"] .group-particle-field,body.group-particles-off
 
 /* Notification centre */
 .notification-list{display:flex;flex-direction:column;gap:9px}.notification-item{width:100%;display:flex;align-items:center;gap:10px;text-align:left;padding:12px 13px;color:var(--text-hi);cursor:pointer;border:1px solid var(--glass-border);background:linear-gradient(145deg,rgba(255,255,255,.06),rgba(255,255,255,.025));}.notification-item.unread{border-color:rgba(var(--accent-rgb),.24);background:linear-gradient(145deg,rgba(var(--accent-rgb),.12),rgba(255,255,255,.03));}.notification-item:active{transform:scale(.985)}.notification-icon{width:34px;height:34px;border-radius:11px;display:flex;align-items:center;justify-content:center;background:var(--accent-soft);color:var(--accent);flex:0 0 34px}.notification-copy{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}.notification-copy strong{font-size:12.5px}.notification-copy span{font-size:11.5px;color:var(--text-lo);line-height:1.35}.notification-copy small{font-size:9.5px;color:var(--text-faint)}.notification-chevron{color:var(--text-faint);flex:0 0 auto}.notification-bell-wrap{position:relative;display:inline-flex}.notification-dot{position:absolute;right:-2px;top:-3px;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:var(--accent);color:#0B0E1A;font-size:9px;font-weight:900;display:flex;align-items:center;justify-content:center;border:2px solid var(--bg-0);box-shadow:0 4px 12px -6px var(--accent-glow)}
-body.group-scope{background:radial-gradient(circle at 15% 0%,rgba(var(--group-accent-rgb),.23),transparent 42%),radial-gradient(circle at 88% 15%,rgba(var(--group-accent-rgb),.12),transparent 38%),var(--bg-0)}
-body.user-scope{background:radial-gradient(circle at 15% 0%,rgba(var(--accent-rgb),.20),transparent 42%),radial-gradient(circle at 88% 15%,rgba(var(--accent-rgb),.10),transparent 38%),var(--bg-0)}
+body.group-scope{background:radial-gradient(circle at 15% 0%,rgba(var(--group-accent-rgb),.23),transparent 42%),radial-gradient(circle at 88% 15%,rgba(var(--group-accent-rgb),.12),transparent 38%),var(--bg-0);background-attachment:fixed;}
+body.user-scope{background:radial-gradient(circle at 15% 0%,rgba(var(--accent-rgb),.20),transparent 42%),radial-gradient(circle at 88% 15%,rgba(var(--accent-rgb),.10),transparent 38%),var(--bg-0);background-attachment:fixed;}
+/* Customize > Motion toggles: real, visible effects rather than no-ops. */
+body.button-stretch-off .btn:active,body.button-stretch-off .icon-btn:active{transform:scale(0.985) !important;}
+body.button-stretch-off .motion-card{transition:none !important;}
+body.hover-glow-off .glass::after,body.hover-glow-off .glass-strong::after{opacity:0 !important;}
+body.hover-glow-off body::after{background:none !important;}
+body.tilt-off .parallax-target{transform:none !important;}
+body.page-transitions-off .page-wipe{display:none !important;}
+body.page-transitions-off .screen.enter-fwd,body.page-transitions-off .screen.enter-back{animation:none !important;}
 .user-theme-page{--accent:var(--user-accent);--accent-2:var(--user-accent-2);--accent-rgb:var(--user-accent-rgb)}
 /* ── Unified surface system ─────────────────────────────────────────────── */
 .liquid-interactive.motion-card{
@@ -1036,6 +1076,7 @@ function normalizeSquadData(sq){
   // Heal duplicated membership records from older join/approval flows.
   if(Array.isArray(sq.members)){ const seen=new Set(); sq.members=sq.members.filter(m=>m&&m.id&&!seen.has(m.id)&&(seen.add(m.id),true)); }
   if(Array.isArray(sq.joinRequests)){ const seenReq=new Set(); sq.joinRequests=sq.joinRequests.filter(r=>r&&r.id&&!seenReq.has(r.id)&&(seenReq.add(r.id),true)); }
+  if(!Array.isArray(sq.bannedIds)) sq.bannedIds=[]; else sq.bannedIds=[...new Set(sq.bannedIds.filter(Boolean))];
   const ownerId = (sq.members||[]).find(m=>m.id && ((sq.roles||{})[m.id]==='owner'))?.id || sq.ownerId || sq.members?.[0]?.id;
   if(!sq.maxMembers) sq.maxMembers=6;
   if(!sq.roles) sq.roles={};
@@ -1129,8 +1170,15 @@ async function saveMe(){
   if (!ME) return false;
   if (isViewerMode()) { showToast('Viewer Mode is read-only — sign in to save changes','ti-lock'); return false; }
   localStorage.setItem(lsKey('me'), JSON.stringify(ME));
-  if (typeof window.fbSet !== 'function') { console.warn('profile sync skipped — Firebase bridge not ready'); return; }
-  try { await window.fbSet('users/' + ME.id, ME); } catch(e){ console.warn('profile sync failed', e); }
+  if (typeof window.fbUpdate !== 'function') { console.warn('profile sync skipped — Firebase bridge not ready'); return; }
+  // IMPORTANT: this must be a merge (fbUpdate), never a full overwrite (fbSet).
+  // ME is a client-side snapshot that can go stale mid-session (e.g. another
+  // tab/device changed xp or groupIds via a transaction or a targeted update
+  // while this client was idle). Overwriting the whole user record with a
+  // stale snapshot silently reverts those changes — this was the cause of
+  // "XP shows 0 even though I have more", and of groupIds losing older
+  // groups after switching/joining elsewhere.
+  try { await window.fbUpdate('users/' + ME.id, ME); } catch(e){ console.warn('profile sync failed', e); }
 }
 
 
@@ -1216,6 +1264,12 @@ function ensureAccountState(){
   if(!ME.xpState.groupBonuses) ME.xpState.groupBonuses = {};
   ME.groupIds = Array.isArray(ME.groupIds) ? ME.groupIds.filter(Boolean) : (ME.squadId ? [ME.squadId] : []);
   ME.groupIds = [...new Set(ME.groupIds)];
+  // Migration for accounts saved before hasCreatedGroup existed: if we're currently
+  // the owner of a squad we're a member of, we must have created one already, so
+  // don't hand out a second free creation. New accounts default to false (free first make).
+  if(ME.hasCreatedGroup===undefined){
+    ME.hasCreatedGroup = !!(SQUAD && SQUAD.roles && SQUAD.roles[ME.id]==='owner' && SQUAD.members?.some(m=>m.id===ME.id));
+  }
 }
 function getGroupIds(){ ensureAccountState(); return ME.groupIds || []; }
 function realGroupCount(){ ensureAccountState(); return [...new Set((ME.groupIds||[]).filter(Boolean))].length; }
@@ -1361,8 +1415,22 @@ async function saveSquad(){
   if(!SQUAD)return false;
   if(isViewerMode()){showToast('Viewer Mode is read-only — sign in to save squad changes','ti-lock');return false}
   try{localStorage.setItem('squadsync:squad_cache:'+SQUAD.id,JSON.stringify(SQUAD))}catch(e){}
-  const patch=buildDeepPatch(SQUAD_SYNC_BASE||{},SQUAD);
-  try{if(Object.keys(patch).length)await window.fbUpdate('squads/'+SQUAD.id,patch);recordSquadSyncBase();return true}catch(e){showToast(navigator.onLine?'Couldn’t sync changes — retrying when possible':'Offline — changes queued for sync','ti-alert-triangle');return false}
+  // If the sync base belongs to a different squad (just created/switched/joined and no
+  // base recorded for it yet), diffing against it compares apples to oranges: fields that
+  // happen to match between two unrelated squads get silently dropped from the write, so
+  // other clients can read back an incomplete record (missing groupStyle fields, stale
+  // settings, etc). In that case write the full object instead of a patch.
+  const baseMatchesCurrent = SQUAD_SYNC_BASE && SQUAD_SYNC_BASE.id === SQUAD.id;
+  try{
+    if(!baseMatchesCurrent){
+      await window.fbSet('squads/'+SQUAD.id, SQUAD);
+    } else {
+      const patch=buildDeepPatch(SQUAD_SYNC_BASE||{},SQUAD);
+      if(Object.keys(patch).length)await window.fbUpdate('squads/'+SQUAD.id,patch);
+    }
+    recordSquadSyncBase();
+    return true;
+  }catch(e){showToast(navigator.onLine?'Couldn’t sync changes — retrying when possible':'Offline — changes queued for sync','ti-alert-triangle');return false}
 }
 
 function attachUserNotificationListener(){
@@ -1375,6 +1443,7 @@ function attachUserNotificationListener(){
       if(!n||n.read||notificationSeenIds.has(n.id)) continue;
       notificationSeenIds.add(n.id);
       if(n.ts && n.ts>sessionStartTs){
+        playGroupSound(n.type);
         showToast(`${n.title}: ${n.body}`,'ti-'+(n.type==='xp'?'sparkles':'bell'));
         notifyUser(n.title,n.body);
         if(n.type==='group_accepted' && n.groupId && ['squad-choice','join-squad'].includes(currentScreen)) openNotificationItem(n);
@@ -1390,7 +1459,15 @@ function attachSquadListener(){
   if (squadUnsub) squadUnsub();
   squadUnsub = window.fbListen('squads/' + SQUAD_ID, (data) => {
     if (data) {
-      SQUAD = data;
+      // Always normalize realtime data (heals duplicate members/joinRequests,
+      // fills missing roles/permissions, etc). loadSquad() already does this
+      // for the initial fetch, but this listener fires on every subsequent
+      // change and was previously assigning the raw Firebase payload straight
+      // to SQUAD — any duplicate that ever made it into the members array
+      // (e.g. from an overlapping approve + write-conflict) would then
+      // persist forever and show up as a doubled member icon/count, with
+      // both copies leaving together since they share one id.
+      SQUAD = normalizeSquadData(data);
       recordSquadSyncBase();
       if(currentScreen === 'tv-board' && watchPlayer.instance){
         reconcileWatchPlayer(SQUAD.watchParty);
@@ -1445,6 +1522,24 @@ async function createUserNotification(type,title,body,opts={}){
 }
 function notificationIcon(type){ return ({nudge:'ti-hand-click',message:'ti-message',call:'ti-phone-incoming',xp:'ti-sparkles',group_request:'ti-clock',group_accepted:'ti-circle-check',group_denied:'ti-x',group_invite:'ti-users-group'}[type]||'ti-bell'); }
 function notificationTime(ts){ return timeAgo(ts); }
+let __groupAudioCtx=null;
+function playGroupSound(kind='default',packOverride=null){
+  const pack=packOverride || SQUAD?.groupStyle?.soundPack || 'subtle';
+  if(pack==='off') return;
+  try{
+    const AC=window.AudioContext||window.webkitAudioContext; if(!AC) return;
+    __groupAudioCtx ||= new AC();
+    const ctx=__groupAudioCtx;
+    if(ctx.state==='suspended') ctx.resume().catch(()=>{});
+    const base=kind==='xp'?660:kind==='call'?520:kind.includes('group')?590:440;
+    const notes=pack==='full'?[base,base*1.25,base*1.5]:[base,base*1.18];
+    notes.forEach((freq,i)=>{
+      const o=ctx.createOscillator(),g=ctx.createGain(); o.type=pack==='full'?'triangle':'sine'; o.frequency.value=freq;
+      const t=ctx.currentTime+i*.075; g.gain.setValueAtTime(.0001,t); g.gain.exponentialRampToValueAtTime(pack==='full'?.045:.026,t+.008); g.gain.exponentialRampToValueAtTime(.0001,t+(pack==='full'?.16:.12));
+      o.connect(g);g.connect(ctx.destination);o.start(t);o.stop(t+(pack==='full'?.18:.14));
+    });
+  }catch(e){}
+}
 async function markAllNotificationsRead(){
   if(!ME || isViewerMode()) return;
   const unread=Object.values(USER_NOTIFICATIONS||{}).filter(n=>n&&!n.read); if(!unread.length) return;
@@ -1469,7 +1564,8 @@ function renderNotificationBell(){
 }
 function renderNotifications(){
   const items=Object.values(USER_NOTIFICATIONS||{}).sort((a,b)=>Number(b.ts||0)-Number(a.ts||0));
-  return `<div class="screen user-theme-page"><div class="page-title-row">${backBtn('notifications-back')}<h2>Notifications</h2><button class="btn btn-ghost" id="notifications-readall" style="margin-left:auto;padding:8px 10px;font-size:11px;">Mark all read</button></div><p class="small-note" style="margin:8px 0 18px 48px;">Nudges, messages, calls, XP updates, group requests and approvals.</p><div class="notification-list">${items.length?items.map(n=>`<button class="notification-item glass liquid-interactive motion-card ${n.read?'read':'unread'}" data-notification-id="${escapeHtml(n.id)}"><span class="notification-icon">${icon(notificationIcon(n.type))}</span><span class="notification-copy"><strong>${escapeHtml(n.title||'Notification')}</strong><span>${escapeHtml(n.body||'')}</span><small>${notificationTime(n.ts)}</small></span>${n.groupId?`<span class="ti notification-chevron">${icon('ti-chevron-right')}</span>`:''}</button>`).join(''):`<div class="empty-hint glass liquid-interactive"><div style="font-size:28px;margin-bottom:8px;">${icon('ti-bell')}</div><strong>You're all caught up.</strong><div style="margin-top:6px;">New squad activity will appear here.</div></div>`}</div></div>`;
+  const ns=SQUAD?.groupStyle?.notificationStyle||'glass';
+  return `<div class="screen user-theme-page notification-style-${ns}"><div class="page-title-row">${backBtn('notifications-back')}<h2>Notifications</h2><button class="btn btn-ghost" id="notifications-readall" style="margin-left:auto;padding:8px 10px;font-size:11px;">Mark all read</button></div><p class="small-note" style="margin:8px 0 18px 48px;">Nudges, messages, calls, XP updates, group requests and approvals · ${ns} style</p><div class="notification-list">${items.length?items.map(n=>`<button class="notification-item glass liquid-interactive motion-card ${n.read?'read':'unread'}" data-notification-id="${escapeHtml(n.id)}"><span class="notification-icon">${icon(notificationIcon(n.type))}</span><span class="notification-copy"><strong>${escapeHtml(n.title||'Notification')}</strong><span>${escapeHtml(n.body||'')}</span><small>${notificationTime(n.ts)}</small></span>${n.groupId?`<span class="ti notification-chevron">${icon('ti-chevron-right')}</span>`:''}</button>`).join(''):`<div class="empty-hint glass liquid-interactive"><div style="font-size:28px;margin-bottom:8px;">${icon('ti-bell')}</div><strong>You're all caught up.</strong><div style="margin-top:6px;">New squad activity will appear here.</div></div>`}</div></div>`;
 }
 
 async function ensureGroupRequestNotification(group, status){
@@ -1569,7 +1665,12 @@ async function resolveJoinRequest(uid, approve){
   }
 
   SQUAD.joinRequests = (SQUAD.joinRequests || []).filter(r => r.id !== uid);
-  SQUAD.members.push({ id: req.id, name: req.name, tz: req.tz, photo: req.photo || '', emoji: '' });
+  // Guard against double-adding: if this uid is somehow already present
+  // (e.g. two approve taps landing before the UI could disable the button),
+  // don't push a second copy.
+  if(!SQUAD.members.some(m => m.id === req.id)){
+    SQUAD.members.push({ id: req.id, name: req.name, tz: req.tz, photo: req.photo || '', emoji: '' });
+  }
   SQUAD.groupXp=Number(SQUAD.groupXp||0)+25;
   if(!SQUAD.status) SQUAD.status = {};
   SQUAD.status[uid] = { avail:'free', icon:'ti-hand-wave', text:'Just joined' };
@@ -1583,11 +1684,10 @@ async function resolveJoinRequest(uid, approve){
   showToast(`${req.name.split(' ')[0]} added to squad`, 'ti-check');
 }
 
-function renderAvatarMarkup(m, size=38){
+function renderAvatarMarkup(m, size=38, extra=''){
   const avatar = m || {};
-  const inner = avatar.emoji ? `<span style="font-size:${Math.round(size*.46)}px;line-height:1;">${escapeHtml(avatar.emoji)}</span>` :
-    avatar.photo ? `<img src="${escapeHtml(avatar.photo)}" alt="">` : getInitials(avatar.name || '');
-  return `<div class="avatar" style="width:${size}px;height:${size}px;font-size:${Math.max(10,Math.round(size*.34))}px;">${inner}</div>`;
+  const inner = avatarVisualInner(avatar,size);
+  return `<div class="avatar" style="width:${size}px;height:${size}px;font-size:${Math.max(10,Math.round(size*.34))}px;">${inner}${extra}</div>`;
 }
 function getInitials(name){
   if(!name) return '?';
@@ -1724,12 +1824,12 @@ function timeAgo(ts){
 function groupBackgroundFor(g){
   const preset=String(g?.backgroundPreset||'aurora');
   const map={
-    aurora:'radial-gradient(circle at 15% 5%, rgba(var(--group-accent-rgb),.23), transparent 42%),radial-gradient(circle at 90% 20%, rgba(155,124,255,.18), transparent 38%),linear-gradient(145deg,#0A0D18,#11162A)',
-    midnight:'radial-gradient(circle at 50% 0%, rgba(var(--group-accent-rgb),.12), transparent 46%),linear-gradient(160deg,#060912,#0E1424)',
-    nebula:'radial-gradient(circle at 20% 20%, rgba(var(--group-accent-rgb),.30), transparent 30%),radial-gradient(circle at 80% 70%, rgba(var(--group-accent-rgb),.14), transparent 35%),linear-gradient(150deg,#070914,#11152C)',
-    emerald:'radial-gradient(circle at 15% 20%, rgba(74,222,128,.18), transparent 35%),linear-gradient(150deg,#06110D,#0F1C18)',
-    rose:'radial-gradient(circle at 82% 10%, rgba(255,124,163,.20), transparent 38%),linear-gradient(150deg,#12080D,#1D1018)',
-    amber:'radial-gradient(circle at 80% 15%, rgba(251,191,36,.18), transparent 35%),linear-gradient(150deg,#120D05,#1E170C)'
+    aurora:'radial-gradient(circle at 15% 5%, rgba(var(--group-accent-rgb),.23), transparent 42%),radial-gradient(circle at 90% 20%, rgba(155,124,255,.18), transparent 38%),linear-gradient(145deg,var(--group-bg,#0A0D18),#11162A)',
+    midnight:'radial-gradient(circle at 50% 0%, rgba(var(--group-accent-rgb),.12), transparent 46%),linear-gradient(160deg,var(--group-bg,#060912),#0E1424)',
+    nebula:'radial-gradient(circle at 20% 20%, rgba(var(--group-accent-rgb),.30), transparent 30%),radial-gradient(circle at 80% 70%, rgba(var(--group-accent-rgb),.14), transparent 35%),linear-gradient(150deg,var(--group-bg,#070914),#11152C)',
+    emerald:'radial-gradient(circle at 15% 20%, rgba(74,222,128,.18), transparent 35%),linear-gradient(150deg,var(--group-bg,#06110D),#0F1C18)',
+    rose:'radial-gradient(circle at 82% 10%, rgba(255,124,163,.20), transparent 38%),linear-gradient(150deg,var(--group-bg,#12080D),#1D1018)',
+    amber:'radial-gradient(circle at 80% 15%, rgba(251,191,36,.18), transparent 35%),linear-gradient(150deg,var(--group-bg,#120D05),#1E170C)'
   };
   return map[preset] || map.aurora;
 }
@@ -1743,18 +1843,39 @@ function applyGroupStyle(){
   if(g.background) root.style.setProperty('--group-bg', g.background);
   root.style.setProperty('--group-background', groupBackgroundFor(g));
   document.body.classList.toggle('liquid-mode', (g.mode||'liquid') === 'liquid');
+  document.body.classList.toggle('crystal-mode', (g.mode||'liquid') === 'crystal');
   document.body.dataset.groupMotion = g.motion || 'ambient';
+  document.body.dataset.groupNotification = g.notificationStyle || 'glass';
   document.body.classList.toggle('group-particles-off', g.ambientParticles === false);
+  document.body.classList.toggle('status-glow-off', g.showStatusGlow === false);
+  document.body.classList.toggle('member-count-off', g.showMemberCount === false);
 }
 
+// Base theme classes this function owns. We remove exactly these before re-adding
+// the ones that should be active, rather than resetting the whole className — a full
+// reset would also wipe classes other code manages independently (group-scope/
+// user-scope from renderAll, liquid-mode/group-particles-off from applyGroupStyle),
+// which is what caused the background to visibly glitch/seam between renders.
+const THEME_OWNED_CLASSES = [...THEMES.map(t=>t.cls).filter(Boolean), 'density-compact', 'reduce-motion-pref', 'parallax-off'];
 function applyTheme(){
   const t = THEMES.find(t => t.id === (LOCAL.theme||'indigo')) || THEMES[0];
   const classes = [t.cls];
   if (LOCAL.density === 'compact') classes.push('density-compact');
   if (LOCAL.reduceMotion) classes.push('reduce-motion-pref');
   if (LOCAL.parallax===false) classes.push('parallax-off');
-  document.body.className = classes.filter(Boolean).join(' ');
+  document.body.classList.remove(...THEME_OWNED_CLASSES);
+  document.body.classList.add(...classes.filter(Boolean));
   document.documentElement.style.setProperty('--liquid-blur',((Number(LOCAL.glassBlur)||26)+'px'));
+  document.body.classList.toggle('button-stretch-off', LOCAL.buttonStretch===false || LOCAL.buttonStretch==='false');
+  document.body.classList.toggle('hover-glow-off', LOCAL.hoverGlow===false);
+  document.body.classList.toggle('page-transitions-off', LOCAL.pageTransitions===false);
+  document.body.classList.toggle('tilt-off', LOCAL.tilt===false);
+  // Keep the group/user background scope classes in sync every time — applyTheme()
+  // is called standalone from many settings handlers (blur slider, accent picker, etc.),
+  // not just from renderAll(), so this can't rely on renderAll() to set them.
+  const groupScreens=['home','board','activities','manage','messages','tv-board','group-settings','roles','join-requests'];
+  document.body.classList.toggle('group-scope', groupScreens.includes(currentScreen));
+  document.body.classList.toggle('user-scope', !groupScreens.includes(currentScreen));
   applyGroupStyle();
 
   if (LOCAL.accentHex) {
@@ -2216,7 +2337,7 @@ function renderCreateSquad(){
         <div style="display:flex; align-items:center; gap:10px;"><span class="ti" style="color:var(--accent);">${icon('ti-lock')}</span><div><div style="font-size:14px; font-weight:600;">Require approval to join</div><div style="font-size:11.5px; color:var(--text-lo); margin-top:2px;">You'll approve each join request</div></div></div>
         <span class="ti" id="sq-locked-check" style="font-size:22px; color:var(--text-faint);"></span>
       </div>
-      <div class="small-note" style="margin:0 0 10px 4px;">${realGroupCount()===0?'Your first squad is free.':'Additional squad: '+XP_CONFIG.createGroup+' XP'}</div><button class="btn btn-primary btn-block" id="sq-create-submit" style="padding:16px;">Create Squad</button>
+      <div class="small-note" style="margin:0 0 10px 4px;">${!ME.hasCreatedGroup?'Your first squad creation is free.':'Creating another squad costs '+XP_CONFIG.createGroup+' XP (you have '+Math.floor(ME.xp||0)+' XP).'}</div><button class="btn btn-primary btn-block" id="sq-create-submit" style="padding:16px;">Create Squad</button>
     </div>
   `;
 }
@@ -2269,7 +2390,7 @@ function renderHome(){
         ${g.bannerUrl&&!g.bannerVideoUrl?`<div class="group-hero-media" style="background-image:url('${escapeHtml(g.bannerUrl)}');background-size:cover;background-position:center;"></div>`:''}
         <div class="group-particle-field" aria-hidden="true"></div><div class="group-hero-overlay"></div>
         <div class="group-hero-content">
-          <div class="group-hero-top">${groupMarkHtml(g,64)}<div style="min-width:0;flex:1;"><div class="group-kicker">${escapeHtml(g.tagline||'Your squad, your space')}</div><h1>${escapeHtml(SQUAD.name)}</h1><div class="group-meta">${groupMemberCount()} / ${groupCapacity()} members · ${escapeHtml(groupAgeLabel())}</div></div><button class="icon-btn liquid-interactive motion-card" id="group-identity-open">${icon('ti-settings')}</button></div>
+          <div class="group-hero-top">${groupMarkHtml(g,64)}<div style="min-width:0;flex:1;"><div class="group-kicker">${escapeHtml(g.tagline||'Your squad, your space')}</div><h1>${escapeHtml(SQUAD.name)}</h1><div class="group-meta"><span class="group-meta-member-count">${groupMemberCount()} / ${groupCapacity()} members · </span>${escapeHtml(groupAgeLabel())}</div></div><button class="icon-btn liquid-interactive motion-card" id="group-identity-open">${icon('ti-settings')}</button></div>
           ${g.description?`<p class="group-description">${escapeHtml(g.description)}</p>`:''}
           <div class="group-stat-row"><div class="group-stat"><strong>Level ${groupLevel()}</strong><span>${groupXpValue()} XP</span></div><div class="group-stat"><strong>${groupStreak()} day</strong><span>streak</span></div><div class="group-stat"><strong>${pct}%</strong><span>to next level</span></div></div>
           <div class="group-level-bar"><span style="width:${pct}%"></span></div>
@@ -2292,7 +2413,7 @@ function renderGrid(members){
     return `
       <div class="friend-tile glass" data-id="${f.id}">
         <div class="tile-content">
-          <div class="avatar">${f.photo?`<img src="${f.photo}" alt="">`:getInitials(f.name)}<div class="status-ring ${a.ring}"></div></div>
+          ${renderAvatarMarkup(f,38,`<div class="status-ring ${a.ring}"></div>`)}
           <div class="friend-name">${f.name}${isMe?' (You)':''}</div>
           <div class="friend-time">${getTimeInTz(f.tz)}</div>
           <div class="friend-status"><span class="ti" style="color:${a.color};font-size:13px;">${icon(st.icon||'ti-hand-stop')}</span><span>${st.text || 'Around'}</span></div>
@@ -2313,7 +2434,7 @@ function renderList(members){
     return `
       <div class="list-item glass" data-id="${f.id}">
         <div class="list-left">
-          <div class="avatar">${f.photo?`<img src="${f.photo}" alt="">`:getInitials(f.name)}<div class="status-ring ${a.ring}"></div></div>
+          ${renderAvatarMarkup(f,38,`<div class="status-ring ${a.ring}"></div>`)}
           <div style="min-width:0;">
             <div class="friend-name">${f.name}${isMe?' (You)':''}</div>
             <div style="font-size:12px; color:var(--text-lo); display:flex; align-items:center; gap:5px; overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><span class="ti" style="color:${a.color};font-size:12px;">${icon(st.icon||'ti-hand-stop')}</span>${st.text||'Around'}</div>
@@ -2339,7 +2460,7 @@ function renderWheel(members){
     const a = AVAIL_STATES.find(a=>a.id===st.avail) || AVAIL_STATES[0];
     return `
       <div class="radial-node" style="--orbit-x:${x}px;--orbit-y:${y}px;--delay:${Math.min(i*70,560)}ms" data-id="${escapeHtml(f.id)}">
-        <div class="avatar" style="width:52px;height:52px;font-size:18px;">${f.photo?`<img src="${escapeHtml(f.photo)}" alt="">`:escapeHtml(f.emoji||getInitials(f.name))}<div class="status-ring ${a.ring}"></div></div>
+        ${renderAvatarMarkup(f,52,`<div class="status-ring ${a.ring}"></div>`)}
         <div class="radial-node-name">${escapeHtml(f.name)}</div>
         <div style="font-size:10px;color:var(--text-lo);text-align:center;">${escapeHtml(getTimeInTz(f.tz))}</div>
       </div>`;
@@ -2445,6 +2566,82 @@ function openStatusEditor(friendId){
 // here since photo upload isn't part of this flow) so the avatar always
 // has one clear source of truth. Syncs to the squad member record too.
 const AVATAR_EMOJIS = ['😀','😎','🤠','🥳','🦊','🐼','🐸','🐵','🦁','🐯','🐨','🐶','🐱','🦄','🐙','🦖','👻','🤖','👽','🎃','🌟','🔥','⚡','🌈','🍕','🍩','☕','🎮','🎧','⚽','🏀','🎨','🚀','🌙'];
+const AVATAR_SHOP_ITEMS = [
+  {id:'common-sun',name:'Sunny',glyph:'☀️',tier:'common',price:10,frequency:'one-time'},
+  {id:'common-cloud',name:'Cloud',glyph:'☁️',tier:'common',price:10,frequency:'one-time'},
+  {id:'common-bolt',name:'Bolt',glyph:'⚡',tier:'common',price:10,frequency:'one-time'},
+  {id:'common-heart',name:'Heart',glyph:'💜',tier:'common',price:10,frequency:'one-time'},
+  {id:'common-star',name:'Star',glyph:'⭐',tier:'common',price:10,frequency:'one-time'},
+  {id:'common-moon',name:'Moon',glyph:'🌙',tier:'common',price:10,frequency:'one-time'},
+  {id:'rare-firefly',name:'Firefly',glyph:'🪄',tier:'rare',price:1000,frequency:'one-time',animated:true},
+  {id:'rare-galaxy',name:'Galaxy',glyph:'🌌',tier:'rare',price:1000,frequency:'one-time',animated:true},
+  {id:'rare-comet',name:'Comet',glyph:'☄️',tier:'rare',price:1000,frequency:'one-time',animated:true},
+  {id:'rare-crystal',name:'Crystal',glyph:'💎',tier:'rare',price:1000,frequency:'one-time',animated:true},
+  {id:'weekly-flame',name:'Weekly Flame',glyph:'🔥',tier:'weekly',price:75,frequency:'weekly',animated:true},
+  {id:'weekly-orbit',name:'Weekly Orbit',glyph:'🪐',tier:'weekly',price:120,frequency:'weekly',animated:true},
+  {id:'monthly-aurora',name:'Monthly Aurora',glyph:'🌈',tier:'monthly',price:250,frequency:'monthly',animated:true},
+  {id:'monthly-crown',name:'Monthly Crown',glyph:'👑',tier:'monthly',price:400,frequency:'monthly',animated:true}
+];
+function ensureAvatarShopState(){
+  ensureAccountState();
+  if(!ME.xpState.avatarShop) ME.xpState.avatarShop={owned:{},weekly:{},monthly:{}};
+  if(!ME.xpState.avatarShop.owned) ME.xpState.avatarShop.owned={};
+  if(!ME.xpState.avatarShop.weekly) ME.xpState.avatarShop.weekly={};
+  if(!ME.xpState.avatarShop.monthly) ME.xpState.avatarShop.monthly={};
+}
+function avatarShopPeriod(item){
+  const d=new Date();
+  if(item.frequency==='weekly'){
+    const first=new Date(d.getFullYear(),0,1); const week=Math.floor(((d-first)/86400000+first.getDay())/7)+1;
+    return `${d.getFullYear()}-W${String(week).padStart(2,'0')}`;
+  }
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+function avatarShopClaimed(item){
+  ensureAvatarShopState();
+  if(item.frequency==='one-time') return !!ME.xpState.avatarShop.owned[item.id];
+  const bucket=item.frequency==='weekly'?ME.xpState.avatarShop.weekly:ME.xpState.avatarShop.monthly;
+  return bucket[item.id]===avatarShopPeriod(item);
+}
+function avatarIconInner(item,size=48){
+  if(!item) return '';
+  const cls=`avatar-shop-icon ${item.animated?'animated rare':''}`;
+  return `<span class="${cls}" style="font-size:${Math.round(size*.50)}px;">${escapeHtml(item.glyph)}</span>`;
+}
+function avatarVisualInner(avatar,size=38){
+  const item=AVATAR_SHOP_ITEMS.find(x=>x.id===avatar?.avatarIconId);
+  if(item) return avatarIconInner(item,size);
+  if(avatar?.emoji) return `<span style="font-size:${Math.round(size*.46)}px;line-height:1;">${escapeHtml(avatar.emoji)}</span>`;
+  if(avatar?.photo) return `<img src="${escapeHtml(avatar.photo)}" alt="">`;
+  return getInitials(avatar?.name||'');
+}
+async function setActiveAvatarIcon(item){
+  if(viewerBlocked('Sign in to customize your avatar')) return false;
+  ensureAvatarShopState();
+  ME.avatarIconId=item?.id||'';
+  ME.emoji='';
+  ME.photo='';
+  await saveMe();
+  if(SQUAD){
+    const m=SQUAD.members.find(x=>x.id===ME.id);
+    if(m){m.avatarIconId=ME.avatarIconId;m.emoji='';m.photo='';SQUAD.updatedAt=Date.now();await saveSquad();}
+  }
+  return true;
+}
+async function buyAvatarShopItem(itemId){
+  const item=AVATAR_SHOP_ITEMS.find(x=>x.id===itemId); if(!item) return;
+  if(viewerBlocked('Sign in to buy avatar icons')) return;
+  ensureAvatarShopState();
+  if(avatarShopClaimed(item)){ showToast(item.frequency==='one-time'?'Already owned':`Available again ${item.frequency==='weekly'?'next week':'next month'}`,'ti-lock'); return; }
+  if(!(await spendXp(item.price,`Avatar icon: ${item.name}`))) return;
+  const state=ME.xpState.avatarShop;
+  if(item.frequency==='one-time') state.owned[item.id]=Date.now();
+  else state[item.frequency==='weekly'?'weekly':'monthly'][item.id]=avatarShopPeriod(item);
+  await setActiveAvatarIcon(item);
+  await saveMeFields({xpState:ME.xpState,xp:ME.xp});
+  showToast(`${item.name} equipped · −${item.price} XP`,'ti-sparkles');
+  renderAll();
+}
 
 function openEmojiPicker(){
   const wrap = document.createElement('div');
@@ -2453,7 +2650,8 @@ function openEmojiPicker(){
     <div class="sheet">
       <div class="sheet-handle"></div>
       <div class="sheet-title">Choose your avatar</div>
-      <div class="sheet-sub">Pick an emoji, or clear it to use your initials.</div>
+      <div class="sheet-sub">Use an emoji, or buy a custom icon from the XP Shop.</div>
+      <button class="btn btn-primary btn-block" id="avatar-shop-from-picker" style="padding:12px;margin-bottom:12px;">${icon('ti-store')} Open icon shop</button>
       <div style="display:grid; grid-template-columns:repeat(6,1fr); gap:8px; margin:16px 0 20px;">
         ${AVATAR_EMOJIS.map(e => `<div class="glass" data-emoji-choice="${e}" style="aspect-ratio:1; display:flex; align-items:center; justify-content:center; font-size:24px; cursor:pointer; border-radius:14px; ${ME.emoji===e?'border-color:var(--accent); background:var(--accent-soft);':''}">${e}</div>`).join('')}
       </div>
@@ -2461,6 +2659,7 @@ function openEmojiPicker(){
     </div>
   `;
   const close = mountSheet(wrap);
+  if(wrap.querySelector('#avatar-shop-from-picker')) wrap.querySelector('#avatar-shop-from-picker').onclick=()=>{close();goTo('shop');};
   wrap.querySelectorAll('[data-emoji-choice]').forEach(cell => {
     cell.onclick = async () => {
       ME.emoji = cell.dataset.emojiChoice;
@@ -2519,18 +2718,89 @@ async function sendNudge(friendId, friendName){
   showToast(`Nudged ${friendName.split(' ')[0]} · −1 XP`, 'ti-hand-click');
 }
 
-async function removeSquadMember(uid){
+// Shared by both "Remove" (can rejoin later) and "Remove & Ban" (blocked from
+// rejoining or re-requesting this squad until an owner/admin unbans them).
+async function removeSquadMember(uid, opts={}){
+  const ban = !!opts.ban;
   if(!can(ME.id,'manageMembers')) return showToast('You cannot remove members','ti-ban');
   if(uid===ME.id) return showToast('Use Leave Squad for yourself','ti-alert-circle');
   const target=SQUAD.members.find(m=>m.id===uid); if(!target) return;
   if(roleOf(uid)==='owner') return showToast('The owner cannot be removed','ti-ban');
+  if(ban && !can(ME.id,'manageRoles') && roleOf(uid)==='admin') return showToast('Only role managers can remove an admin','ti-ban');
   SQUAD.members=SQUAD.members.filter(m=>m.id!==uid);
   if(SQUAD.status) delete SQUAD.status[uid];
   if(SQUAD.roles) delete SQUAD.roles[uid];
   if(SQUAD.permissions) delete SQUAD.permissions[uid];
   if(SQUAD.joinRequests) SQUAD.joinRequests=SQUAD.joinRequests.filter(r=>r.id!==uid);
+  if(ban){
+    if(!Array.isArray(SQUAD.bannedIds)) SQUAD.bannedIds=[];
+    if(!SQUAD.bannedIds.includes(uid)) SQUAD.bannedIds.push(uid);
+  }
   SQUAD.updatedAt=Date.now();
-  await saveSquad(); softUpdate(); showToast(`${target.name.split(' ')[0]} removed`,'ti-user-minus');
+  await saveSquad();
+  // Clean up the removed user's own record so this squad stops showing up for them
+  // (their groupIds list, and their squadId if this squad was their active one) —
+  // otherwise their client still thinks they belong here (e.g. "leaves together"
+  // symptoms, phantom membership counts) even though the squad's member list no
+  // longer includes them.
+  try{
+    const removedUser = await window.fbGet('users/'+uid);
+    if(removedUser){
+      const nextGroupIds = Array.isArray(removedUser.groupIds) ? removedUser.groupIds.filter(id=>id!==SQUAD.id) : [];
+      const patch = { groupIds: nextGroupIds };
+      if(removedUser.squadId===SQUAD.id) patch.squadId = nextGroupIds[0]||null;
+      await window.fbUpdate('users/'+uid, patch);
+      await window.fbUpdate('users/'+uid+'/notifications/'+`group_removed_${SQUAD.id}`,{id:`group_removed_${SQUAD.id}`,type:ban?'group_banned':'group_removed',title:ban?'Removed and banned':'Removed from group',body:ban?`You were removed from ${SQUAD.name} and can no longer rejoin.`:`You were removed from ${SQUAD.name}.`,ts:Date.now(),read:false});
+    }
+  }catch(e){}
+  softUpdate();
+  showToast(ban?`${target.name.split(' ')[0]} removed and banned`:`${target.name.split(' ')[0]} removed`,'ti-user-minus');
+}
+// Action sheet opened by tapping a member row in Manage Squad. Anyone can
+// open it (to view basic info / their own notes link), but the Remove and
+// Remove & Ban actions only render for someone with the manageMembers
+// permission, and never render for the target's own row or the owner's row.
+function openMemberActions(uid){
+  if(!SQUAD || !ME) return;
+  const target = SQUAD.members.find(m=>m.id===uid);
+  if(!target) return;
+  const isMe = uid === ME.id;
+  const iManage = can(ME.id, 'manageMembers') && !isMe && roleOf(uid) !== 'owner' && (roleOf(uid)!=='admin' || can(ME.id,'manageRoles'));
+  const role = ROLES.find(r => r.id === roleOf(uid)) || ROLES[2];
+  const wrap = document.createElement('div');
+  wrap.className = 'sheet-backdrop';
+  wrap.innerHTML = `
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:18px;">
+        ${renderAvatarMarkup(target,46)}
+        <div style="min-width:0;">
+          <div style="font-weight:800; font-size:16px;">${escapeHtml(target.name)}${isMe?' (You)':''}</div>
+          <div style="font-size:11.5px; color:${role.color}; display:flex; align-items:center; gap:4px;"><span class="ti" style="font-size:11px;">${icon(role.icon)}</span>${role.label}</div>
+        </div>
+      </div>
+      <div class="stack">
+        ${!isMe?`<button class="btn btn-ghost btn-block" id="ma-notes-btn" style="padding:13px;"><span class="ti">${icon('ti-notes')}</span> View private notes</button>`:''}
+        ${iManage?`<button class="btn btn-ghost btn-block" id="ma-remove-btn" style="padding:13px;color:var(--red);border-color:rgba(248,113,113,0.3);"><span class="ti">${icon('ti-user-minus')}</span> Remove from squad</button>`:''}
+        ${iManage?`<button class="btn btn-ghost btn-block hold-confirm" data-hold-confirm="Remove &amp; ban" id="ma-ban-btn" style="padding:13px;color:var(--red);border-color:rgba(248,113,113,0.3);"><span class="ti">${icon('ti-ban')}</span> Remove &amp; ban</button>`:''}
+        ${!iManage && !isMe ? `<div class="small-note" style="text-align:center;margin-top:4px;">You don't have permission to remove members.</div>` : ''}
+      </div>
+    </div>
+  `;
+  const close = mountSheet(wrap);
+  if(wrap.querySelector('#ma-notes-btn')) wrap.querySelector('#ma-notes-btn').onclick = () => { close(); openFriendNotes(uid); goTo('friend-notes', {friendId: uid}); };
+  if(wrap.querySelector('#ma-remove-btn')) wrap.querySelector('#ma-remove-btn').onclick = async () => {
+    if(!confirm(`Remove ${target.name.split(' ')[0]} from the squad? They can rejoin later with the invite code.`)) return;
+    close();
+    await removeSquadMember(uid, {ban:false});
+  };
+  const banBtn = wrap.querySelector('#ma-ban-btn');
+  // The global initHoldToConfirm() scan (run on every bindEvents/renderAll pass)
+  // picks up [data-hold-confirm] elements anywhere in the document, including
+  // ones just added to a sheet — it wraps this onclick so a real click only
+  // fires after the hold completes.
+  if(banBtn) banBtn.onclick = async () => { close(); await removeSquadMember(uid, {ban:true}); };
+  initHoldToConfirm();
 }
 function renderSquadManage(){
   const cap = SQUAD.maxMembers || 6;
@@ -2542,7 +2812,7 @@ function renderSquadManage(){
     return `
     <div class="glass" style="padding:14px 16px; margin-bottom:10px; display:flex; align-items:center; justify-content:space-between; cursor:pointer;" data-manage-member="${m.id}">
       <div style="display:flex; align-items:center; gap:12px; min-width:0;">
-        <div class="avatar" style="width:38px;height:38px;font-size:13px;">${m.emoji?`<span style="font-size:18px;">${m.emoji}</span>`:m.photo?`<img src="${m.photo}" alt="">`:getInitials(m.name)}</div>
+        ${renderAvatarMarkup(m,38)}
         <div style="min-width:0;">
           <div style="font-weight:700; font-size:14.5px; overflow:hidden;text-overflow:ellipsis;white-space:nowrap; display:flex; align-items:center; gap:6px;">${m.name} ${isMe ? '(You)' : ''}
             <span style="display:inline-flex; align-items:center; gap:3px; font-size:10px; font-weight:700; color:${role.color}; background:rgba(255,255,255,0.06); padding:2px 6px; border-radius:8px; text-transform:uppercase; letter-spacing:.04em;"><span class="ti" style="font-size:10px;">${icon(role.icon)}</span>${role.label}</span>
@@ -2635,7 +2905,7 @@ function renderGroupSettings(){
     ${g.bannerVideoUrl?`<video src="${escapeHtml(g.bannerVideoUrl)}" autoplay muted loop playsinline style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.34;"></video>`:''}
     ${g.bannerUrl&&!g.bannerVideoUrl?`<div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(8,10,18,.05),rgba(8,10,18,.8)),url('${escapeHtml(g.bannerUrl)}') center/cover;"></div>`:''}
     <div style="position:relative;z-index:1;padding:18px;"><div style="display:flex;align-items:center;gap:12px;">${groupMarkHtml(g,64)}<div style="min-width:0;flex:1;"><div class="field-label" style="margin:0;">Group identity</div><div style="font-size:21px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(SQUAD.name)}</div><div style="color:var(--text-lo);font-size:12px;margin-top:3px;">${escapeHtml(g.tagline||'Your squad, your space')}</div></div><div class="xp-badge">Level ${groupLevel()}</div></div>
-    <div class="group-stat-row"><div class="group-stat"><strong>${groupMemberCount()}/${cap}</strong><span>Members</span></div><div class="group-stat"><strong>${groupXpValue()}</strong><span>Squad XP</span></div><div class="group-stat"><strong>${groupStreak()}</strong><span>Day streak</span></div></div></div>
+    <div class="group-stat-row"><div class="group-stat ${g.showMemberCount===false?'hidden':''}"><strong>${groupMemberCount()}/${cap}</strong><span>Members</span></div><div class="group-stat"><strong>${groupXpValue()}</strong><span>Squad XP</span></div><div class="group-stat"><strong>${groupStreak()}</strong><span>Day streak</span></div></div></div>
   </div>
 
   <div class="section-label">Identity</div>${sw('Squad name','gs-name',SQUAD.name,'text','maxlength="28"')}${sw('Tagline','gs-tagline',g.tagline,'text','maxlength="60"')}
@@ -2663,7 +2933,7 @@ function renderGroupSettings(){
   <div class="field"><label class="field-label">Corner radius — <span id="gs-radius-value" style="color:var(--accent);">${g.radius}px</span></label><input type="range" id="gs-radius" min="10" max="34" value="${g.radius}" style="width:100%;accent-color:var(--accent);"></div>
   <div class="field"><label class="field-label">Ambient motion</label><select class="control-select" id="gs-motion"><option value="ambient" ${g.motion==='ambient'?'selected':''}>Ambient + parallax</option><option value="waves" ${g.motion==='waves'?'selected':''}>Slow waves</option><option value="minimal" ${g.motion==='minimal'?'selected':''}>Minimal</option></select></div>
   <div class="field"><label class="field-label">Notification style</label><select class="control-select" id="gs-notification"><option value="glass" ${g.notificationStyle==='glass'?'selected':''}>Glass</option><option value="minimal" ${g.notificationStyle==='minimal'?'selected':''}>Minimal</option><option value="cinematic" ${g.notificationStyle==='cinematic'?'selected':''}>Cinematic</option></select></div>
-  <div class="field"><label class="field-label">Sound pack</label><select class="control-select" id="gs-sound"><option value="off" ${g.soundPack==='off'?'selected':''}>Off</option><option value="subtle" ${g.soundPack==='subtle'?'selected':''}>Subtle</option><option value="full" ${g.soundPack==='full'?'selected':''}>Full</option></select></div>
+  <div class="field"><label class="field-label">Sound pack</label><div style="display:grid;grid-template-columns:1fr auto;gap:8px;"><select class="control-select" id="gs-sound"><option value="off" ${g.soundPack==='off'?'selected':''}>Off</option><option value="subtle" ${g.soundPack==='subtle'?'selected':''}>Subtle</option><option value="full" ${g.soundPack==='full'?'selected':''}>Full</option></select><button class="btn btn-ghost liquid-interactive motion-card" id="gs-sound-preview" style="padding:10px 12px;">${icon('ti-volume-2')} Test</button></div><div class="small-note">Played for new group notifications. Preview uses the selected pack before saving.</div></div>
   <div class="stack"><div class="glass liquid-interactive motion-card" style="padding:13px 15px;display:flex;align-items:center;justify-content:space-between;"><span style="font-size:13px;font-weight:600;">Ambient particles</span><input type="checkbox" id="gs-particles" ${g.ambientParticles!==false?'checked':''}></div><div class="glass liquid-interactive motion-card" style="padding:13px 15px;display:flex;align-items:center;justify-content:space-between;"><span style="font-size:13px;font-weight:600;">Glow status rings</span><input type="checkbox" id="gs-status-glow" ${g.showStatusGlow!==false?'checked':''}></div><div class="glass liquid-interactive motion-card" style="padding:13px 15px;display:flex;align-items:center;justify-content:space-between;"><span style="font-size:13px;font-weight:600;">Show member count</span><input type="checkbox" id="gs-member-count" ${g.showMemberCount!==false?'checked':''}></div></div>
   <button class="btn btn-primary btn-block liquid-interactive motion-card" id="gs-save" style="padding:15px;margin-top:18px;">${icon('ti-check')} Save group design</button>${can(ME.id,'manageRoles')?`<button class="btn btn-ghost btn-block liquid-interactive motion-card" id="go-roles" style="padding:13px;margin-top:10px;">${icon('ti-shield')} Manage roles &amp; permissions</button>`:''}
   </div>`;
@@ -2679,7 +2949,7 @@ function renderRoles(){
     <div class="glass" style="padding:14px 16px; margin-bottom:10px;">
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:${m.id===ME.id?'0':'10px'};">
         <div style="display:flex; align-items:center; gap:10px; min-width:0;">
-          <div class="avatar" style="width:34px;height:34px;font-size:12px;">${m.emoji?`<span style="font-size:16px;">${m.emoji}</span>`:m.photo?`<img src="${m.photo}" alt="">`:getInitials(m.name)}</div>
+          ${renderAvatarMarkup(m,34)}
           <div style="font-weight:700; font-size:14px; overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${m.name}${m.id===ME.id?' (You)':''}</div>
         </div>
         ${!isOwner && m.id!==ME.id ? `
@@ -3035,7 +3305,7 @@ function renderTriviaGame(){
       const a = answers[m.id];
       const status = !a ? `<span style="color:var(--text-faint);">Hasn't answered</span>` : a.correct ? `<span style="color:var(--green); font-weight:700;">Correct</span>` : `<span style="color:var(--red); font-weight:700;">Wrong</span>`;
       return `<div class="glass" style="padding:10px 14px; margin-bottom:8px; display:flex; align-items:center; justify-content:space-between;">
-        <div style="display:flex; align-items:center; gap:10px;"><div class="avatar" style="width:28px;height:28px;font-size:11px;">${m.emoji?`<span style="font-size:14px;">${m.emoji}</span>`:m.photo?`<img src="${m.photo}" alt="">`:getInitials(m.name)}</div><span style="font-size:13.5px; font-weight:600;">${m.name.split(' ')[0]}</span></div>
+        <div style="display:flex; align-items:center; gap:10px;">${renderAvatarMarkup(m,28)}<span style="font-size:13.5px; font-weight:600;">${m.name.split(' ')[0]}</span></div>
         <span style="font-size:12.5px;">${status}</span>
       </div>`;
     }).join('')}
@@ -3305,7 +3575,7 @@ function renderXp(){
   ];
   const unlocked=xpAchievements().map(a=>a.id); const achievements=achievementsDefs.map(a=>{const on=unlocked.includes(a[0]);return `<div class="xp-achievement ${on?'':'locked'} liquid-interactive motion-card"><div class="xp-achievement-icon">${icon(a[3])}</div><div style="min-width:0;"><div style="font-weight:800;font-size:12px;">${a[1]}</div><div class="small-note">${a[2]}</div></div></div>`}).join('');
   const demoRanks={}; if(isViewerMode()){(SQUAD?.members||[]).forEach((m,i)=>demoRanks[m.id]=m.id===ME.id?245:[420,380,315,270,0][i]||0);} const members=(SQUAD?.members||[]).map(m=>({id:m.id,name:m.name,xp:m.id===ME.id?Math.floor(ME.xp||0):(demoRanks[m.id] ?? XP_LEADERBOARD_CACHE[m.id] ?? 0)})).sort((a,b)=>b.xp-a.xp);
-  const board=members.slice(0,10).map((m,i)=>`<div class="glass xp-rank liquid-interactive motion-card"><div class="xp-rank-pos">${i+1}</div><div class="avatar" style="width:34px;height:34px;font-size:12px;">${m.id===ME.id?(ME.photo?`<img src="${ME.photo}" alt="">`:getInitials(m.name)) : getInitials(m.name)}</div><div class="xp-rank-name">${escapeHtml(m.name)}${m.id===ME.id?' (You)':''}</div><div class="xp-rank-value">${m.xp} XP</div></div>`).join('');
+  const board=members.slice(0,10).map((m,i)=>`<div class="glass xp-rank liquid-interactive motion-card"><div class="xp-rank-pos">${i+1}</div>${renderAvatarMarkup(m,34)}<div class="xp-rank-name">${escapeHtml(m.name)}${m.id===ME.id?' (You)':''}</div><div class="xp-rank-value">${m.xp} XP</div></div>`).join('');
   const panel=tab==='history'?`<div class="stack">${history}</div>`:tab==='missions'?`<div class="stack">${missions}</div>`:tab==='achievements'?`<div class="xp-achievement-grid">${achievements}</div>`:tab==='leaderboard'?`<div class="stack">${board||'<div class="empty-hint glass">No squad members yet.</div>'}</div>`:`${overview}`;
   return `<div class="screen">
     <div class="page-title-row">${backBtn()}<h2>XP &amp; Rewards</h2></div>
@@ -3315,24 +3585,25 @@ function renderXp(){
 }
 
 function renderShop(){
-  ensureAccountState();
+  ensureAvatarShopState();
+  const tiers=[['common','Common icons'],['rare','Rare animated icons'],['weekly','Weekly icons'],['monthly','Monthly icons']];
+  const cards=tier=>AVATAR_SHOP_ITEMS.filter(i=>i.tier===tier).map(item=>{
+    const claimed=avatarShopClaimed(item), owned=item.frequency==='one-time'&&!!ME.xpState.avatarShop.owned[item.id];
+    const active=ME.avatarIconId===item.id;
+    const action=active?'Equipped':claimed?(owned?'Owned':'Claimed'):isViewerMode()?'Sign in to buy':`${item.price} XP`;
+    const disabled=active||claimed||isViewerMode();
+    return `<div class="avatar-shop-card"><div class="avatar-shop-preview">${avatarIconInner(item,48)}</div><div class="avatar-shop-meta"><div class="avatar-shop-name">${escapeHtml(item.name)}</div><span class="avatar-shop-badge">${item.frequency==='one-time'?(item.tier==='rare'?'Permanent · animated':'Permanent · one-time'):item.frequency==='weekly'?'Once per week':'Once per month'}</span><button class="btn btn-primary avatar-shop-buy" data-avatar-buy="${item.id}" ${disabled?'disabled':''}>${action}</button></div></div>`;
+  }).join('');
+  const current=AVATAR_SHOP_ITEMS.find(i=>i.id===ME.avatarIconId);
   return `<div class="screen">
-    <div class="page-title-row">${backBtn('shop-back')}<h2>XP Shop</h2></div>
-    <div class="xp-hero glass">
-      <div class="small-note" style="margin:0;">Your balance</div>
-      <div class="xp-number" style="margin-top:4px;">${Math.floor(ME.xp||0)} <span style="font-size:13px;color:var(--text-lo);">XP</span></div>
-    </div>
-    <div class="section-label">Coming into the economy</div>
-    <div class="stack">
-      <div class="glass shop-card"><div><div style="font-weight:700;">Daily spin</div><div class="small-note">8 weighted outcomes, up to 50 XP</div></div><div class="shop-price">15 XP</div></div>
-      <div class="glass shop-card"><div><div style="font-weight:700;">Nudge</div><div class="small-note">Send a live nudge to a member</div></div><div class="shop-price">1 XP</div></div>
-      <div class="glass shop-card"><div><div style="font-weight:700;">Additional group</div><div class="small-note">Create or join beyond the free allowance</div></div><div class="shop-price">70 / 20 XP</div></div>
-    </div>
-    <div class="section-label">Account color</div>
-    <div class="glass" style="padding:14px 16px;display:flex;align-items:center;justify-content:space-between;">
-      <div><div style="font-weight:700;">Your personal accent</div><div class="small-note">Used across XP, shop, profile and controls.</div></div>
-      <div style="width:34px;height:34px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 5px var(--accent-soft),0 8px 16px var(--accent-glow);"></div>
-    </div>
+    <div class="page-title-row">${backBtn('shop-back')}<h2>Avatar Icon Shop</h2></div>
+    <div class="xp-hero glass" style="margin-bottom:12px;"><div style="display:flex;align-items:center;gap:12px;"><div class="avatar" style="width:58px;height:58px;font-size:22px;">${current?avatarIconInner(current,58):avatarVisualInner(ME,58)}</div><div><div class="small-note">Your balance</div><div class="xp-number" style="margin-top:3px;font-size:34px;">${Math.floor(ME.xp||0)} <span style="font-size:13px;color:var(--text-lo);">XP</span></div></div></div><div class="small-note" style="margin-top:10px;">Common starts at 10 XP. Rare animated icons cost 1000 XP.</div></div>
+    <div class="section-label">Custom user icons</div>
+    <div class="shop-tier glass"><div class="shop-tier-head"><div><div style="font-weight:800;">Common</div><div class="small-note">Permanent ownership · 10 XP each</div></div><span class="xp-badge">10 XP</span></div><div class="shop-item-grid">${cards('common')}</div></div>
+    <div class="shop-tier glass"><div class="shop-tier-head"><div><div style="font-weight:800;">Rare animated</div><div class="small-note">Permanent ownership · 1000 XP each</div></div><span class="xp-badge">1000 XP</span></div><div class="shop-item-grid">${cards('rare')}</div></div>
+    <div class="shop-tier glass"><div class="shop-tier-head"><div><div style="font-weight:800;">Weekly rotation</div><div class="small-note">One purchase per item each week</div></div><span class="xp-badge">75–120 XP</span></div><div class="shop-item-grid">${cards('weekly')}</div></div>
+    <div class="shop-tier glass"><div class="shop-tier-head"><div><div style="font-weight:800;">Monthly rotation</div><div class="small-note">One purchase per item each month</div></div><span class="xp-badge">250–400 XP</span></div><div class="shop-item-grid">${cards('monthly')}</div></div>
+    <div class="small-note" style="text-align:center;margin:12px 4px 4px;">Buying an icon equips it immediately. Your purchased icons stay attached to your account.</div>
   </div>`;
 }
 
@@ -3341,7 +3612,7 @@ function renderMe(){
     <div class="screen user-theme-page">
       <div class="top-row"><div>${renderNotificationBell()}</div><div class="icon-btn" id="me-signout-btn"><span class="ti">${icon('ti-logout')}</span></div></div>
       <div style="text-align:center; padding:4px 0 20px;">
-        <div class="avatar" id="me-avatar-btn" style="width:76px;height:76px;font-size:26px;margin:0 auto 12px; cursor:pointer; position:relative;">${ME.emoji?`<span style="font-size:34px;">${ME.emoji}</span>`:ME.photo?`<img src="${ME.photo}" alt="">`:getInitials(ME.name)}
+        <div class="avatar" id="me-avatar-btn" style="width:76px;height:76px;font-size:26px;margin:0 auto 12px; cursor:pointer; position:relative;">${avatarVisualInner(ME,76)}
           <div style="position:absolute; bottom:-2px; right:-2px; width:24px;height:24px;border-radius:50%; background:var(--accent); display:flex; align-items:center; justify-content:center; border:2px solid var(--bg-0);"><span class="ti" style="font-size:12px; color:#0B0E1A;">${icon('ti-pencil')}</span></div>
         </div>
         <h2>${ME.name}</h2>
@@ -3412,7 +3683,7 @@ function renderCustomize(){
 function renderAvatarGroup(members){
   const shown=(members||[]).slice(0,5);
   const extra=Math.max(0,(members||[]).length-shown.length);
-  const avatars=shown.map((m,i)=>`<div class="ag-avatar" style="--i:${i}" data-ag-member="${escapeHtml(m.id)}">${m.photo?`<img src="${escapeHtml(m.photo)}" alt="">`:escapeHtml(m.emoji||getInitials(m.name))}<span class="ag-tooltip">${escapeHtml(m.name)}</span></div>`).join('');
+  const avatars=shown.map((m,i)=>{const inner=avatarVisualInner(m,38);return `<div class="ag-avatar" style="--i:${i}" data-ag-member="${escapeHtml(m.id)}">${inner}<span class="ag-tooltip">${escapeHtml(m.name)}</span></div>`}).join('');
   return `<div class="avatar-group" id="home-avatar-group" aria-label="Squad members">${avatars}${extra?`<div class="ag-more">+${extra}</div>`:''}</div>`;
 }
 function openMotionDialog({title,sub='',body='',from='top',actions=''}){
@@ -3428,7 +3699,7 @@ function openMotionDialog({title,sub='',body='',from='top',actions=''}){
 }
 function openHomeMemberDialog(){
   if(!SQUAD) return;
-  const rows=SQUAD.members.map(m=>{const st=friendState(m);return `<div class="member-row"><div class="avatar" style="width:34px;height:34px;font-size:12px;">${m.photo?`<img src="${escapeHtml(m.photo)}" alt="">`:escapeHtml(m.emoji||getInitials(m.name))}</div><div style="min-width:0;flex:1"><div style="font-weight:800;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(m.name)}${m.id===ME.id?' (You)':''}</div><div style="font-size:11px;color:var(--text-lo);">${escapeHtml(st.text||'Around')} · ${escapeHtml(getTimeInTz(m.tz))}</div></div><span class="ti" style="color:${(AVAIL_STATES.find(a=>a.id===st.avail)||AVAIL_STATES[0]).color}">${icon(st.icon||'ti-hand-stop')}</span></div>`}).join('');
+  const rows=SQUAD.members.map(m=>{const st=friendState(m);return `<div class="member-row">${renderAvatarMarkup(m,34)}<div style="min-width:0;flex:1"><div style="font-weight:800;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(m.name)}${m.id===ME.id?' (You)':''}</div><div style="font-size:11px;color:var(--text-lo);">${escapeHtml(st.text||'Around')} · ${escapeHtml(getTimeInTz(m.tz))}</div></div><span class="ti" style="color:${(AVAIL_STATES.find(a=>a.id===st.avail)||AVAIL_STATES[0]).color}">${icon(st.icon||'ti-hand-stop')}</span></div>`}).join('');
   openMotionDialog({title:'Squad members',sub:`${SQUAD.members.length} member${SQUAD.members.length===1?'':'s'} · live status`,body:`<div class="motion-dialog-list">${rows}</div>`});
 }
 function openSyncPopover(anchor){
@@ -3459,6 +3730,9 @@ function bindEvents(){
   if(byId('notifications-readall')) byId('notifications-readall').onclick=async()=>{await markAllNotificationsRead();softUpdate();};
   document.querySelectorAll('[data-notification-id]').forEach(el=>el.onclick=async()=>{const n=USER_NOTIFICATIONS[el.dataset.notificationId];if(n&&!n.read&&!isViewerMode()){try{await window.fbUpdate('users/'+ME.id+'/notifications/'+n.id,{read:true});}catch(e){}}await openNotificationItem(n);});
   if(byId('xp-shop-btn')) byId('xp-shop-btn').onclick = () => goTo('shop');
+  document.querySelectorAll('[data-avatar-buy]').forEach(btn=>{
+    btn.onclick=async()=>{ if(btn.dataset.busy==='1') return; btn.dataset.busy='1'; try{ await buyAvatarShopItem(btn.dataset.avatarBuy); } finally { btn.dataset.busy=''; } };
+  });
   if(byId('group-create-btn')) byId('group-create-btn').onclick = () => goTo('create-squad');
   if(byId('group-join-btn')) byId('group-join-btn').onclick = () => goTo('join-squad');
   if(byId('me-create-group')) byId('me-create-group').onclick = () => goTo('create-squad');
@@ -3549,6 +3823,8 @@ function bindEvents(){
 
   if(byId('sq-create-submit')){
     byId('sq-create-submit').onclick = async () => {
+      const btn = byId('sq-create-submit');
+      if(btn.dataset.busy==='1') return; // guard against double-submit on fast double-tap
       const name = byId('sq-name').value.trim();
       if(!name) return showToast('Enter squad name', 'ti-alert-circle');
       const cap = Math.min(15, Math.max(2, window.__pendingCap || 6));
@@ -3556,7 +3832,13 @@ function bindEvents(){
       ensureAccountState();
       const groupCount=await verifiedGroupCount();
       if(groupCount>=XP_CONFIG.maxGroups) return showToast('Maximum 5 groups reached','ti-alert-triangle');
-      if(groupCount>=1 && !(await spendXp(XP_CONFIG.createGroup,'Create group'))) return;
+      // "First creation free" is about whether you have ever CREATED a group before —
+      // not whether you currently belong to one. Someone who only ever joined groups
+      // via invite (never created their own) still gets their first creation free,
+      // even if they're already a member of several joined groups.
+      const isFirstCreation = !ME.hasCreatedGroup;
+      if(!isFirstCreation && !(await spendXp(XP_CONFIG.createGroup,'Create group'))) return;
+      btn.dataset.busy='1'; btn.setAttribute('disabled','true');
       const id = 'sq_' + genCode() + Date.now().toString(36);
       SQUAD = normalizeSquadData({
         id, name, code: genCode(),
@@ -3576,7 +3858,7 @@ function bindEvents(){
         showMemberCount:true, showStatusGlow:true, notificationStyle:'glass', soundPack:'subtle',
         ambientParticles:true
       },
-        members: [{ id: ME.id, name: ME.name, tz: ME.tz, photo: ME.photo || '', emoji: ME.emoji || '' }],
+        members: [{ id: ME.id, name: ME.name, tz: ME.tz, photo: ME.photo || '', emoji: ME.emoji || '', avatarIconId: ME.avatarIconId || '' }],
         status: { [ME.id]: { avail:'free', icon:'ti-hand-wave', text:'Just joined' } },
         // The creator always starts as owner with every permission — roles
         // and permissions are keyed by user id so they travel with the
@@ -3593,6 +3875,7 @@ function bindEvents(){
       await saveMySquadId();
       ensureAccountState();
       if(!ME.groupIds.includes(id)) ME.groupIds.push(id);
+      ME.hasCreatedGroup = true;
       await saveMe();
       await awardGroupRoleXp(id,'owner');
       attachSquadListener();
@@ -3649,7 +3932,7 @@ function bindEvents(){
         if(joinedCount>=XP_CONFIG.maxGroups){ errEl.textContent='You can belong to a maximum of 5 groups.'; errEl.style.display='block'; return; }
         const joinCost=joinedCount>=2?XP_CONFIG.extraGroup:0;
         if(joinCost>0 && !(await spendXp(joinCost,'Join additional group'))){ errEl.textContent=`You need ${joinCost} XP to join another group.`; errEl.style.display='block'; return; }
-        sq.members.push({ id: ME.id, name: ME.name, tz: ME.tz, photo: ME.photo || '', emoji: ME.emoji || '' });
+        sq.members.push({ id: ME.id, name: ME.name, tz: ME.tz, photo: ME.photo || '', emoji: ME.emoji || '', avatarIconId: ME.avatarIconId || '' });
         sq.groupXp=Number(sq.groupXp||0)+25;
         if(!sq.status) sq.status = {};
         sq.status[ME.id] = { avail:'free', icon:'ti-hand-wave', text:'Just joined' };
@@ -3764,13 +4047,35 @@ function bindEvents(){
     byId('leave-squad-btn').onclick = async () => {
       if(viewerBlocked('Viewer Mode cannot leave the demo squad')) return;
       if(SQUAD && ME){
-        SQUAD.members = SQUAD.members.filter(m=>m.id!==ME.id);
-        if(SQUAD.status) delete SQUAD.status[ME.id];
-        if(SQUAD.roles) delete SQUAD.roles[ME.id];
-        if(SQUAD.permissions) delete SQUAD.permissions[ME.id];
-        try{ await window.fbSet('squads/' + SQUAD.id, SQUAD); }catch(e){}
+        if(roleOf(ME.id)==='owner' && SQUAD.members.length>1){
+          showToast('Transfer ownership before leaving, or remove all other members first','ti-alert-triangle');
+          return;
+        }
+        const leavingId = ME.id, squadId = SQUAD.id;
+        SQUAD.members = SQUAD.members.filter(m=>m.id!==leavingId);
+        if(SQUAD.status) delete SQUAD.status[leavingId];
+        if(SQUAD.roles) delete SQUAD.roles[leavingId];
+        if(SQUAD.permissions) delete SQUAD.permissions[leavingId];
+        SQUAD.updatedAt = Date.now();
+        // Patch-save (merge) rather than a full fbSet overwrite — other
+        // members' concurrent changes must survive this write. This is the
+        // same class of bug that caused "both leave together": a stale full
+        // overwrite here could resurrect a member list from before someone
+        // else's approval/removal landed.
+        await saveSquad();
+        // Clean up our own groupIds/squadId so this squad stops showing up
+        // in "switch group" after leaving.
+        ensureAccountState();
+        ME.groupIds = (ME.groupIds||[]).filter(id=>id!==squadId);
+        if(ME.squadId===squadId) ME.squadId = ME.groupIds[0]||null;
+        await saveMe();
       }
       SQUAD_ID = null; SQUAD = null;
+      if(squadUnsub){ squadUnsub(); squadUnsub=null; }
+      if(boardUnsub){ boardUnsub(); boardUnsub=null; }
+      if(nudgeUnsub){ nudgeUnsub(); nudgeUnsub=null; }
+      if(chatUnsub){ chatUnsub(); chatUnsub=null; }
+      if(callUnsub){ callUnsub(); callUnsub=null; }
       await saveMySquadId();
       goTo('squad-choice', {replace:true});
     };
@@ -3838,10 +4143,10 @@ function bindEvents(){
   if(byId('go-roles')) byId('go-roles').onclick = () => goTo('roles');
 
   document.querySelectorAll('[data-approve-req]').forEach(btn => {
-    btn.onclick = async () => { await resolveJoinRequest(btn.dataset.approveReq, true); };
+    btn.onclick = async () => { if(btn.dataset.busy==='1') return; btn.dataset.busy='1'; try{ await resolveJoinRequest(btn.dataset.approveReq, true); } finally { btn.dataset.busy=''; } };
   });
   document.querySelectorAll('[data-deny-req]').forEach(btn => {
-    btn.onclick = async () => { await resolveJoinRequest(btn.dataset.denyReq, false); };
+    btn.onclick = async () => { if(btn.dataset.busy==='1') return; btn.dataset.busy='1'; try{ await resolveJoinRequest(btn.dataset.denyReq, false); } finally { btn.dataset.busy=''; } };
   });
 
   if(byId('gs-cap')){
@@ -3862,6 +4167,7 @@ function bindEvents(){
   }
   if(byId('gs-cap')) byId('gs-cap').oninput=()=>byId('gs-cap-value').textContent=byId('gs-cap').value;
   if(byId('gs-radius')) byId('gs-radius').oninput=()=>byId('gs-radius-value').textContent=byId('gs-radius').value+'px';
+  if(byId('gs-sound-preview')) byId('gs-sound-preview').onclick=()=>playGroupSound('preview',byId('gs-sound').value);
   if(byId('gs-save')){
     byId('gs-save').onclick=async()=>{
       if(viewerBlocked() || !can(ME.id,'editGroupSettings')) return;
@@ -4065,7 +4371,7 @@ async function bootForUser(user){
   SQUAD = s;
   recordSquadSyncBase();
   await touchGroupStreak();
-  if(!SQUAD.groupStyle) SQUAD.groupStyle={tagline:'',description:'',logo:'',logoUrl:'',bannerUrl:'',accent:'#7C9CFF',accent2:'#9B7CFF',background:'#0B0E1A',mode:'liquid',radius:18,motion:'ambient',density:'comfortable',showMemberCount:true,showStatusGlow:true};
+  if(!SQUAD.groupStyle) SQUAD.groupStyle=defaultGroupStyle(); else SQUAD.groupStyle={...defaultGroupStyle(),...SQUAD.groupStyle};
   currentScreen = 'home';
   await initXpOnBoot();
   renderAll();
