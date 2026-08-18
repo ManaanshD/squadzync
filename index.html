@@ -1461,7 +1461,7 @@ async function awardGroupRoleXp(groupId, role){
 }
 function groupMarkHtml(g,size=54, extraClass=''){
   const gs=Object.assign({logo:'✦',logoUrl:'',accent:'#7C9CFF',accent2:'#9B7CFF'},g||{});
-  const inner=gs.logoUrl ? `<img src="${escapeHtml(gs.logoUrl)}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='block';">` : '';
+  const inner=gs.logoUrl ? `<img src="${escapeHtml(safeMediaUrl(gs.logoUrl))}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='block';">` : '';
   const fallback=gs.logo ? `<span style="font-size:${Math.round(size*.44)}px;display:${gs.logoUrl?'none':'block'};">${escapeHtml(gs.logo)}</span>` : `<span style="font-size:${Math.round(size*.44)}px;">✦</span>`;
   const rgb=hexToRgb(gs.accent)||'124,156,255';
   return `<div class="group-mark ${extraClass}" style="width:${size}px;height:${size}px;--group-accent:${escapeHtml(gs.accent)};--group-accent-2:${escapeHtml(gs.accent2)};--group-accent-rgb:${rgb};">${inner}${fallback}</div>`;
@@ -2454,7 +2454,7 @@ function renderSquadChoice(){
   return `
     <div class="screen" style="padding-top:50px; text-align:center;">
       <div class="brand-mark" style="width:56px;height:56px;border-radius:18px;margin:0 auto 20px;"><span class="ti" style="font-size:26px;color:#0B0E1A;">${icon('ti-users-group')}</span></div>
-      <h2 style="font-size:26px; margin-bottom:8px;">Welcome, ${ME.name}</h2>
+      <h2 style="font-size:26px; margin-bottom:8px;">Welcome, ${escapeHtml(ME.name)}</h2>
       <p style="color:var(--text-lo); font-size:14px; margin-bottom:36px;">Join an existing squad or create a new one for your group.</p>
       <div style="display:flex; flex-direction:column; gap:12px;">
         <button class="btn btn-primary btn-block" id="btn-to-create" style="padding:18px;"><span class="ti">${icon('ti-plus')}</span> Create New Squad</button>
@@ -2532,8 +2532,8 @@ function renderHome(){
     <div class="screen group-theme-card">
       ${isViewerMode()?`<div class="viewer-banner"><span class="ti">${icon('ti-eye')}</span><div><strong>Viewer Mode</strong><br>Demo data only — sign in to make changes.</div><button class="viewer-exit" id="viewer-exit-btn">Sign in</button></div>`:''}
       <div class="group-hero glass-strong liquid-sheen liquid-interactive motion-card" style="--group-hero-bg:${g.background};--group-background:${groupBackgroundFor(g)};">
-        ${g.bannerVideoUrl?`<video class="group-hero-media" src="${escapeHtml(g.bannerVideoUrl)}" autoplay muted loop playsinline></video>`:''}
-        ${g.bannerUrl&&!g.bannerVideoUrl?`<div class="group-hero-media" style="background-image:url('${escapeHtml(g.bannerUrl)}');background-size:cover;background-position:center;"></div>`:''}
+        ${g.bannerVideoUrl?`<video class="group-hero-media" src="${escapeHtml(safeMediaUrl(g.bannerVideoUrl))}" autoplay muted loop playsinline></video>`:''}
+        ${g.bannerUrl&&!g.bannerVideoUrl?`<div class="group-hero-media" style="background-image:url('${escapeHtml(safeMediaUrl(g.bannerUrl))}');background-size:cover;background-position:center;"></div>`:''}
         <div class="group-particle-field" aria-hidden="true"></div><div class="group-hero-overlay"></div>
         <div class="group-hero-content">
           <div class="group-hero-top">${groupMarkHtml(g,64)}<div style="min-width:0;flex:1;"><div class="group-kicker">${escapeHtml(g.tagline||'Your squad, your space')}</div><h1>${escapeHtml(SQUAD.name)}</h1><div class="group-meta"><span class="group-meta-member-count">${groupMemberCount()} / ${groupCapacity()} members · </span>${escapeHtml(groupAgeLabel())}</div></div><button class="icon-btn liquid-interactive motion-card" id="group-identity-open">${icon('ti-settings')}</button></div>
@@ -2560,7 +2560,7 @@ function renderGrid(members){
       <div class="friend-tile glass" data-id="${f.id}">
         <div class="tile-content">
           ${renderAvatarMarkup(f,38,`<div class="status-ring ${a.ring}"></div>`)}
-          <div class="friend-name">${f.name}${isMe?' (You)':''}</div>
+          <div class="friend-name">${escapeHtml(f.name)}${isMe?' (You)':''}</div>
           <div class="friend-time">${getTimeInTz(f.tz)}</div>
           <div class="friend-status"><span class="ti" style="color:${a.color};font-size:13px;">${icon(st.icon||'ti-hand-stop')}</span><span>${st.text || 'Around'}</span></div>
           ${cd ? `<div class="friend-countdown">${cd}</div>` : ''}
@@ -2582,7 +2582,7 @@ function renderList(members){
         <div class="list-left">
           ${renderAvatarMarkup(f,38,`<div class="status-ring ${a.ring}"></div>`)}
           <div style="min-width:0;">
-            <div class="friend-name">${f.name}${isMe?' (You)':''}</div>
+            <div class="friend-name">${escapeHtml(f.name)}${isMe?' (You)':''}</div>
             <div style="font-size:12px; color:var(--text-lo); display:flex; align-items:center; gap:5px; overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><span class="ti" style="color:${a.color};font-size:12px;">${icon(st.icon||'ti-hand-stop')}</span>${st.text||'Around'}</div>
           </div>
         </div>
@@ -2758,7 +2758,7 @@ function avatarVisualInner(avatar,size=38){
   const item=AVATAR_SHOP_ITEMS.find(x=>x.id===avatar?.avatarIconId);
   if(item) return avatarIconInner(item,size);
   if(avatar?.emoji) return `<span style="font-size:${Math.round(size*.46)}px;line-height:1;">${escapeHtml(avatar.emoji)}</span>`;
-  if(avatar?.photo) return `<img src="${escapeHtml(avatar.photo)}" alt="">`;
+  if(avatar?.photo) return `<img src="${escapeHtml(safeMediaUrl(avatar.photo))}" alt="">`;
   return getInitials(avatar?.name||'');
 }
 async function setActiveAvatarIcon(item){
@@ -2800,7 +2800,8 @@ function openEmojiPicker(){
     cell.onclick = async () => {
       ME.emoji = cell.dataset.emojiChoice;
       ME.photo = '';
-      await saveMe();
+      const savedProfile=await saveMe();
+      if(!savedProfile) return;
       if(SQUAD){
         const m = SQUAD.members.find(x=>x.id===ME.id);
         if(m){ m.emoji = ME.emoji; m.photo = ''; SQUAD.updatedAt = Date.now(); await saveSquad(); }
@@ -2950,7 +2951,7 @@ function renderSquadManage(){
       <div style="display:flex; align-items:center; gap:12px; min-width:0;">
         ${renderAvatarMarkup(m,38)}
         <div style="min-width:0;">
-          <div style="font-weight:700; font-size:14.5px; overflow:hidden;text-overflow:ellipsis;white-space:nowrap; display:flex; align-items:center; gap:6px;">${m.name} ${isMe ? '(You)' : ''}
+          <div style="font-weight:700; font-size:14.5px; overflow:hidden;text-overflow:ellipsis;white-space:nowrap; display:flex; align-items:center; gap:6px;">${escapeHtml(m.name)} ${isMe ? '(You)' : ''}
             <span style="display:inline-flex; align-items:center; gap:3px; font-size:10px; font-weight:700; color:${role.color}; background:rgba(255,255,255,0.06); padding:2px 6px; border-radius:8px; text-transform:uppercase; letter-spacing:.04em;"><span class="ti" style="font-size:10px;">${icon(role.icon)}</span>${role.label}</span>
           </div>
           <div style="font-size:11.5px; color:var(--text-lo);">${m.tz.replace(/_/g,' ')}</div>
@@ -2984,9 +2985,9 @@ function renderJoinRequests(){
   const body = reqs.length ? reqs.map(r => `
     <div class="glass" style="padding:14px 16px; margin-bottom:10px; display:flex; align-items:center; justify-content:space-between; gap:10px;">
       <div style="display:flex; align-items:center; gap:12px; min-width:0;">
-        <div class="avatar" style="width:38px;height:38px;font-size:13px;">${r.photo?`<img src="${r.photo}" alt="">`:getInitials(r.name)}</div>
+        <div class="avatar" style="width:38px;height:38px;font-size:13px;">${r.photo?`<img src="${escapeHtml(safeMediaUrl(r.photo))}" alt="">`:getInitials(r.name)}</div>
         <div style="min-width:0;">
-          <div style="font-weight:700; font-size:14.5px; overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.name}</div>
+          <div style="font-weight:700; font-size:14.5px; overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(r.name)}</div>
           <div style="font-size:11px; color:var(--text-faint);">Requested ${timeAgo(r.ts)}</div>
         </div>
       </div>
@@ -3020,8 +3021,8 @@ function openGroupInviteDialog(){
   document.body.appendChild(wrap);
   const close=()=>wrap.remove();
   wrap.addEventListener('click',e=>{if(e.target===wrap||e.target.closest('.dialog-close'))close();});
-  wrap.querySelector('#invite-copy').onclick=()=>navigator.clipboard?.writeText(link).then(()=>showToast('Invite link copied','ti-copy'));
-  wrap.querySelector('#invite-share').onclick=async()=>{try{if(navigator.share) await navigator.share({title:`Join ${SQUAD.name}`,text:g.tagline||'Join my SquadZync group',url:link}); else await navigator.clipboard?.writeText(link); showToast(navigator.share?'Invite shared':'Invite link copied','ti-share-3')}catch(e){}};
+  wrap.querySelector('#invite-copy').onclick=()=>copyTextSafe(link,'Invite link copied','Copy failed — use Share instead');
+  wrap.querySelector('#invite-share').onclick=async()=>{try{if(navigator.share){await navigator.share({title:`Join ${SQUAD.name}`,text:g.tagline||'Join my SquadZync group',url:link});showToast('Invite shared','ti-share-3');}else{await copyTextSafe(link,'Invite link copied','Share unavailable — copy the link manually');}}catch(e){if(e?.name!=='AbortError')showToast('Could not share invite','ti-alert-triangle')}};
   wrap.querySelector('#invite-qr').onclick=()=>openQrDialog(link,SQUAD.name);
   initLiquidInteractions(); initMotionCards();
 }
@@ -3038,8 +3039,8 @@ function renderGroupSettings(){
   return `<div class="screen group-theme-card"><div class="page-title-row">${backBtn('group-settings-back')}<h2>Group studio</h2></div>
   <p class="small-note" style="margin:8px 0 20px 48px;">Build the identity of this squad. These settings sync to everyone.</p>
   <div class="glass-strong liquid-sheen liquid-interactive motion-card group-identity" style="padding:0;overflow:hidden;margin-bottom:14px;background:var(--group-background);">
-    ${g.bannerVideoUrl?`<video src="${escapeHtml(g.bannerVideoUrl)}" autoplay muted loop playsinline style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.34;"></video>`:''}
-    ${g.bannerUrl&&!g.bannerVideoUrl?`<div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(8,10,18,.05),rgba(8,10,18,.8)),url('${escapeHtml(g.bannerUrl)}') center/cover;"></div>`:''}
+    ${g.bannerVideoUrl?`<video src="${escapeHtml(safeMediaUrl(g.bannerVideoUrl))}" autoplay muted loop playsinline style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.34;"></video>`:''}
+    ${g.bannerUrl&&!g.bannerVideoUrl?`<div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(8,10,18,.05),rgba(8,10,18,.8)),url('${escapeHtml(safeMediaUrl(g.bannerUrl))}') center/cover;"></div>`:''}
     <div style="position:relative;z-index:1;padding:18px;"><div style="display:flex;align-items:center;gap:12px;">${groupMarkHtml(g,64)}<div style="min-width:0;flex:1;"><div class="field-label" style="margin:0;">Group identity</div><div style="font-size:21px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(SQUAD.name)}</div><div style="color:var(--text-lo);font-size:12px;margin-top:3px;">${escapeHtml(g.tagline||'Your squad, your space')}</div></div><div class="xp-badge">Level ${groupLevel()}</div></div>
     <div class="group-stat-row"><div class="group-stat ${g.showMemberCount===false?'hidden':''}"><strong>${groupMemberCount()}/${cap}</strong><span>Members</span></div><div class="group-stat"><strong>${groupXpValue()}</strong><span>Squad XP</span></div><div class="group-stat"><strong>${groupStreak()}</strong><span>Day streak</span></div></div></div>
   </div>
@@ -3086,7 +3087,7 @@ function renderRoles(){
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:${m.id===ME.id?'0':'10px'};">
         <div style="display:flex; align-items:center; gap:10px; min-width:0;">
           ${renderAvatarMarkup(m,34)}
-          <div style="font-weight:700; font-size:14px; overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${m.name}${m.id===ME.id?' (You)':''}</div>
+          <div style="font-weight:700; font-size:14px; overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(m.name)}${m.id===ME.id?' (You)':''}</div>
         </div>
         ${!isOwner && m.id!==ME.id ? `
         <select class="control-select" data-role-select="${m.id}" style="width:auto; padding:7px 10px; font-size:12px; border-radius:10px;">
@@ -3345,14 +3346,14 @@ function openWatchLinkSheet(){
     if(src.type!=='youtube') return showToast('Enter a valid YouTube URL','ti-brand-youtube');
     const now=Date.now();
     SQUAD.watchParty={service:'youtube',title,link,sourceType:'youtube',sourceId:src.id,hostId:ME.id,hostName:ME.name,playing:false,position:0,positionTs:now,action:'pause',watchers:{[ME.id]:{id:ME.id,name:ME.name,ts:now}},startedAt:now,updatedAt:now,version:1};
-    await saveSquad(); close(); softUpdate(); showToast('YouTube watch party started','ti-device-tv-play');
+    const saved=await saveSquad(); if(!saved) return; close(); softUpdate(); showToast('YouTube watch party started','ti-device-tv-play');
   };
 }
 async function joinWatchParty(){if(!SQUAD?.watchParty)return;if(!SQUAD.watchParty.watchers)SQUAD.watchParty.watchers={};SQUAD.watchParty.watchers[ME.id]={id:ME.id,name:ME.name,ts:Date.now()};SQUAD.updatedAt=Date.now();await saveSquad();softUpdate();}
 async function leaveWatchParty(){if(!SQUAD?.watchParty?.watchers)return;delete SQUAD.watchParty.watchers[ME.id];SQUAD.updatedAt=Date.now();await saveSquad();softUpdate();}
 async function toggleWatchPlaying(){if(!SQUAD?.watchParty||SQUAD.watchParty.hostId!==ME.id)return;const room=SQUAD.watchParty;const pos=watchPlayerPosition();await publishWatchCommand(room.playing?'pause':'play',pos,{actionTs:Date.now()});softUpdate();reconcileWatchPlayer(room);}
 async function captureWatchPosition(){if(!SQUAD?.watchParty||SQUAD.watchParty.hostId!==ME.id)return;const pos=watchPlayerPosition();SQUAD.watchParty.position=pos;SQUAD.watchParty.positionTs=Date.now();SQUAD.watchParty.updatedAt=Date.now();SQUAD.updatedAt=SQUAD.watchParty.updatedAt;await saveSquad();showToast('Position broadcast','ti-pin');}
-async function endWatchParty(){if(!SQUAD?.watchParty||SQUAD.watchParty.hostId!==ME.id)return;destroyWatchPlayer();SQUAD.watchParty=null;SQUAD.updatedAt=Date.now();await saveSquad();softUpdate();showToast('Watch party ended','ti-check');}
+async function endWatchParty(){if(!SQUAD?.watchParty||SQUAD.watchParty.hostId!==ME.id)return;destroyWatchPlayer();SQUAD.watchParty=null;SQUAD.updatedAt=Date.now();const saved=await saveSquad();if(!saved)return;softUpdate();showToast('Watch party ended','ti-check');}
 
 // ── Trivia ───────────────────────────────────────────────────────────────
 // Fetches a question from Open Trivia DB (opentdb.com \u2014 free, no API key)
@@ -3536,6 +3537,19 @@ function renderBoard(){
 function escapeHtml(s){
   const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML;
 }
+function copyTextSafe(text,success='Copied',fail='Copy failed') {
+  return (async()=>{ try {
+    if(navigator.clipboard?.writeText){ await navigator.clipboard.writeText(String(text)); }
+    else { const ta=document.createElement('textarea'); ta.value=String(text); ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+    showToast(success,'ti-copy'); return true;
+  } catch(e) { showToast(fail,'ti-alert-triangle'); return false; } })();
+}
+function safeMediaUrl(value){
+  const raw=String(value||'').trim();
+  if(!raw) return '';
+  try{ const u=new URL(raw, location.href); return ['http:','https:','blob:'].includes(u.protocol)?u.href:''; }catch(e){ return ''; }
+}
+
 
 // Reactions are stored per-note as { [userId]: emoji } — one reaction per
 // person per note, tapping the same emoji again clears it.
@@ -3749,7 +3763,7 @@ function renderMe(){
         <div class="avatar" id="me-avatar-btn" style="width:76px;height:76px;font-size:26px;margin:0 auto 12px; cursor:pointer; position:relative;">${avatarVisualInner(ME,76)}
           <div style="position:absolute; bottom:-2px; right:-2px; width:24px;height:24px;border-radius:50%; background:var(--accent); display:flex; align-items:center; justify-content:center; border:2px solid var(--bg-0);"><span class="ti" style="font-size:12px; color:#0B0E1A;">${icon('ti-pencil')}</span></div>
         </div>
-        <h2>${ME.name}</h2>
+        <h2>${escapeHtml(ME.name)}</h2>
         <p style="color:var(--text-lo); font-size:13px; margin-top:4px;">${(ME.tz||'').replace(/_/g,' ')}</p>
         <div style="display:flex;justify-content:center;gap:8px;margin-top:10px;flex-wrap:wrap;">
           <span class="xp-badge">${icon('ti-flame')} ${Math.floor(ME.xp||0)} XP</span>
@@ -3773,7 +3787,7 @@ function renderMe(){
       </div>
       <div class="field" style="margin-top:20px;">
         <label class="field-label">Display name</label>
-        <input type="text" id="me-name-input" value="${ME.name}" maxlength="24">
+        <input type="text" id="me-name-input" value="${escapeHtml(ME.name)}" maxlength="24">
       </div>
       <div class="field">
         <label class="field-label">Time zone</label>
@@ -4000,7 +4014,8 @@ function bindEvents(){
       SQUAD_ID = id;
       window.__pendingCap = null;
       window.__pendingLocked = false;
-      await saveSquad();
+      const squadSaved=await saveSquad();
+      if(!squadSaved){ btn.dataset.busy=''; btn.removeAttribute('disabled'); return; }
       await saveMySquadId();
       ensureAccountState();
       if(!ME.groupIds.includes(id)) ME.groupIds.push(id);
@@ -4077,11 +4092,13 @@ function bindEvents(){
       sq.updatedAt = Date.now();
       SQUAD = sq;
       SQUAD_ID = sq.id;
-      await saveSquad();
+      const joinedSquadSaved=await saveSquad();
+      if(!joinedSquadSaved){ errEl.textContent='Could not join — check connection and try again.'; errEl.style.display='block'; return; }
       await saveMySquadId();
       ensureAccountState();
       if(!ME.groupIds.includes(sq.id)) ME.groupIds.push(sq.id);
-      await saveMe();
+      const joinedProfileSaved=await saveMe();
+      if(!joinedProfileSaved){ errEl.textContent='Joined locally, but your profile could not sync. Please retry once online.'; errEl.style.display='block'; return; }
       try{ await window.fbUpdate('users/'+ME.id+'/notifications/'+`group_request_${sq.id}`,{read:true}); }catch(e){}
       await awardGroupRoleXp(sq.id,'member');
       attachUserNotificationListener(); attachSquadListener();
@@ -4091,8 +4108,8 @@ function bindEvents(){
   }
 
   if(byId('sq-created-done')) byId('sq-created-done').onclick = () => goTo('home', {replace:true});
-  if(byId('copy-invite-code')) byId('copy-invite-code').onclick = () => { navigator.clipboard?.writeText(SQUAD.code).then(()=>showToast('Code copied','ti-copy')); };
-  if(byId('copy-invite-manage')) byId('copy-invite-manage').onclick = () => { navigator.clipboard?.writeText(SQUAD.code).then(()=>showToast('Code copied','ti-copy')); };
+  if(byId('copy-invite-code')) byId('copy-invite-code').onclick = () => copyTextSafe(SQUAD.code,'Code copied','Copy failed');
+  if(byId('copy-invite-manage')) byId('copy-invite-manage').onclick = () => copyTextSafe(SQUAD.code,'Code copied','Copy failed');
 
   if(byId('my-status-btn')) byId('my-status-btn').onclick = () => openStatusEditor(ME.id);
   if(byId('group-identity-open')) byId('group-identity-open').onclick = () => goTo('group-settings');
@@ -4309,17 +4326,17 @@ function bindEvents(){
       const expiryMs=Number(byId('gs-invite-expiry')?.value||0);
       SQUAD.name=name; SQUAD.maxMembers=cap; SQUAD.inviteExpiresAt=expiryMs>0?Date.now()+expiryMs:null;
       SQUAD.groupStyle={...defaultGroupStyle(),...(SQUAD.groupStyle||{}),tagline:byId('gs-tagline').value.trim(),description:byId('gs-description').value.trim(),logo:byId('gs-logo').value.trim()||'✦',logoUrl:byId('gs-logo-url').value.trim(),bannerUrl:byId('gs-banner-url').value.trim(),bannerVideoUrl:byId('gs-banner-video-url').value.trim(),accent:byId('gs-accent').value||'#7C9CFF',accent2:byId('gs-accent2').value||'#9B7CFF',background:byId('gs-background').value||'#0B0E1A',backgroundPreset:byId('gs-bg-preset').value||'aurora',mode:byId('gs-mode').value,radius:Number(byId('gs-radius').value)||18,motion:byId('gs-motion').value,notificationStyle:byId('gs-notification').value,soundPack:byId('gs-sound').value,ambientParticles:byId('gs-particles').checked,showStatusGlow:byId('gs-status-glow').checked,showMemberCount:byId('gs-member-count').checked};
-      SQUAD.updatedAt=Date.now(); await saveSquad(); applyGroupStyle(); showToast('Group identity saved','ti-check'); goTo('manage',{replace:true});
+      SQUAD.updatedAt=Date.now(); const saved=await saveSquad(); if(!saved) return; applyGroupStyle(); showToast('Group identity saved','ti-check'); goTo('manage',{replace:true});
     };
   }
-  if(byId('gs-copy-invite')) byId('gs-copy-invite').onclick=()=>navigator.clipboard?.writeText(safeInviteLink(SQUAD.code)).then(()=>showToast('Invite link copied','ti-copy'));
+  if(byId('gs-copy-invite')) byId('gs-copy-invite').onclick=async()=>{const link=safeInviteLink(SQUAD.code);try{if(navigator.clipboard?.writeText)await navigator.clipboard.writeText(link);else{const ta=document.createElement('textarea');ta.value=link;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();}showToast('Invite link copied','ti-copy')}catch(e){showToast('Copy failed — use Share instead','ti-alert-triangle')}};
   if(byId('gs-share-invite')) byId('gs-share-invite').onclick=()=>openGroupInviteDialog();
   if(byId('gs-qr-invite')) byId('gs-qr-invite').onclick=()=>openQrDialog(safeInviteLink(SQUAD.code),SQUAD.name);
   if(byId('gs-regenerate-invite')) byId('gs-regenerate-invite').onclick=async()=>{
     if(viewerBlocked() || !can(ME.id,'editGroupSettings')) return;
     const expiryMs=Number(byId('gs-invite-expiry')?.value||0);
     SQUAD.code=genCode(); SQUAD.inviteRegeneratedAt=Date.now(); SQUAD.inviteExpiresAt=expiryMs>0?Date.now()+expiryMs:null; SQUAD.updatedAt=Date.now();
-    await saveSquad(); showToast('Invite code regenerated','ti-refresh'); softUpdate();
+    const saved=await saveSquad(); if(!saved) return; showToast('Invite code regenerated','ti-refresh'); softUpdate();
   };
   if(byId('gs-generate-palette')) byId('gs-generate-palette').onclick=()=>{
     if(viewerBlocked() || !can(ME.id,'editGroupSettings')) return;
@@ -4336,7 +4353,8 @@ function bindEvents(){
       if(!SQUAD.permissions) SQUAD.permissions = {};
       SQUAD.permissions[uid] = { ...DEFAULT_PERMISSIONS[newRole] };
       SQUAD.updatedAt = Date.now();
-      await saveSquad();
+      const saved=await saveSquad();
+      if(!saved) return;
       softUpdate();
       showToast(`Role updated`, 'ti-shield');
     };
@@ -4349,7 +4367,8 @@ function bindEvents(){
       if(!SQUAD.permissions[uid]) SQUAD.permissions[uid] = { ...DEFAULT_PERMISSIONS[roleOf(uid)] };
       SQUAD.permissions[uid][permId] = !SQUAD.permissions[uid][permId];
       SQUAD.updatedAt = Date.now();
-      await saveSquad();
+      const saved=await saveSquad();
+      if(!saved) return;
       softUpdate();
     };
   });
