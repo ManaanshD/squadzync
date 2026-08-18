@@ -1265,8 +1265,8 @@ async function saveMe(){
 
 
 const XP_CONFIG = {
-  daily:10, monthly:50, nudge:1, createGroup:70, extraGroup:20, maxGroups:5,
-  spinCost:15,
+  daily:10, monthly:50, nudge:1, createGroup:0, extraGroup:0, maxCreatedGroups:2, maxJoinedGroups:3, maxGroups:5,
+  spinCost:0,
   spins:[{xp:0,weight:28},{xp:5,weight:22},{xp:10,weight:15},{xp:0,weight:12},{xp:1,weight:10},{xp:15,weight:7},{xp:20,weight:5},{xp:50,weight:1}]
 };
 const XP_LEVEL_STEP = 250;
@@ -1368,6 +1368,23 @@ async function verifiedGroupIds(){
   return ME.groupIds;
 }
 async function verifiedGroupCount(){ const ids=await verifiedGroupIds(); return ids.length; }
+async function verifiedGroupStats(){
+  ensureAccountState();
+  const ids=[...new Set([...(ME.groupIds||[]),...(ME.squadId?[ME.squadId]:[])].filter(Boolean))];
+  let created=0, joined=0, valid=[];
+  for(const id of ids){
+    try{
+      const s=await window.fbGet('squads/'+id);
+      if(!s?.members?.some(m=>m.id===ME.id)) continue;
+      valid.push(id);
+      const role=s.roles?.[ME.id] || (s.members?.find(m=>m.id===ME.id)?.role) || 'member';
+      if(role==='owner') created++; else joined++;
+    }catch(e){}
+  }
+  ME.groupIds=[...new Set(valid)];
+  if(ME.squadId && !ME.groupIds.includes(ME.squadId)) ME.squadId=ME.groupIds[0]||null;
+  return {created,joined,total:created+joined};
+}
 function recordXpMetaOnly(delta,reason,type){ensureXpMeta();const entry={id:'xp_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),delta:Number(delta)||0,reason:String(reason||'XP'),type:type||((delta||0)>=0?'earn':'spend'),ts:Date.now()};ME.xpState.history=[entry,...(ME.xpState.history||[])].slice(0,150)}
 async function saveMeFields(fields){if(!ME||isViewerMode())return false;try{await window.fbUpdate('users/'+ME.id,fields);return true}catch(e){return false}}
 async function atomicUserXpDelta(uid,delta){
@@ -1471,6 +1488,7 @@ async function switchSquad(id){
 }
 async function initXpOnBoot(){
   if(!ME) return;
+  if(ME.createdGroupCount==null) ME.createdGroupCount=ME.hasCreatedGroup?1:0;
   ensureAccountState();
   await reconcileUserXpBalance();
   await awardDailyXp();
@@ -1485,7 +1503,7 @@ async function performDailySpin(){
   ensureAccountState();
   const today=localDateKey();
   if(ME.xpState.lastSpin===today){ showToast('Daily spin already used','ti-clock'); return; }
-  if(!(await spendXp(XP_CONFIG.spinCost,'Daily spin'))) return;
+  if(Number(XP_CONFIG.spinCost||0)>0 && !(await spendXp(XP_CONFIG.spinCost,'Daily spin'))) return;
   const total=XP_CONFIG.spins.reduce((a,b)=>a+b.weight,0);
   let r=Math.random()*total, reward=0;
   for(const opt of XP_CONFIG.spins){ r-=opt.weight; if(r<=0){ reward=opt.xp; break; } }
@@ -1770,19 +1788,20 @@ async function resolveJoinRequest(uid, approve){
   let requester = null;
   try{ requester = await window.fbGet('users/' + uid); }catch(e){}
   const requesterGroups = Array.isArray(requester?.groupIds) ? requester.groupIds : (requester?.squadId?[requester.squadId]:[]);
-  if(requesterGroups.length >= XP_CONFIG.maxGroups){
-    showToast(`${req.name.split(' ')[0]} is already in 5 groups`,'ti-alert-triangle');
+  const requesterCreated = Number(requester?.createdGroupCount||0);
+  const requesterJoined = Math.max(0, requesterGroups.length - requesterCreated);
+  if(requesterJoined >= XP_CONFIG.maxJoinedGroups){
+    showToast(`${req.name.split(' ')[0]} already belongs to 3 joined groups`,'ti-alert-triangle');
     return;
   }
-  const joinCost = requesterGroups.length >= 2 ? XP_CONFIG.extraGroup : 0;
-  if(requester && joinCost>0 && (Number(requester.xp)||0) < joinCost){
-    showToast(`${req.name.split(' ')[0]} needs ${joinCost} XP to join another group`,'ti-alert-triangle');
-    return;
+  if(requester && requesterCreated >= XP_CONFIG.maxCreatedGroups){
+    // This approval is a join, so a user can still join if they have room in their joined-group allowance.
   }
+  const joinCost = 0;
 
   if(requester){
     try{
-      if(joinCost>0){const charged=await atomicUserXpDelta(uid,-joinCost);if(!charged.ok){showToast(`${req.name.split(' ')[0]} no longer has ${joinCost} XP`,'ti-alert-triangle');return}requester.xp=charged.xp}
+      if(joinCost>0){const charged=await atomicUserXpDelta(uid,-joinCost);if(!charged.ok){showToast(`${req.name.split(' ')[0]} could not complete the join`,'ti-alert-triangle');return}requester.xp=charged.xp}
       requester.groupIds=[...new Set([...(requester.groupIds||[]),...(requester.squadId?[requester.squadId]:[]),SQUAD.id])];
       requester.xpState=requester.xpState||{};requester.xpState.groupBonuses=requester.xpState.groupBonuses||{};const bonusKey=`${SQUAD.id}:member`;if(!requester.xpState.groupBonuses[bonusKey])requester.xpState.groupBonuses[bonusKey]=Date.now();
       await window.fbUpdate('users/'+uid,{groupIds:[...new Set(requester.groupIds)],squadId:requester.squadId||null,xp:requester.xp,xpState:requester.xpState});
@@ -2755,19 +2774,9 @@ async function setActiveAvatarIcon(item){
   }
   return true;
 }
-async function buyAvatarShopItem(itemId){
-  const item=AVATAR_SHOP_ITEMS.find(x=>x.id===itemId); if(!item) return;
-  if(viewerBlocked('Sign in to buy avatar icons')) return;
-  ensureAvatarShopState();
-  if(avatarShopClaimed(item)){ showToast(item.frequency==='one-time'?'Already owned':`Available again ${item.frequency==='weekly'?'next week':'next month'}`,'ti-lock'); return; }
-  if(!(await spendXp(item.price,`Avatar icon: ${item.name}`))) return;
-  const state=ME.xpState.avatarShop;
-  if(item.frequency==='one-time') state.owned[item.id]=Date.now();
-  else state[item.frequency==='weekly'?'weekly':'monthly'][item.id]=avatarShopPeriod(item);
-  await setActiveAvatarIcon(item);
-  await saveMeFields({xpState:ME.xpState,xp:ME.xp});
-  showToast(`${item.name} equipped · −${item.price} XP`,'ti-sparkles');
-  renderAll();
+async function buyAvatarShopItem(){
+  showToast('Item Shop is coming soon','ti-clock');
+  return false;
 }
 
 function openEmojiPicker(){
@@ -2777,8 +2786,8 @@ function openEmojiPicker(){
     <div class="sheet">
       <div class="sheet-handle"></div>
       <div class="sheet-title">Choose your avatar</div>
-      <div class="sheet-sub">Use an emoji, or buy a custom icon from the XP Shop.</div>
-      <button class="btn btn-primary btn-block" id="avatar-shop-from-picker" style="padding:12px;margin-bottom:12px;">${icon('ti-store')} Open icon shop</button>
+      <div class="sheet-sub">Use an emoji for now. Custom items are coming soon.</div>
+      <button class="btn btn-primary btn-block" id="avatar-shop-from-picker" style="padding:12px;margin-bottom:12px;">${icon('ti-store')} Item shop · Coming soon</button>
       <div style="display:grid; grid-template-columns:repeat(6,1fr); gap:8px; margin:16px 0 20px;">
         ${AVATAR_EMOJIS.map(e => `<div class="glass" data-emoji-choice="${e}" style="aspect-ratio:1; display:flex; align-items:center; justify-content:center; font-size:24px; cursor:pointer; border-radius:14px; ${ME.emoji===e?'border-color:var(--accent); background:var(--accent-soft);':''}">${e}</div>`).join('')}
       </div>
@@ -2786,7 +2795,7 @@ function openEmojiPicker(){
     </div>
   `;
   const close = mountSheet(wrap);
-  if(wrap.querySelector('#avatar-shop-from-picker')) wrap.querySelector('#avatar-shop-from-picker').onclick=()=>{close();goTo('shop');};
+  if(wrap.querySelector('#avatar-shop-from-picker')) wrap.querySelector('#avatar-shop-from-picker').onclick=()=>showToast('Item Shop is coming soon','ti-clock');
   wrap.querySelectorAll('[data-emoji-choice]').forEach(cell => {
     cell.onclick = async () => {
       ME.emoji = cell.dataset.emojiChoice;
@@ -3683,14 +3692,14 @@ function renderXp(){
     <div class="section-label">Daily spin</div>
     <div class="glass liquid-interactive motion-card" style="padding:18px;text-align:center;">
       <div class="spin-wheel" id="daily-spin-wheel">${icon('ti-dice')}</div>
-      <div style="font-weight:800;font-size:16px;">Spend 15 XP to spin</div>
+      <div style="font-weight:800;font-size:16px;">Free daily spin</div>
       <div class="small-note" style="margin:6px 0 14px;">Rare rewards are exponentially harder to hit.</div>
-      <button class="btn btn-primary btn-block liquid-interactive motion-card" id="daily-spin-btn" ${spinUsed?'disabled':''} style="padding:14px;">${spinUsed?'Spin used today':`Spin for 15 XP`}</button>
+      <button class="btn btn-primary btn-block liquid-interactive motion-card" id="daily-spin-btn" ${spinUsed?'disabled':''} style="padding:14px;">${spinUsed?'Spin used today':`Spin for free XP`}</button>
     </div>
     <div class="section-label">Spin table</div><div class="stack">${spinRows}</div>
     <div class="section-label">Groups</div>
     <div class="glass liquid-interactive motion-card" style="padding:14px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><span style="font-size:12px;color:var(--text-lo);">Groups joined</span><strong>${ids.length}/${XP_CONFIG.maxGroups}</strong></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><span style="font-size:12px;color:var(--text-lo);">Groups</span><strong>Up to 2 created · 3 joined</strong></div>
       ${ids.length?ids.map(id=>{const active=id===SQUAD_ID,fallback=active&&SQUAD?SQUAD:{name:'Saved group',id};return `<div class="xp-group-row glass ${active?'group-identity':''}" data-switch-group="${escapeHtml(id)}" style="cursor:pointer;margin-bottom:6px;">${active?groupMarkHtml(fallback.groupStyle||{},38):`<div class="group-mark" style="width:38px;height:38px;"><span style="font-size:16px;">✦</span></div>`}<div style="min-width:0;flex:1;"><div style="font-size:13px;font-weight:700;">${escapeHtml(fallback.name||'Group')}</div><div style="font-size:10.5px;color:var(--text-faint);">${active?'Active group':'Tap to switch'}</div></div>${active?`<span class="xp-badge">Active</span>`:`<span class="ti" style="color:var(--text-faint);">${icon('ti-chevron-right')}</span>`}</div>`}).join(''):'<div class="small-note">No groups yet.</div>'}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;"><button class="btn btn-ghost liquid-interactive motion-card" id="group-create-btn" style="padding:11px 10px;">${icon('ti-plus')} New group</button><button class="btn btn-ghost liquid-interactive motion-card" id="group-join-btn" style="padding:11px 10px;">${icon('ti-key')} Join group</button></div>
     </div>`;
@@ -3712,25 +3721,23 @@ function renderXp(){
 }
 
 function renderShop(){
-  ensureAvatarShopState();
-  const tiers=[['common','Common icons'],['rare','Rare animated icons'],['weekly','Weekly icons'],['monthly','Monthly icons']];
-  const cards=tier=>AVATAR_SHOP_ITEMS.filter(i=>i.tier===tier).map(item=>{
-    const claimed=avatarShopClaimed(item), owned=item.frequency==='one-time'&&!!ME.xpState.avatarShop.owned[item.id];
-    const active=ME.avatarIconId===item.id;
-    const action=active?'Equipped':claimed?(owned?'Owned':'Claimed'):isViewerMode()?'Sign in to buy':`${item.price} XP`;
-    const disabled=active||claimed||isViewerMode();
-    return `<div class="avatar-shop-card"><div class="avatar-shop-preview">${avatarIconInner(item,48)}</div><div class="avatar-shop-meta"><div class="avatar-shop-name">${escapeHtml(item.name)}</div><span class="avatar-shop-badge">${item.frequency==='one-time'?(item.tier==='rare'?'Permanent · animated':'Permanent · one-time'):item.frequency==='weekly'?'Once per week':'Once per month'}</span><button class="btn btn-primary avatar-shop-buy" data-avatar-buy="${item.id}" ${disabled?'disabled':''}>${action}</button></div></div>`;
-  }).join('');
-  const current=AVATAR_SHOP_ITEMS.find(i=>i.id===ME.avatarIconId);
   return `<div class="screen">
-    <div class="page-title-row">${backBtn('shop-back')}<h2>Avatar Icon Shop</h2></div>
-    <div class="xp-hero glass" style="margin-bottom:12px;"><div style="display:flex;align-items:center;gap:12px;"><div class="avatar" style="width:58px;height:58px;font-size:22px;">${current?avatarIconInner(current,58):avatarVisualInner(ME,58)}</div><div><div class="small-note">Your balance</div><div class="xp-number" style="margin-top:3px;font-size:34px;">${Math.floor(ME.xp||0)} <span style="font-size:13px;color:var(--text-lo);">XP</span></div></div></div><div class="small-note" style="margin-top:10px;">Common starts at 10 XP. Rare animated icons cost 1000 XP.</div></div>
-    <div class="section-label">Custom user icons</div>
-    <div class="shop-tier glass"><div class="shop-tier-head"><div><div style="font-weight:800;">Common</div><div class="small-note">Permanent ownership · 10 XP each</div></div><span class="xp-badge">10 XP</span></div><div class="shop-item-grid">${cards('common')}</div></div>
-    <div class="shop-tier glass"><div class="shop-tier-head"><div><div style="font-weight:800;">Rare animated</div><div class="small-note">Permanent ownership · 1000 XP each</div></div><span class="xp-badge">1000 XP</span></div><div class="shop-item-grid">${cards('rare')}</div></div>
-    <div class="shop-tier glass"><div class="shop-tier-head"><div><div style="font-weight:800;">Weekly rotation</div><div class="small-note">One purchase per item each week</div></div><span class="xp-badge">75–120 XP</span></div><div class="shop-item-grid">${cards('weekly')}</div></div>
-    <div class="shop-tier glass"><div class="shop-tier-head"><div><div style="font-weight:800;">Monthly rotation</div><div class="small-note">One purchase per item each month</div></div><span class="xp-badge">250–400 XP</span></div><div class="shop-item-grid">${cards('monthly')}</div></div>
-    <div class="small-note" style="text-align:center;margin:12px 4px 4px;">Buying an icon equips it immediately. Your purchased icons stay attached to your account.</div>
+    <div class="page-title-row">${backBtn('shop-back')}<h2>Item Shop</h2></div>
+    <div class="xp-hero glass liquid-interactive motion-card" style="margin-bottom:12px;">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div class="group-mark" style="width:58px;height:58px;--group-accent:var(--accent);--group-accent-2:var(--accent-2);--group-accent-rgb:var(--accent-rgb);">${icon('ti-store')}</div>
+        <div>
+          <div class="small-note">XP Item Shop</div>
+          <div style="font-size:30px;font-weight:800;line-height:1.05;margin-top:3px;">COMING SOON</div>
+        </div>
+      </div>
+      <div class="small-note" style="margin-top:12px;">We are focusing on earning XP right now. Spending and item purchases will be introduced later.</div>
+    </div>
+    <div class="glass liquid-interactive motion-card" style="padding:18px;text-align:center;">
+      <div style="font-size:22px;margin-bottom:8px;">${icon('ti-sparkles')}</div>
+      <strong>Keep earning XP</strong>
+      <div class="small-note" style="margin-top:6px;">Daily rewards, group activity, missions and XP progression remain active.</div>
+    </div>
   </div>`;
 }
 
@@ -3756,7 +3763,7 @@ function renderMe(){
       </div>
       <div class="section-label">Groups</div>
       <div class="glass group-actions-card motion-card" style="padding:14px 16px;margin-bottom:10px;">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;"><span class="ti" style="color:var(--accent);">${icon('ti-users-group')}</span><div><div style="font-size:14px;font-weight:700;">Manage your groups</div><div style="font-size:11px;color:var(--text-lo);">${getGroupIds().length}/${XP_CONFIG.maxGroups} joined · switch, create or join</div></div></div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;"><span class="ti" style="color:var(--accent);">${icon('ti-users-group')}</span><div><div style="font-size:14px;font-weight:700;">Manage your groups</div><div style="font-size:11px;color:var(--text-lo);">Up to ${XP_CONFIG.maxCreatedGroups} created · ${XP_CONFIG.maxJoinedGroups} joined · free</div></div></div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"><button class="btn btn-ghost" id="me-create-group" style="padding:11px 10px;">${icon('ti-plus')} Create</button><button class="btn btn-ghost" id="me-join-group" style="padding:11px 10px;">${icon('ti-key')} Join</button></div>
       </div>
       <div class="section-label">Settings</div>
@@ -3957,14 +3964,9 @@ function bindEvents(){
       const cap = Math.min(15, Math.max(2, window.__pendingCap || 6));
       const locked = !!window.__pendingLocked;
       ensureAccountState();
-      const groupCount=await verifiedGroupCount();
-      if(groupCount>=XP_CONFIG.maxGroups) return showToast('Maximum 5 groups reached','ti-alert-triangle');
-      // "First creation free" is about whether you have ever CREATED a group before —
-      // not whether you currently belong to one. Someone who only ever joined groups
-      // via invite (never created their own) still gets their first creation free,
-      // even if they're already a member of several joined groups.
-      const isFirstCreation = !ME.hasCreatedGroup;
-      if(!isFirstCreation && !(await spendXp(XP_CONFIG.createGroup,'Create group'))) return;
+      const groupStats=await verifiedGroupStats();
+      if(groupStats.created>=XP_CONFIG.maxCreatedGroups) return showToast('You can create a maximum of 2 groups','ti-alert-triangle');
+      // Group creation is free during the current XP-first phase. XP is earned now; spending mechanics come later.
       btn.dataset.busy='1'; btn.setAttribute('disabled','true');
       const id = 'sq_' + genCode() + Date.now().toString(36);
       SQUAD = normalizeSquadData({
@@ -4003,6 +4005,7 @@ function bindEvents(){
       ensureAccountState();
       if(!ME.groupIds.includes(id)) ME.groupIds.push(id);
       ME.hasCreatedGroup = true;
+      ME.createdGroupCount = Math.min(XP_CONFIG.maxCreatedGroups, Number(ME.createdGroupCount||0) + 1);
       await saveMe();
       await awardGroupRoleXp(id,'owner');
       attachSquadListener();
@@ -4038,7 +4041,9 @@ function bindEvents(){
           showToast('Request already sent — waiting for approval', 'ti-clock');
           return;
         }
-        const requestGroupCount=await verifiedGroupCount(); const requestJoinCost=requestGroupCount>=2?XP_CONFIG.extraGroup:0; sq.joinRequests.push({ id: ME.id, name: ME.name, tz: ME.tz, photo: ME.photo || '', ts: Date.now(), joinCost:requestJoinCost, groupCountAtRequest:requestGroupCount });
+        const requestStats=await verifiedGroupStats();
+        if(requestStats.joined>=XP_CONFIG.maxJoinedGroups){ errEl.textContent='You can join a maximum of 3 groups.'; errEl.style.display='block'; return; }
+        sq.joinRequests.push({ id: ME.id, name: ME.name, tz: ME.tz, photo: ME.photo || '', ts: Date.now(), joinCost:0, groupCountAtRequest:requestStats.total });
         sq.updatedAt = Date.now();
         try{
           if(typeof window.fbSet === 'function') await window.fbSet('squads/' + sq.id, sq);
@@ -4055,10 +4060,9 @@ function bindEvents(){
       }
       if(!alreadyMember){
         ensureAccountState();
-        const joinedCount=await verifiedGroupCount();
-        if(joinedCount>=XP_CONFIG.maxGroups){ errEl.textContent='You can belong to a maximum of 5 groups.'; errEl.style.display='block'; return; }
-        const joinCost=joinedCount>=2?XP_CONFIG.extraGroup:0;
-        if(joinCost>0 && !(await spendXp(joinCost,'Join additional group'))){ errEl.textContent=`You need ${joinCost} XP to join another group.`; errEl.style.display='block'; return; }
+        const groupStats=await verifiedGroupStats();
+        if(groupStats.joined>=XP_CONFIG.maxJoinedGroups){ errEl.textContent='You can join a maximum of 3 groups.'; errEl.style.display='block'; return; }
+        // Joining is free during the current XP-first phase.
         sq.members.push({ id: ME.id, name: ME.name, tz: ME.tz, photo: ME.photo || '', emoji: ME.emoji || '', avatarIconId: ME.avatarIconId || '' });
         sq.groupXp=Number(sq.groupXp||0)+25;
         if(!sq.status) sq.status = {};
