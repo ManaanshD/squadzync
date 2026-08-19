@@ -490,7 +490,7 @@ p{margin:0;}
 .wheel-node .avatar{width:52px;height:52px;font-size:18px;}
 .wheel-node-name{font-size:11px; font-weight:700; text-align:center; max-width:70px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
 
-.bottom-nav{position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:100%; max-width:480px; padding:12px 20px calc(14px + env(safe-area-inset-bottom)); background:rgba(11,14,26,0.72); backdrop-filter:blur(30px); -webkit-backdrop-filter:blur(30px); border-top:1px solid var(--glass-border); display:flex; justify-content:space-around; align-items:center; z-index:90; animation:nav-in .5s var(--ease-out-ios) .05s backwards;}
+.bottom-nav{position:fixed; bottom:0; left:50%; transform:translate3d(-50%,0,0); width:min(480px,100vw); max-width:100vw; box-sizing:border-box; padding:12px 20px calc(14px + env(safe-area-inset-bottom)); background:rgba(11,14,26,0.72); backdrop-filter:blur(30px); -webkit-backdrop-filter:blur(30px); border-top:1px solid var(--glass-border); display:flex; justify-content:space-around; align-items:center; z-index:90; animation:nav-in .5s var(--ease-out-ios) .05s backwards;}
 @keyframes nav-in{from{opacity:0; transform:translate(-50%, 16px);} to{opacity:1; transform:translate(-50%, 0);}}
 .nav-item{display:flex; flex-direction:column; align-items:center; gap:4px; color:var(--text-faint); font-size:10px; font-weight:600; cursor:pointer; transition:color .2s ease, transform .3s var(--ease-spring); -webkit-user-select:none; user-select:none;}
 .nav-item i{font-size:22px; transition:transform .3s var(--ease-spring);}
@@ -1211,6 +1211,55 @@ input[type=email]::placeholder,input[type=password]::placeholder{color:rgba(155,
   .xp-tab,.xp-tab-pill,.xp-progress span,.xp-mini-progress span{transition:none!important;}
 }
 
+
+/* Phone/viewport hardening */
+html,body,#app{width:100%;max-width:100%;min-width:0;}
+body{overflow-x:hidden;}
+#app{width:min(480px,100vw);}
+.screen{width:100%;max-width:100%;min-width:0;overflow-wrap:anywhere;}
+.screen > *{max-width:100%;min-width:0;}
+input,select,textarea,button,.btn{max-width:100%;box-sizing:border-box;}
+.media-upload-grid,.widget-grid,.board-grid,.overlap-grid,.motion-tabs{min-width:0;max-width:100%;}
+.media-upload-card{min-width:0;overflow:hidden;}
+.group-switch-wrap,.group-switch-panel,.motion-tab-panel{max-width:100%;min-width:0;}
+.bottom-nav{right:auto;overflow:hidden;isolation:isolate;}
+.bottom-nav .nav-item{min-width:0;flex:1 1 0;width:20%;padding:2px 1px;white-space:nowrap;}
+.sheet,.dialog{max-width:min(480px,100vw);box-sizing:border-box;}
+.fab{max-width:calc(100vw - 32px);}
+@media (max-width:520px){
+  #app{padding-bottom:calc(104px + env(safe-area-inset-bottom));}
+  .screen{padding-left:16px;padding-right:16px;padding-bottom:calc(104px + env(safe-area-inset-bottom));}
+  .page-title-row:has(.back-btn){margin-left:-16px;margin-right:-16px;padding-left:16px;padding-right:16px;}
+  .bottom-nav{width:100vw;max-width:100vw;left:0;right:0;transform:translate3d(0,0,0);padding-left:max(10px,env(safe-area-inset-left));padding-right:max(10px,env(safe-area-inset-right));}
+  .bottom-nav .nav-item{font-size:9px;gap:3px;}
+  .bottom-nav .nav-item .ti{font-size:21px;}
+  .sheet{border-radius:24px 24px 0 0;padding-left:16px;padding-right:16px;}
+  .dialog-backdrop,.motion-dialog-backdrop{padding:10px;}
+}
+@media (max-width:390px){
+  .screen{padding-left:14px;padding-right:14px;}
+  .page-title-row:has(.back-btn){margin-left:-14px;margin-right:-14px;padding-left:14px;padding-right:14px;}
+  .widget-grid,.board-grid,.overlap-grid{grid-template-columns:1fr;}
+  .bottom-nav{padding-left:7px;padding-right:7px;}
+  .bottom-nav .nav-item{font-size:8.5px;}
+  .bottom-nav .nav-item .ti{font-size:20px;}
+  .motion-tabs{gap:3px;}
+  .motion-tab{padding-left:5px;padding-right:5px;font-size:11px;}
+}
+@media (max-width:340px){
+  .screen{padding-left:12px;padding-right:12px;}
+  .page-title-row:has(.back-btn){margin-left:-12px;margin-right:-12px;padding-left:12px;padding-right:12px;}
+  .bottom-nav .nav-item{font-size:8px;}
+  .bottom-nav .nav-item .ti{font-size:19px;}
+  .btn{font-size:14px;padding-left:14px;padding-right:14px;}
+}
+@media (orientation:landscape) and (max-height:520px){
+  .bottom-nav{padding-top:7px;padding-bottom:max(7px,env(safe-area-inset-bottom));}
+  .screen{padding-bottom:calc(82px + env(safe-area-inset-bottom));}
+  #app{padding-bottom:calc(82px + env(safe-area-inset-bottom));}
+  .login-wrap{padding-top:18px;padding-bottom:18px;}
+}
+
 </style>
 </head>
 <body>
@@ -1480,11 +1529,42 @@ function viewerBlocked(msg='Sign in to make changes'){ if(isViewerMode()){ showT
 let SQUAD_ID = null;
 let LOCAL = { links:{}, layout:'grid', theme:'indigo', accentHex:'', density:'comfortable', reduceMotion:false, haptics:true, lastNudge:{}, notifications:false, homescreenWidget:true, parallax:true, parallaxStrength:'medium', glassBlur:26, tilt:true, buttonStretch:true, pageTransitions:true, hoverGlow:true };
 const HAPTICS_SUPPORTED = typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function';
+const HAPTIC_TOUCH_DEVICE = typeof navigator !== 'undefined' && (
+  navigator.maxTouchPoints > 0 ||
+  (window.matchMedia && window.matchMedia('(pointer:coarse)').matches)
+);
+let __lastHapticTs = 0;
 function haptic(pattern='light'){
-  if(!HAPTICS_SUPPORTED || LOCAL.haptics===false || LOCAL.reduceMotion) return false;
-  const patterns={light:8,medium:16,success:[10,24,10],selection:6,spin:[5,18,5]};
+  if(!HAPTICS_SUPPORTED || !HAPTIC_TOUCH_DEVICE || LOCAL.haptics===false) return false;
+  const patterns={
+    light:8, medium:16, selection:6, success:[10,24,10],
+    error:[18,32,18], spin:[5,18,5], hold:[8,18,8,18,14]
+  };
   try{ return navigator.vibrate(patterns[pattern] ?? pattern); }catch(_){ return false; }
 }
+function hapticDebounced(pattern='light'){
+  const now=Date.now();
+  if(now-__lastHapticTs<45) return false;
+  __lastHapticTs=now;
+  return haptic(pattern);
+}
+document.addEventListener('pointerup',(e)=>{
+  if(!HAPTIC_TOUCH_DEVICE || LOCAL.haptics===false) return;
+  const el=e.target?.closest?.(
+    'button,.btn,.icon-btn,.fab,.nav-item,.motion-tab,.layout-opt,.preset-pill,.avail-chip,'+
+    '.reaction-chip,.reaction-add,.theme-swatch,.color-swatch-custom,.nudge-btn,.social-tab,'+
+    '.social-mini-btn,.task-check,[data-switch-group],[data-xp-tab],[data-layout-choice],'+
+    '[data-activity],[data-watch-service],.group-switch-trigger,.group-switch-add,.group-switch-row,'+
+    '.media-upload-card,.school-picker-trigger,.school-option'
+  );
+  if(!el || el.disabled || el.getAttribute('aria-disabled')==='true') return;
+  let kind='selection';
+  if(el.matches('.btn-primary,.fab,[data-activity],[data-watch-service]')) kind='medium';
+  else if(el.matches('.nudge-btn,.reaction-chip,.reaction-add')) kind='light';
+  else if(el.matches('.school-option,.preset-pill,.avail-chip,.theme-swatch')) kind='selection';
+  else if(el.matches('.hold-confirm,[data-hold-confirm]')) kind='hold';
+  hapticDebounced(kind);
+},{passive:true});
 
 let currentScreen = 'loading';
 let navDirection = 'fwd';
@@ -2757,9 +2837,9 @@ function mountSheet(wrap){
   return close;
 }
 
-function goTo(screen, opts={}){ const commit=()=>{if(!opts.replace&&currentScreen&&currentScreen!=='loading')history_stack.push(currentScreen);navDirection='fwd';currentScreen=screen;renderAll();try{history.pushState({s:screen},'', '#'+screen);}catch(e){}};playPageWipe(commit);}
+function goTo(screen, opts={}){ hapticDebounced('selection'); const commit=()=>{if(!opts.replace&&currentScreen&&currentScreen!=='loading')history_stack.push(currentScreen);navDirection='fwd';currentScreen=screen;renderAll();try{history.pushState({s:screen},'', '#'+screen);}catch(e){}};playPageWipe(commit);}
 
-function goBack(fallback='home'){ const commit=()=>{navDirection='back';currentScreen=history_stack.length?history_stack.pop():fallback;renderAll();try{history.replaceState({s:currentScreen},'', '#'+currentScreen);}catch(e){}};playPageWipe(commit);}
+function goBack(fallback='home'){ hapticDebounced('selection'); const commit=()=>{navDirection='back';currentScreen=history_stack.length?history_stack.pop():fallback;renderAll();try{history.replaceState({s:currentScreen},'', '#'+currentScreen);}catch(e){}};playPageWipe(commit);}
 
 window.addEventListener('popstate', (e)=>{
   if(!ME) return;
@@ -3029,12 +3109,35 @@ function initLiquidInteractions(){
 
 function playPageWipe(cb){ if(LOCAL.reduceMotion||LOCAL.pageTransitions===false){cb();return;} const w=document.getElementById('page-wipe'); if(!w){cb();return;} w.className='page-wipe'; requestAnimationFrame(()=>{w.classList.add('in'); setTimeout(()=>{cb();requestAnimationFrame(()=>{w.classList.remove('in');w.classList.add('out');setTimeout(()=>w.className='page-wipe',380);});},190);}); }
 function initMotionCards(){ document.querySelectorAll('.motion-card').forEach(el=>{ if(el.dataset.motionBound==='1')return;el.dataset.motionBound='1';let active=false;const reset=()=>{el.style.setProperty('--tilt-x','0deg');el.style.setProperty('--tilt-y','0deg');el.classList.remove('motion-pressed');};el.addEventListener('pointerenter',()=>{active=true},{passive:true});el.addEventListener('pointermove',e=>{if(!active||!LOCAL.tilt||LOCAL.reduceMotion)return;const r=el.getBoundingClientRect(),nx=(e.clientX-r.left)/r.width-.5,ny=(e.clientY-r.top)/r.height-.5;el.style.setProperty('--tilt-x',(-ny*5.2).toFixed(2)+'deg');el.style.setProperty('--tilt-y',(nx*6.5).toFixed(2)+'deg');},{passive:true});el.addEventListener('pointerdown',()=>el.classList.add('motion-pressed'),{passive:true});el.addEventListener('pointerup',()=>el.classList.remove('motion-pressed'),{passive:true});el.addEventListener('pointerleave',()=>{active=false;reset();},{passive:true});el.addEventListener('pointercancel',reset,{passive:true});}); }
-function initHoldToConfirm(){ document.querySelectorAll('[data-hold-confirm]').forEach(btn=>{if(btn.dataset.holdBound==='1')return;btn.dataset.holdBound='1';const dur=900;let start=0,timer=0,raf=0,ok=false;const bar=document.createElement('span');bar.className='hold-progress';btn.appendChild(bar);const reset=()=>{clearTimeout(timer);cancelAnimationFrame(raf);start=0;bar.style.width='0%';btn.classList.remove('motion-holding');};const loop=()=>{if(!start)return;const p=Math.min(1,(performance.now()-start)/dur);bar.style.width=(p*100)+'%';if(p<1)raf=requestAnimationFrame(loop);};btn.addEventListener('pointerdown',e=>{if(e.button!==undefined&&e.button!==0)return;ok=false;start=performance.now();btn.classList.add('motion-holding');raf=requestAnimationFrame(loop);timer=setTimeout(()=>{ok=true;btn.dataset.holdConfirmed='1';bar.style.width='100%';btn.click();setTimeout(reset,80);},dur);},{passive:true});btn.addEventListener('pointerup',()=>{if(!ok)reset();},{passive:true});btn.addEventListener('pointercancel',reset,{passive:true});btn.addEventListener('click',e=>{if(btn.dataset.holdConfirmed==='1'){delete btn.dataset.holdConfirmed;return;}e.preventDefault();e.stopImmediatePropagation();showToast('Hold to confirm','ti-hand-stop');},{capture:true});}); }
+function initHoldToConfirm(){ document.querySelectorAll('[data-hold-confirm]').forEach(btn=>{if(btn.dataset.holdBound==='1')return;btn.dataset.holdBound='1';const dur=900;let start=0,timer=0,raf=0,ok=false;const bar=document.createElement('span');bar.className='hold-progress';btn.appendChild(bar);const reset=()=>{clearTimeout(timer);cancelAnimationFrame(raf);start=0;bar.style.width='0%';btn.classList.remove('motion-holding');};const loop=()=>{if(!start)return;const p=Math.min(1,(performance.now()-start)/dur);bar.style.width=(p*100)+'%';if(p<1)raf=requestAnimationFrame(loop);};btn.addEventListener('pointerdown',e=>{if(e.button!==undefined&&e.button!==0)return;ok=false;start=performance.now();btn.classList.add('motion-holding');raf=requestAnimationFrame(loop);timer=setTimeout(()=>{ok=true;btn.dataset.holdConfirmed='1';bar.style.width='100%';hapticDebounced('hold');btn.click();setTimeout(reset,80);},dur);},{passive:true});btn.addEventListener('pointerup',()=>{if(!ok)reset();},{passive:true});btn.addEventListener('pointercancel',reset,{passive:true});btn.addEventListener('click',e=>{if(btn.dataset.holdConfirmed==='1'){delete btn.dataset.holdConfirmed;return;}e.preventDefault();e.stopImmediatePropagation();showToast('Hold to confirm','ti-hand-stop');},{capture:true});}); }
 function openFriendNotes(friendId){
   currentParams = { friendId };
   goTo('friend-notes');
 }
 
+async function signOutSquadZync(){
+  hapticDebounced('medium');
+  try{
+    if(squadUnsub) squadUnsub();
+    if(boardUnsub) boardUnsub();
+    if(nudgeUnsub) nudgeUnsub();
+    if(chatUnsub) chatUnsub();
+    if(callUnsub) callUnsub();
+    if(notificationUnsub) notificationUnsub();
+    squadUnsub=boardUnsub=nudgeUnsub=chatUnsub=callUnsub=notificationUnsub=null;
+    USER_NOTIFICATIONS={};
+    notificationSeenIds.clear();
+    await window.fbSignOut();
+  }catch(e){
+    console.warn('Sign out failed',e);
+    showToast('Could not sign out — try again','ti-alert-triangle');
+    return;
+  }
+  ME=null; SQUAD=null; SQUAD_ID=null; history_stack=[];
+  currentScreen='login';
+  try{ history.replaceState({s:'login'},'', '#login'); }catch(e){}
+  renderAll();
+}
 function renderNav(active){
   return `
     <div class="bottom-nav">
@@ -3153,14 +3256,19 @@ function renderOnboard(){
 
 function renderSquadChoice(){
   return `
-    <div class="screen" style="padding-top:50px; text-align:center;">
+    <div class="screen" style="padding-top:28px; text-align:center;">
+      <div class="top-row" style="margin-bottom:26px;">
+        <div></div>
+        <button class="icon-btn liquid-interactive" id="choice-signout-btn" aria-label="Sign out" title="Sign out"><span class="ti">${icon('ti-logout')}</span></button>
+      </div>
       <div class="brand-mark" style="width:56px;height:56px;border-radius:18px;margin:0 auto 20px;"><span class="ti" style="font-size:26px;color:#0B0E1A;">${icon('ti-users-group')}</span></div>
       <h2 style="font-size:26px; margin-bottom:8px;">Welcome, ${escapeHtml(ME.name)}</h2>
-      <p style="color:var(--text-lo); font-size:14px; margin-bottom:36px;">Join an existing squad or create a new one for your group.</p>
-      <div style="display:flex; flex-direction:column; gap:12px;">
-        <button class="btn btn-primary btn-block" id="btn-to-create" style="padding:18px;"><span class="ti">${icon('ti-plus')}</span> Create New Squad</button>
-        <button class="btn btn-ghost btn-block" id="btn-to-join" style="padding:18px;"><span class="ti">${icon('ti-key')}</span> Join with Code</button>
+      <p style="color:var(--text-lo); font-size:14px; margin:0 auto 28px; max-width:340px;">Join an existing squad or create a new one for your group.</p>
+      <div style="display:flex; flex-direction:column; gap:12px; max-width:360px; margin:0 auto;">
+        <button class="btn btn-primary btn-block" id="btn-to-create"><span class="ti">${icon('ti-plus')}</span> Create New Squad</button>
+        <button class="btn btn-ghost btn-block" id="btn-to-join"><span class="ti">${icon('ti-key')}</span> Join with Code</button>
       </div>
+      <p class="small-note" style="margin:18px auto 0;max-width:320px;">You can switch between groups later from the group menu.</p>
     </div>
   `;
 }
@@ -3290,7 +3398,7 @@ function bindWheelInteractions(){
   const pointAngle=(e)=>{const r=stage.getBoundingClientRect();return Math.atan2(e.clientY-(r.top+r.height/2),e.clientX-(r.left+r.width/2))*180/Math.PI;};
   const down=e=>{if(e.target.closest('.wheel-tool,.wheel-member-node')) return; WHEEL_STATE.dragging=true;WHEEL_STATE.auto=false;WHEEL_STATE.lastX=e.clientX;WHEEL_STATE.lastT=performance.now();lastAngle=pointAngle(e);stage.setPointerCapture?.(e.pointerId);stage.classList.add('dragging');};
   const move=e=>{if(!WHEEL_STATE.dragging)return;const a=pointAngle(e);let d=a-lastAngle;if(d>180)d-=360;if(d<-180)d+=360;const now=performance.now(),dt=Math.max(8,now-WHEEL_STATE.lastT);WHEEL_STATE.velocity=d/dt;setWheelRotation(WHEEL_STATE.rotation+d);lastAngle=a;WHEEL_STATE.lastT=now;};
-  const up=e=>{if(!WHEEL_STATE.dragging)return;WHEEL_STATE.dragging=false;stage.classList.remove('dragging');try{stage.releasePointerCapture?.(e.pointerId)}catch(_){}; if(Math.abs(WHEEL_STATE.velocity)>0.12) haptic('spin'); else haptic('selection'); animateWheelInertia();};
+  const up=e=>{if(!WHEEL_STATE.dragging)return;WHEEL_STATE.dragging=false;stage.classList.remove('dragging');try{stage.releasePointerCapture?.(e.pointerId)}catch(_){}; if(Math.abs(WHEEL_STATE.velocity)>0.12) hapticDebounced('spin'); else hapticDebounced('selection'); animateWheelInertia();};
   stage.addEventListener('pointerdown',down);stage.addEventListener('pointermove',move);stage.addEventListener('pointerup',up);stage.addEventListener('pointercancel',up);stage.addEventListener('dblclick',()=>{WHEEL_STATE.velocity=1.6;WHEEL_STATE.auto=false;haptic('spin');animateWheelInertia();});
   stage.addEventListener('wheel',e=>{e.preventDefault();setWheelRotation(WHEEL_STATE.rotation+e.deltaY*.12);WHEEL_STATE.auto=false;},{passive:false});
   // Remove any portalled wheel popovers left by a previous render.
@@ -3308,7 +3416,7 @@ function bindWheelInteractions(){
     node.addEventListener('pointerenter',show);node.addEventListener('pointerleave',hide);
     node.addEventListener('focus',show);node.addEventListener('blur',hide);
     node.addEventListener('pointerdown',e=>e.stopPropagation());
-    node.addEventListener('click',e=>{e.stopPropagation();const id=node.dataset.id;if(WHEEL_STATE.focusedId===id){haptic('medium');openStatusEditor(id);}else{WHEEL_STATE.focusedId=id;haptic('selection');document.querySelectorAll('.wheel-member-node').forEach(n=>n.classList.toggle('focused',n.dataset.id===id));show();}});
+    node.addEventListener('click',e=>{e.stopPropagation();const id=node.dataset.id;if(WHEEL_STATE.focusedId===id){hapticDebounced('medium');openStatusEditor(id);}else{WHEEL_STATE.focusedId=id;hapticDebounced('selection');document.querySelectorAll('.wheel-member-node').forEach(n=>n.classList.toggle('focused',n.dataset.id===id));show();}});
   });
   document.querySelectorAll('[data-wheel-action]').forEach(btn=>btn.onclick=()=>{
     const a=btn.dataset.wheelAction;
@@ -5314,14 +5422,35 @@ function bindEvents(){
         if(ME.squadId===squadId) ME.squadId = ME.groupIds[0]||null;
         await saveMe();
       }
-      SQUAD_ID = null; SQUAD = null;
+      const nextGroupId=(ME.groupIds||[])[0]||null;
+      SQUAD_ID=null; SQUAD=null;
       if(squadUnsub){ squadUnsub(); squadUnsub=null; }
       if(boardUnsub){ boardUnsub(); boardUnsub=null; }
       if(nudgeUnsub){ nudgeUnsub(); nudgeUnsub=null; }
       if(chatUnsub){ chatUnsub(); chatUnsub=null; }
       if(callUnsub){ callUnsub(); callUnsub=null; }
+
+      if(nextGroupId){
+        const next=await loadSquad(nextGroupId);
+        if(next && next.members?.some(m=>m.id===ME.id)){
+          SQUAD=next; SQUAD_ID=nextGroupId; ME.squadId=nextGroupId;
+          recordSquadSyncBase();
+          await saveMySquadId();
+          attachSquadListener();
+          applyTheme();
+          hapticDebounced('success');
+          showToast(`Now viewing ${next.name}`,'ti-arrows-shuffle');
+          goTo('home',{replace:true});
+          return;
+        }
+        ME.groupIds=(ME.groupIds||[]).filter(id=>id!==nextGroupId);
+        ME.squadId=ME.groupIds[0]||null;
+        await saveMe();
+      }
       await saveMySquadId();
-      goTo('squad-choice', {replace:true});
+      SQUAD_ID=null; SQUAD=null;
+      hapticDebounced('success');
+      goTo('squad-choice',{replace:true});
     };
   }
 
@@ -5585,19 +5714,8 @@ function bindEvents(){
     };
   }
 
-  if(byId('me-signout-btn')){
-    byId('me-signout-btn').onclick = async () => {
-      if(squadUnsub) squadUnsub();
-      if(boardUnsub) boardUnsub();
-      if(nudgeUnsub) nudgeUnsub();
-      if(chatUnsub) chatUnsub();
-      if(callUnsub) callUnsub();
-      await window.fbSignOut();
-      if(notificationUnsub) notificationUnsub(); notificationUnsub=null; USER_NOTIFICATIONS={}; notificationSeenIds.clear();
-      ME = null; SQUAD = null; SQUAD_ID = null; history_stack = [];
-      goTo('login', {replace:true});
-    };
-  }
+  if(byId('me-signout-btn')) byId('me-signout-btn').onclick = signOutSquadZync;
+  if(byId('choice-signout-btn')) byId('choice-signout-btn').onclick = signOutSquadZync;
   // Viewer fallback: controls that are not explicitly navigation-safe and are not
   // already wired with an onclick handler get a clear explanation instead of silently doing nothing.
   document.querySelectorAll('button, .icon-btn, .fab, .nudge-btn').forEach(el=>{
