@@ -1277,7 +1277,8 @@ input,select,textarea,button,.btn{max-width:100%;box-sizing:border-box;}
   .home-header-controls{width:100%;margin-left:0;justify-content:flex-end;flex:0 0 auto;gap:6px;overflow-x:auto;scrollbar-width:none;}
   .home-header-controls::-webkit-scrollbar{display:none;}
   .group-switch-trigger{width:100%;max-width:100%;padding:4px 5px;align-items:flex-start;text-align:left;}
-  .group-switch-trigger>div{min-width:0;flex:1 1 auto;}
+  .group-switch-trigger>.group-mark{flex:0 0 auto;}
+  .group-switch-trigger>div:not(.group-mark){min-width:0;flex:1 1 auto;}
   .group-switch-trigger .brand-name{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;word-break:break-word;line-height:1.15;max-width:none;}
   .group-switch-trigger .sync-badge{white-space:normal;line-height:1.15;margin-top:2px;}
   .group-switch-caret{margin-top:4px;}
