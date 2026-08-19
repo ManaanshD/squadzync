@@ -665,7 +665,7 @@ body.reduce-motion-pref *, body.reduce-motion-pref *::before, body.reduce-motion
 
 /* ── Group switcher (homepage) ───────────────────────────────────────── */
 .group-switch-wrap{position:relative;min-width:0;}
-.group-switch-trigger{display:flex;align-items:center;gap:10px;min-width:0;cursor:pointer;background:transparent;border:none;padding:2px;border-radius:14px;transition:background .18s ease;}
+.group-switch-trigger{display:flex;align-items:flex-start;gap:10px;min-width:0;width:100%;cursor:pointer;background:transparent;border:none;padding:2px;border-radius:14px;transition:background .18s ease;}
 .group-switch-trigger:hover{background:var(--glass);}
 .group-switch-caret{flex:0 0 auto;width:18px;height:18px;display:flex;align-items:center;justify-content:center;color:var(--text-faint);transition:transform .25s var(--ease-spring);}
 .group-switch-wrap.open .group-switch-caret{transform:rotate(180deg);}
@@ -679,7 +679,7 @@ body.reduce-motion-pref *, body.reduce-motion-pref *::before, body.reduce-motion
 .group-switch-row{display:flex;align-items:center;gap:10px;padding:9px 8px;border-radius:12px;cursor:pointer;transition:background .15s ease;}
 .group-switch-row:hover{background:var(--glass);}
 .group-switch-row.active{background:linear-gradient(135deg,rgba(var(--group-accent-rgb,124,156,255),.20),rgba(255,255,255,.03));}
-.group-switch-name{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.group-switch-name{font-size:13px;font-weight:700;white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;word-break:break-word;line-height:1.2;}
 .group-switch-sub{font-size:10.5px;color:var(--text-faint);margin-top:1px;}
 .group-switch-add{display:flex;align-items:center;gap:10px;padding:9px 8px;border-radius:12px;cursor:pointer;margin-top:4px;border-top:1px solid var(--glass-border);padding-top:12px;color:var(--accent);font-weight:700;font-size:12.5px;}
 .group-switch-add:hover{background:var(--glass);}
@@ -1020,7 +1020,7 @@ input[type=email]::placeholder,input[type=password]::placeholder{color:rgba(155,
 .wheel-tool.active{color:var(--accent);background:var(--accent-soft);border-color:rgba(var(--accent-rgb),.32);box-shadow:0 8px 20px -12px var(--accent-glow);}
 .wheel-feature-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:4px 4px 0;padding:9px 12px;border-radius:13px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.07);font-size:10.5px;color:var(--text-faint);}
 .wheel-feature-row b{color:var(--text-hi);}
-.wheel-stage{touch-action:none;overflow:visible;user-select:none;cursor:grab;--wheel-rot:0deg;}
+.wheel-stage{touch-action:pan-y;overflow:visible;user-select:none;cursor:grab;--wheel-rot:0deg;}
 .wheel-stage.dragging{cursor:grabbing;}
 .radial-orbit{position:absolute;inset:0;transform:rotate(var(--wheel-rot));transform-origin:50% 50%;transition:transform .22s var(--ease-out-ios);will-change:transform;z-index:3;}
 .wheel-stage.dragging .radial-orbit{transition:none;}
@@ -1260,6 +1260,53 @@ input,select,textarea,button,.btn{max-width:100%;box-sizing:border-box;}
   .login-wrap{padding-top:18px;padding-bottom:18px;}
 }
 
+
+/* Media uploads: the native file input is hidden; the whole glass card is the picker. */
+.media-upload-card{display:flex;align-items:center;gap:10px;min-height:64px;padding:13px 14px;cursor:pointer;position:relative;}
+.media-upload-card>.ti{width:34px;height:34px;flex:0 0 34px;border-radius:11px;background:var(--accent-soft);color:var(--accent);}
+.media-upload-card>span:not(.ti){min-width:0;display:flex;flex-direction:column;gap:2px;line-height:1.2;}
+.media-upload-card strong{font:800 13px var(--font-display);color:var(--text-hi);overflow-wrap:anywhere;}
+.media-upload-card small{font-size:10.5px;color:var(--text-lo);line-height:1.25;overflow-wrap:anywhere;}
+.media-upload-card .media-file-input{position:absolute!important;width:1px!important;height:1px!important;opacity:0!important;pointer-events:none!important;clip:rect(0 0 0 0)!important;clip-path:inset(50%)!important;}
+.media-upload-card.media-uploading{opacity:.65;transform:scale(.99);}
+@media(max-width:520px){.media-upload-grid{grid-template-columns:1fr!important;gap:8px!important}.media-upload-card{min-height:58px;padding:11px 12px;}.media-upload-wide{grid-column:auto!important;}}
+
+@media(max-width:520px){
+  .home .top-row,.home-screen .top-row{flex-wrap:wrap;align-items:center;}
+  .home-group-head{flex:1 1 100%;width:100%;max-width:100%;min-width:0;margin-bottom:9px;}
+  .home-header-controls{width:100%;margin-left:0;justify-content:flex-end;flex:0 0 auto;gap:6px;overflow-x:auto;scrollbar-width:none;}
+  .home-header-controls::-webkit-scrollbar{display:none;}
+  .group-switch-trigger{width:100%;max-width:100%;padding:4px 5px;align-items:flex-start;text-align:left;}
+  .group-switch-trigger>div{min-width:0;flex:1 1 auto;}
+  .group-switch-trigger .brand-name{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;word-break:break-word;line-height:1.15;max-width:none;}
+  .group-switch-trigger .sync-badge{white-space:normal;line-height:1.15;margin-top:2px;}
+  .group-switch-caret{margin-top:4px;}
+}
+
+@media(max-width:520px){
+  .bottom-nav{left:0!important;right:0!important;width:100%!important;max-width:none!important;box-sizing:border-box!important;transform:translate3d(0,0,0)!important;
+    padding-left:max(8px,env(safe-area-inset-left));padding-right:max(8px,env(safe-area-inset-right));
+    animation:nav-in-mobile .38s var(--ease-out-ios) .05s both!important;}
+  .bottom-nav .nav-item{min-width:0!important;width:auto!important;flex:1 1 0!important;padding-left:2px;padding-right:2px;}
+}
+@keyframes nav-in-mobile{from{opacity:0;transform:translate3d(0,16px,0)}to{opacity:1;transform:translate3d(0,0,0)}}
+
+.school-picker{position:relative;min-width:0;z-index:40;}
+.school-picker-trigger{display:flex!important;align-items:center;justify-content:space-between;gap:10px;text-align:left;min-width:0;}
+.school-picker-trigger .school-picker-value{min-width:0;flex:1 1 auto;white-space:normal;overflow-wrap:anywhere;line-height:1.25;}
+.school-picker-trigger>.ti{flex:0 0 auto;color:var(--text-faint);transition:transform .2s var(--ease-spring);}
+.school-picker.open .school-picker-trigger>.ti{transform:rotate(180deg);}
+.school-picker-panel{position:absolute;left:0;right:0;top:calc(100% + 8px);max-height:min(58vh,430px);overflow:hidden;border:1px solid rgba(255,255,255,.16);border-radius:16px;background:linear-gradient(145deg,rgba(31,37,64,.98),rgba(9,13,26,.98));backdrop-filter:blur(30px) saturate(180%);-webkit-backdrop-filter:blur(30px) saturate(180%);box-shadow:0 24px 60px -20px rgba(0,0,0,.82);padding:9px;z-index:1000;}
+.school-picker-search{width:100%;margin:0 0 7px;min-height:42px;border-radius:12px;}
+.school-picker-suggestions,.school-picker-list{max-height:330px;overflow-y:auto;overscroll-behavior:contain;}
+.school-picker-section{padding:6px 7px 5px;color:var(--accent);font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;}
+.school-option{width:100%;display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:9px 10px;border:0;border-radius:11px;background:transparent;color:var(--text-hi);text-align:left;cursor:pointer;}
+.school-option:hover,.school-option:focus-visible{background:rgba(255,255,255,.07);outline:none;}
+.school-option.suggested{background:rgba(var(--accent-rgb),.06);}
+.school-option-name{font-size:12.5px;font-weight:700;line-height:1.25;white-space:normal;overflow-wrap:anywhere;}
+.school-option-country{font-size:10px;color:var(--text-faint);} 
+.school-picker-empty{padding:22px 12px;text-align:center;color:var(--text-faint);font-size:12px;}
+@media(max-width:520px){.school-picker-panel{position:absolute;left:0;right:0;top:calc(100% + 8px);max-height:62vh;z-index:1500;}.school-picker-suggestions,.school-picker-list{max-height:50vh;}}
 </style>
 </head>
 <body>
@@ -1308,7 +1355,7 @@ const ICONS = {
   'hand-stop': '<path d="M8 13V6.5a1.5 1.5 0 0 1 3 0V12"/><path d="M11 5.5a1.5 1.5 0 0 1 3 0V12"/><path d="M14 6.5a1.5 1.5 0 0 1 3 0V12"/><path d="M17 10a1.5 1.5 0 0 1 3 0v4a6 6 0 0 1-6 6h-2c-2.5 0-3.5-1-5-3l-2.7-4a1.4 1.4 0 0 1 2-2L8 13"/>',
   'hand-wave': '<path d="M8.5 11.5 6 9a1.4 1.4 0 0 0-2 2l4.5 5c1.5 1.5 2.5 2 4.5 2h1.5a5 5 0 0 0 5-5V9a1.4 1.4 0 0 0-2.7-.5"/><path d="M14 9V6.5a1.5 1.5 0 0 0-3 0V6a1.5 1.5 0 0 0-2.8-.7"/><path d="M17 9.2V7.5a1.5 1.5 0 0 0-3-.3"/><path d="M4 5c1.5-2 4-3 6-1"/>',
   'key': '<circle cx="8" cy="15" r="4"/><path d="M10.8 12.2 19 4"/><path d="M16 8l2 2M19 5l2 2"/>',
-  'layout-grid': '<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>',  'arrows-shuffle': '<path d="M18 4h3v3"/><path d="M4 20 21 4"/><path d="M18 20h3v-3"/><path d="M15.5 15.5 21 20"/><path d="M4 4c2 0 4.5 1.2 6.4 3.4"/>',
+  'layout-grid': '<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>',
   'focus-2': '<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2" fill="currentColor" stroke="none"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>',
   'crosshair': '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2" fill="currentColor" stroke="none"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>',
 
@@ -1361,7 +1408,6 @@ const ICONS = {
   // ── Icons added for battery status, TV Board (watch-together), trivia, and messaging/calling ──
   'bulb': '<path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3Z"/>',
   'info-circle': '<circle cx="12" cy="12" r="9"/><path d="M12 11v5.5"/><path d="M12 7.5h.01"/>',
-  'maximize': '<path d="M9 4H4v5"/><path d="m4 4 6 6"/><path d="M15 4h5v5"/><path d="m20 4-6 6"/><path d="M9 20H4v-5"/><path d="m4 20 6-6"/><path d="M15 20h5v-5"/><path d="m20 20-6-6"/>',
   'pencil': '<path d="M4 16.5V20h3.5L18.5 9 15 5.5 4 16.5Z" stroke-linejoin="round"/><path d="m13.5 7 3.5 3.5"/>',
   'battery': '<rect x="2.5" y="7" width="17" height="10" rx="2"/><path d="M22 10.5v3"/>',
   'battery-2': '<rect x="2.5" y="7" width="17" height="10" rx="2"/><path d="M22 10.5v3"/><path d="M6 9.5v5" stroke-linecap="butt"/>',
@@ -1381,6 +1427,15 @@ const ICONS = {
   'pause': '<path d="M8 5h3v14H8zM13 5h3v14h-3z" fill="currentColor" stroke="none"/>',
   'volume': '<path d="M4 10h4l5-4v12l-5-4H4z"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"/>',
   'maximize': '<path d="M8 3H3v5M3 3l6 6M16 3h5v5M21 3l-6 6M8 21H3v-5M3 21l6-6M16 21h5v-5M21 21l-6-6"/>',
+  // ── Icons for viewer mode, media upload, invites, shop, moderation, audio preview ──
+  'eye': '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
+  'image': '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.6" fill="currentColor" stroke="none"/><path d="m4 17 5-5 4 4 3-3 4 4"/>',
+  'photo': '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.6" fill="currentColor" stroke="none"/><path d="m4 17 5-5 4 4 3-3 4 4"/>',
+  'qrcode': '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v3M14 20h3M20 20v.01"/>',
+  'share-3': '<circle cx="6" cy="12" r="2.3"/><circle cx="17" cy="6" r="2.3"/><circle cx="17" cy="18" r="2.3"/><path d="m8 10.8 7-3.6M8 13.2l7 3.6"/>',
+  'store': '<path d="M4 9.5 5 4h14l1 5.5"/><path d="M4 9.5a2.5 2.5 0 0 0 5 0 2.5 2.5 0 0 0 5 0 2.5 2.5 0 0 0 5 0"/><path d="M5.5 10v9.5A1 1 0 0 0 6.5 20.5h11a1 1 0 0 0 1-1V10"/><path d="M10 20.5V15h4v5.5"/>',
+  'user-minus': '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c1-3.5 3.7-5.5 6.5-5.5s5.5 2 6.5 5.5"/><path d="M15 11h6"/>',
+  'volume-2': '<path d="M4 10h4l5-4v12l-5-4H4z"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"/>',
 };
 
 // Renders "ti ti-<name>" (and legacy "ti-<name>") strings into inline SVG.
@@ -2916,8 +2971,9 @@ function softUpdate(containerSelector){
 }
 
 
+const PARALLAX_STRENGTH_FACTORS = { subtle:0.5, medium:1, strong:1.8 };
 function initParallax(){
-  if(window.__parallaxBound)return;window.__parallaxBound=true;const root=document.documentElement;let raf=0,last=null,cache=[],dirty=true;const refresh=()=>{cache=[...document.querySelectorAll('.parallax-target')].map(el=>({el,rect:el.getBoundingClientRect()}));dirty=false};const tick=()=>{raf=0;if(!last)return;if(dirty)refresh();const e=last;last=null;root.style.setProperty('--pointer-x',(e.clientX/window.innerWidth*100)+'%');root.style.setProperty('--pointer-y',(e.clientY/window.innerHeight*100)+'%');for(const {el,rect} of cache){if(rect.bottom<0||rect.top>innerHeight||rect.right<0||rect.left>innerWidth)continue;const dx=Math.max(-10,Math.min(10,(e.clientX-(rect.left+rect.width/2))/35));const dy=Math.max(-8,Math.min(8,(e.clientY-(rect.top+rect.height/2))/35));el.style.setProperty('--px',dx.toFixed(2)+'px');el.style.setProperty('--py',dy.toFixed(2)+'px');el.style.setProperty('--ry',(-dx*.18).toFixed(2)+'deg');el.style.setProperty('--rx',(dy*.18).toFixed(2)+'deg')}};window.addEventListener('pointermove',e=>{if(e.pointerType==='touch'||LOCAL.reduceMotion||LOCAL.parallax===false)return;last=e;if(!raf)raf=requestAnimationFrame(tick)},{passive:true});window.addEventListener('resize',()=>{dirty=true},{passive:true});window.addEventListener('scroll',()=>{dirty=true},{passive:true})}
+  if(window.__parallaxBound)return;window.__parallaxBound=true;const root=document.documentElement;let raf=0,last=null,cache=[],dirty=true;const refresh=()=>{cache=[...document.querySelectorAll('.parallax-target')].map(el=>({el,rect:el.getBoundingClientRect()}));dirty=false};const tick=()=>{raf=0;if(!last)return;if(dirty)refresh();const e=last;last=null;const strength=PARALLAX_STRENGTH_FACTORS[LOCAL.parallaxStrength]||1;root.style.setProperty('--pointer-x',(e.clientX/window.innerWidth*100)+'%');root.style.setProperty('--pointer-y',(e.clientY/window.innerHeight*100)+'%');for(const {el,rect} of cache){if(rect.bottom<0||rect.top>innerHeight||rect.right<0||rect.left>innerWidth)continue;const dx=Math.max(-10*strength,Math.min(10*strength,(e.clientX-(rect.left+rect.width/2))/35*strength));const dy=Math.max(-8*strength,Math.min(8*strength,(e.clientY-(rect.top+rect.height/2))/35*strength));el.style.setProperty('--px',dx.toFixed(2)+'px');el.style.setProperty('--py',dy.toFixed(2)+'px');el.style.setProperty('--ry',(-dx*.18).toFixed(2)+'deg');el.style.setProperty('--rx',(dy*.18).toFixed(2)+'deg')}};window.addEventListener('pointermove',e=>{if(e.pointerType==='touch'||LOCAL.reduceMotion||LOCAL.parallax===false)return;last=e;if(!raf)raf=requestAnimationFrame(tick)},{passive:true});window.addEventListener('resize',()=>{dirty=true},{passive:true});window.addEventListener('scroll',()=>{dirty=true},{passive:true})}
 initParallax();
 
 
@@ -3194,6 +3250,39 @@ async function hydrateSchoolSelect(sel,selected){
   catch(e){sel.innerHTML='<option value="">School directory unavailable</option><option value="__retry__">Retry loading schools</option>';if(state)state.textContent='Could not load schools. You can retry when connected.';}
 }
 function selectedSchoolFromSelect(sel){if(!sel||!sel.value||sel.value==='__retry__')return null;const o=sel.options[sel.selectedIndex];if(!o?.dataset?.schoolName)return null;return {name:o.dataset.schoolName,country:o.dataset.schoolCountry||'',code:o.dataset.schoolCode||'',domain:o.dataset.schoolDomain||'',web:o.dataset.schoolWeb||''};}
+
+const SCHOOL_TIMEZONE_HINTS={
+  'Asia/Kolkata':['India'],'Asia/Singapore':['Singapore','Malaysia','Hong Kong'],'Asia/Hong_Kong':['Hong Kong','China'],'Asia/Tokyo':['Japan'],'Asia/Seoul':['South Korea','Korea'],
+  'Asia/Dubai':['United Arab Emirates'],'Asia/Karachi':['Pakistan'],'Asia/Dhaka':['Bangladesh'],'Asia/Kathmandu':['Nepal'],'Asia/Bangkok':['Thailand'],'Asia/Jakarta':['Indonesia'],
+  'Europe/London':['United Kingdom'],'Europe/Dublin':['Ireland'],'Europe/Paris':['France'],'Europe/Berlin':['Germany'],'Europe/Madrid':['Spain'],'Europe/Rome':['Italy'],
+  'Europe/Amsterdam':['Netherlands'],'Europe/Zurich':['Switzerland'],'Europe/Vienna':['Austria'],'Europe/Warsaw':['Poland'],'Europe/Istanbul':['Turkey'],
+  'America/New_York':['United States','USA'],'America/Los_Angeles':['United States','USA'],'America/Chicago':['United States','USA'],'America/Toronto':['Canada'],
+  'Australia/Sydney':['Australia'],'Pacific/Auckland':['New Zealand']
+};
+function schoolSuggestedCountries(tz){return SCHOOL_TIMEZONE_HINTS[tz]||[];}
+function schoolPickerHtml(){return `<div class="school-picker" id="me-school-picker"><button type="button" class="control-select school-picker-trigger" id="me-school-input" aria-haspopup="listbox" aria-expanded="false"><span class="school-picker-value">No school selected</span><span class="ti">${icon('ti-chevron-down')}</span></button><div class="school-picker-panel hidden" id="me-school-panel"><input class="school-picker-search" id="me-school-search" type="search" autocomplete="off" placeholder="Search university or country…"><div class="school-picker-suggestions" id="me-school-suggestions"></div><div class="school-picker-list" id="me-school-list" role="listbox"></div></div></div>`;}
+function schoolLabel(s){return s?.name?`${s.name}${s.country?` · ${s.country}`:''}`:'No school selected';}
+function renderSchoolPickerList(query=''){
+  const list=byId('me-school-list');const sugg=byId('me-school-suggestions');if(!list)return;
+  const q=String(query||'').trim().toLowerCase(); const tz=byId('me-tz-input')?.value||ME?.tz||''; const hints=schoolSuggestedCountries(tz);
+  let data=Array.isArray(SCHOOL_DIRECTORY)?SCHOOL_DIRECTORY:[];
+  let filtered=q?data.filter(s=>(s.name+' '+s.country+' '+s.domain).toLowerCase().includes(q)):data;
+  const suggested=!q&&hints.length?data.filter(s=>hints.some(h=>(s.country||'').toLowerCase().includes(h.toLowerCase()))).slice(0,8):[];
+  if(sugg){sugg.innerHTML=suggested.length?`<div class="school-picker-section">Suggested for ${escapeHtml(TIMEZONES.find(t=>t.value===tz)?.label||tz)}</div>`+suggested.map(s=>schoolOptionButton(s,true)).join('') : '';sugg.classList.toggle('hidden',!suggested.length);}
+  const shown=(q?filtered:(suggested.length ? data.filter(s=>!suggested.some(x=>schoolKey(x)===schoolKey(s))) : filtered)).slice(0,120);
+  list.innerHTML=shown.length?shown.map(s=>schoolOptionButton(s,false)).join(''):`<div class="school-picker-empty">No matching schools</div>`;
+  list.querySelectorAll('[data-school-pick]').forEach(b=>b.onclick=()=>selectSchoolPicker(JSON.parse(decodeURIComponent(b.dataset.schoolPick))));
+  if(sugg) sugg.querySelectorAll('[data-school-pick]').forEach(b=>b.onclick=()=>selectSchoolPicker(JSON.parse(decodeURIComponent(b.dataset.schoolPick))));
+}
+function schoolOptionButton(s,suggested=false){const payload=encodeURIComponent(JSON.stringify(s));return `<button type="button" class="school-option${suggested?' suggested':''}" data-school-pick="${payload}"><span class="school-option-name">${escapeHtml(s.name)}</span><span class="school-option-country">${escapeHtml(s.country||'')}</span></button>`;}
+function selectSchoolPicker(s){const picker=byId('me-school-picker'),trigger=byId('me-school-input');if(!picker||!trigger)return;trigger.dataset.selectedSchool=JSON.stringify(s||null);trigger.querySelector('.school-picker-value').textContent=schoolLabel(s);picker.classList.remove('open');byId('me-school-panel')?.classList.add('hidden');trigger.setAttribute('aria-expanded','false');hapticDebounced?.('selection');}
+async function hydrateSchoolPicker(selected){
+  const state=byId('me-school-input-state'); if(state)state.textContent='Loading the global school directory…';
+  try{await loadSchoolDirectory();const trigger=byId('me-school-input');if(trigger&&selected){selectSchoolPicker(selected);}else if(trigger){trigger.dataset.selectedSchool='';trigger.querySelector('.school-picker-value').textContent='No school selected';}renderSchoolPickerList('');if(state)state.textContent=`${SCHOOL_DIRECTORY.length.toLocaleString()} schools available`;}
+  catch(e){if(state)state.textContent='Could not load schools. Check your connection and try again.';}
+}
+function selectedSchoolFromPicker(){const el=byId('me-school-input');if(!el?.dataset?.selectedSchool)return null;try{return JSON.parse(el.dataset.selectedSchool)||null}catch(e){return null;}}
+
 function renderLogin(){
   return `
     <div class="login-wrap">
@@ -3392,41 +3481,63 @@ function positionWheelPopover(node){
 }
 function bindWheelInteractions(){
   const stage=document.querySelector('[data-wheel-stage]'); if(!stage) return;
-  const disc=document.querySelector('[data-wheel-disc]');
-  const orbit=document.querySelector('[data-radial-orbit]');
-  let lastAngle=null;
+  let lastAngle=null, pending=false, active=false, startX=0, startY=0, lastX=0, lastT=0, gestureAxis='';
   const pointAngle=(e)=>{const r=stage.getBoundingClientRect();return Math.atan2(e.clientY-(r.top+r.height/2),e.clientX-(r.left+r.width/2))*180/Math.PI;};
-  const down=e=>{if(e.target.closest('.wheel-tool,.wheel-member-node')) return; WHEEL_STATE.dragging=true;WHEEL_STATE.auto=false;WHEEL_STATE.lastX=e.clientX;WHEEL_STATE.lastT=performance.now();lastAngle=pointAngle(e);stage.setPointerCapture?.(e.pointerId);stage.classList.add('dragging');};
-  const move=e=>{if(!WHEEL_STATE.dragging)return;const a=pointAngle(e);let d=a-lastAngle;if(d>180)d-=360;if(d<-180)d+=360;const now=performance.now(),dt=Math.max(8,now-WHEEL_STATE.lastT);WHEEL_STATE.velocity=d/dt;setWheelRotation(WHEEL_STATE.rotation+d);lastAngle=a;WHEEL_STATE.lastT=now;};
-  const up=e=>{if(!WHEEL_STATE.dragging)return;WHEEL_STATE.dragging=false;stage.classList.remove('dragging');try{stage.releasePointerCapture?.(e.pointerId)}catch(_){}; if(Math.abs(WHEEL_STATE.velocity)>0.12) hapticDebounced('spin'); else hapticDebounced('selection'); animateWheelInertia();};
-  stage.addEventListener('pointerdown',down);stage.addEventListener('pointermove',move);stage.addEventListener('pointerup',up);stage.addEventListener('pointercancel',up);stage.addEventListener('dblclick',()=>{WHEEL_STATE.velocity=1.6;WHEEL_STATE.auto=false;haptic('spin');animateWheelInertia();});
-  stage.addEventListener('wheel',e=>{e.preventDefault();setWheelRotation(WHEEL_STATE.rotation+e.deltaY*.12);WHEEL_STATE.auto=false;},{passive:false});
-  // Remove any portalled wheel popovers left by a previous render.
+  const reset=()=>{pending=false;active=false;gestureAxis='';lastAngle=null;stage.classList.remove('dragging');};
+  const down=e=>{
+    if(e.target.closest('.wheel-tool,.wheel-member-node')) return;
+    pending=true; active=false; gestureAxis=''; startX=lastX=e.clientX; startY=e.clientY; lastT=performance.now();
+    WHEEL_STATE.auto=false;
+  };
+  const move=e=>{
+    if(!pending && !active) return;
+    const dx=e.clientX-startX, dy=e.clientY-startY;
+    if(pending){
+      const dist=Math.hypot(dx,dy);
+      if(dist<8) return;
+      // Vertical swipes belong to the page. Horizontal swipes intentionally rotate the wheel.
+      if(Math.abs(dy) > Math.abs(dx)*1.12){ reset(); return; }
+      if(Math.abs(dx) < Math.abs(dy)*0.72){ reset(); return; }
+      gestureAxis='horizontal'; active=true; pending=false;
+      stage.setPointerCapture?.(e.pointerId); stage.classList.add('dragging');
+      lastAngle=pointAngle(e); lastX=e.clientX; lastT=performance.now();
+      return;
+    }
+    const a=pointAngle(e); let d=a-lastAngle; if(d>180)d-=360;if(d<-180)d+=360;
+    const now=performance.now(),dt=Math.max(8,now-lastT);
+    WHEEL_STATE.velocity=d/dt; setWheelRotation(WHEEL_STATE.rotation+d);
+    lastAngle=a;lastX=e.clientX;lastT=now;
+  };
+  const up=e=>{
+    if(!pending && !active) return;
+    if(active){ try{stage.releasePointerCapture?.(e.pointerId)}catch(_){}; stage.classList.remove('dragging'); if(Math.abs(WHEEL_STATE.velocity)>0.12) hapticDebounced?.('spin'); else hapticDebounced?.('selection'); animateWheelInertia(); }
+    reset();
+  };
+  const cancel=()=>reset();
+  stage.addEventListener('pointerdown',down,{passive:true});
+  stage.addEventListener('pointermove',move,{passive:true});
+  stage.addEventListener('pointerup',up,{passive:true});
+  stage.addEventListener('pointercancel',cancel,{passive:true});
+  stage.addEventListener('dblclick',()=>{WHEEL_STATE.velocity=1.6;WHEEL_STATE.auto=false;hapticDebounced?.('spin');animateWheelInertia();});
+  stage.addEventListener('wheel',e=>{setWheelRotation(WHEEL_STATE.rotation+e.deltaY*.12);WHEEL_STATE.auto=false;},{passive:true});
   document.querySelectorAll('body > .wheel-node-pop').forEach(x=>x.remove());
   document.querySelectorAll('.wheel-member-node').forEach(node=>{
-    const pop=node.querySelector('.wheel-node-pop');
-    node.__wheelPopover=pop;
-    const show=()=>{
-      document.querySelectorAll('.wheel-node-pop.open').forEach(x=>x.classList.remove('open'));
-      positionWheelPopover(node);
-      pop?.classList.add('open');
-      node.classList.add('hovered');
-    };
+    const pop=node.querySelector('.wheel-node-pop'); node.__wheelPopover=pop;
+    const show=()=>{document.querySelectorAll('.wheel-node-pop.open').forEach(x=>x.classList.remove('open'));positionWheelPopover(node);pop?.classList.add('open');node.classList.add('hovered');};
     const hide=()=>{pop?.classList.remove('open');node.classList.remove('hovered');};
     node.addEventListener('pointerenter',show);node.addEventListener('pointerleave',hide);
     node.addEventListener('focus',show);node.addEventListener('blur',hide);
     node.addEventListener('pointerdown',e=>e.stopPropagation());
-    node.addEventListener('click',e=>{e.stopPropagation();const id=node.dataset.id;if(WHEEL_STATE.focusedId===id){hapticDebounced('medium');openStatusEditor(id);}else{WHEEL_STATE.focusedId=id;hapticDebounced('selection');document.querySelectorAll('.wheel-member-node').forEach(n=>n.classList.toggle('focused',n.dataset.id===id));show();}});
+    node.addEventListener('click',e=>{e.stopPropagation();const id=node.dataset.id;if(WHEEL_STATE.focusedId===id){hapticDebounced?.('medium');openStatusEditor(id);}else{WHEEL_STATE.focusedId=id;hapticDebounced?.('selection');document.querySelectorAll('.wheel-member-node').forEach(n=>n.classList.toggle('focused',n.dataset.id===id));show();}});
   });
   document.querySelectorAll('[data-wheel-action]').forEach(btn=>btn.onclick=()=>{
-    const a=btn.dataset.wheelAction;
+    const a=btn.dataset.wheelAction; hapticDebounced?.('selection');
     if(a==='auto'){WHEEL_STATE.auto=!WHEEL_STATE.auto;btn.classList.toggle('active',WHEEL_STATE.auto);animateWheelInertia();}
-    if(a==='shuffle'){ const ids=[...document.querySelectorAll('.wheel-member-node')].map(n=>n.dataset.id); WHEEL_STATE.order=ids.sort(()=>Math.random()-.5); WHEEL_STATE.velocity=0.42; WHEEL_STATE.auto=false; haptic('spin'); softUpdate(); }
+    if(a==='shuffle'){ const ids=[...document.querySelectorAll('.wheel-member-node')].map(n=>n.dataset.id); WHEEL_STATE.order=ids.sort(()=>Math.random()-.5); WHEEL_STATE.velocity=0.42; WHEEL_STATE.auto=false; hapticDebounced?.('spin'); softUpdate(); }
     if(a==='recenter'){WHEEL_STATE.velocity=0;setWheelRotation(0);WHEEL_STATE.focusedId=null;document.querySelectorAll('.wheel-member-node').forEach(n=>n.classList.remove('focused'));}
     if(a==='focus' && !WHEEL_STATE.focusedId){ showToast('Tap a member first, then focus them','ti-focus-2'); }
     if(a==='focus' && WHEEL_STATE.focusedId){const n=document.querySelector(`.wheel-member-node[data-id="${CSS.escape(WHEEL_STATE.focusedId)}"]`);if(n){const r=n.getBoundingClientRect(),s=stage.getBoundingClientRect();const ang=Math.atan2(r.top+r.height/2-(s.top+s.height/2),r.left+r.width/2-(s.left+s.width/2))*180/Math.PI;setWheelRotation(WHEEL_STATE.rotation-(ang+90));}}
   });
-  animateWheelInertia();
 }
 function renderHome(){
   const layout = LOCAL.layout || 'grid';
@@ -4927,7 +5038,7 @@ function renderMe(){
       </div>
       <div class="field school-select">
         <label class="field-label">School / University</label>
-        <select class="control-select" id="me-school-input"><option value="">Loading schools…</option></select>
+        ${schoolPickerHtml()}
         <div id="me-school-input-state" class="school-load-state">Global school directory loads from the university API.</div>
       </div>
       <button class="btn btn-primary btn-block" id="me-save-btn" style="padding:15px;">Save profile</button>
@@ -5692,10 +5803,18 @@ function bindEvents(){
     });
   }
 
-  if(byId('me-school-input')){
-    const sel=byId('me-school-input');
-    hydrateSchoolSelect(sel,ME.school||null);
-    sel.onchange=()=>{if(sel.value==='__retry__')hydrateSchoolSelect(sel,ME.school||null);};
+  if(byId('me-school-picker')){
+    hydrateSchoolPicker(ME.school||null);
+    const picker=byId('me-school-picker'),trigger=byId('me-school-input'),panel=byId('me-school-panel'),search=byId('me-school-search');
+    trigger.onclick=()=>{const open=!picker.classList.contains('open');picker.classList.toggle('open',open);panel?.classList.toggle('hidden',!open);trigger.setAttribute('aria-expanded',open?'true':'false');if(open){renderSchoolPickerList(search?.value||'');setTimeout(()=>search?.focus(),0);}};
+    search?.addEventListener('input',()=>renderSchoolPickerList(search.value));
+    if(!window.__schoolPickerOutsideBound){
+      window.__schoolPickerOutsideBound=true;
+      document.addEventListener('click',e=>{
+        const p=byId('me-school-picker'); if(!p||p.contains(e.target)) return;
+        p.classList.remove('open'); byId('me-school-panel')?.classList.add('hidden'); byId('me-school-input')?.setAttribute('aria-expanded','false');
+      });
+    }
   }
   if(byId('me-save-btn')){
     byId('me-save-btn').onclick = async () => {
@@ -5703,7 +5822,7 @@ function bindEvents(){
       if(!name) return showToast('Name cannot be empty', 'ti-alert-circle');
       ME.name = name;
       ME.tz = byId('me-tz-input').value;
-      ME.school = selectedSchoolFromSelect(byId('me-school-input'));
+      ME.school = selectedSchoolFromPicker();
       await saveMe();
       if(SQUAD){
         const m = SQUAD.members.find(x=>x.id===ME.id);
