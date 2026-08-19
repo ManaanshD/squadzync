@@ -64,11 +64,56 @@
   const emitFirebaseError=(error,path,op)=>{try{window.dispatchEvent(new CustomEvent('squadzync:firebase-error',{detail:{error,path,op}}))}catch(e){}};
   const enqueueMutation=(op,path,value)=>{const q=readMutationQueue();q.push({id:Date.now()+'_'+Math.random().toString(36).slice(2,7),op,path,value,ts:Date.now()});writeMutationQueue(q);try{window.dispatchEvent(new CustomEvent('squadzync:sync-state',{detail:{state:'queued',count:q.length}}))}catch(e){}};
   window.__pendingMutationCount=()=>readMutationQueue().length;
-  window.__flushFirebaseQueue=async()=>{if(!db||!navigator.onLine)return;let q=readMutationQueue();if(!q.length)return;try{window.dispatchEvent(new CustomEvent('squadzync:sync-state',{detail:{state:'syncing',count:q.length}}))}catch(e){}const remaining=[];for(const item of q){try{if(item.op==='set')await window.fbSetRaw(item.path,item.value);else await window.fbUpdateRaw(item.path,item.value)}catch(e){remaining.push(item);emitFirebaseError(e,item.path,item.op)}}writeMutationQueue(remaining);try{window.dispatchEvent(new CustomEvent('squadzync:sync-state',{detail:{state:remaining.length?'error':'live',count:remaining.length}}))}catch(e){}};
+  // Exponential backoff for queue flushes: retries after network loss or a
+  // burst of failures (e.g. rate limiting) back off 2s → 4s → 8s ... capped
+  // at 60s, instead of hammering Firebase the instant connectivity returns.
+  let __flushBackoffMs=0, __flushTimer=null, __flushInFlight=false;
+  const FLUSH_BASE_MS=2000, FLUSH_MAX_MS=60000;
+  const scheduleFlushRetry=()=>{
+    if(__flushTimer) return;
+    __flushBackoffMs = __flushBackoffMs ? Math.min(__flushBackoffMs*2, FLUSH_MAX_MS) : FLUSH_BASE_MS;
+    __flushTimer = setTimeout(()=>{ __flushTimer=null; window.__flushFirebaseQueue?.(); }, __flushBackoffMs);
+  };
+  window.__flushFirebaseQueue=async()=>{
+    if(!db||!navigator.onLine||__flushInFlight) return;
+    let q=readMutationQueue();
+    if(!q.length){ __flushBackoffMs=0; return; }
+    __flushInFlight=true;
+    try{window.dispatchEvent(new CustomEvent('squadzync:sync-state',{detail:{state:'syncing',count:q.length}}))}catch(e){}
+    const remaining=[];
+    let hadError=false;
+    for(const item of q){
+      try{
+        if(item.op==='set')await window.fbSetRaw(item.path,item.value);
+        else await window.fbUpdateRaw(item.path,item.value)
+      }catch(e){
+        remaining.push(item);
+        hadError=true;
+        emitFirebaseError(e,item.path,item.op);
+        // A failure likely means the whole batch is currently blocked
+        // (offline flap, permission issue, rate limit) — stop draining
+        // the queue and let backoff handle the retry instead of burning
+        // through every remaining item on a connection that just failed.
+        const idx=q.indexOf(item);
+        remaining.push(...q.slice(idx+1).filter(x=>!remaining.includes(x)));
+        break;
+      }
+    }
+    writeMutationQueue(remaining);
+    __flushInFlight=false;
+    if(hadError && remaining.length){
+      scheduleFlushRetry();
+      try{window.dispatchEvent(new CustomEvent('squadzync:sync-state',{detail:{state:'error',count:remaining.length}}))}catch(e){}
+    }else{
+      __flushBackoffMs=0;
+      if(__flushTimer){ clearTimeout(__flushTimer); __flushTimer=null; }
+      try{window.dispatchEvent(new CustomEvent('squadzync:sync-state',{detail:{state:'live',count:0}}))}catch(e){}
+    }
+  };
   window.fbSet=async(path,value)=>{if(!db)throw new Error('Firebase not connected');if(!navigator.onLine){enqueueMutation('set',path,value);return;}try{return await window.fbSetRaw(path,value)}catch(e){emitFirebaseError(e,path,'set');throw e}};
   window.fbUpdate=async(path,value)=>{if(!db)throw new Error('Firebase not connected');if(!navigator.onLine){enqueueMutation('update',path,value);return;}try{return await window.fbUpdateRaw(path,value)}catch(e){emitFirebaseError(e,path,'update');throw e}};
   window.fbTxn=async(path,updater)=>{if(!db||!navigator.onLine)throw new Error('Firebase transaction unavailable offline');try{return await window.fbTxnRaw(path,updater)}catch(e){emitFirebaseError(e,path,'transaction');throw e}};
-  window.addEventListener('online',()=>window.__flushFirebaseQueue?.());
+  window.addEventListener('online',()=>{ __flushBackoffMs=0; window.__flushFirebaseQueue?.(); });
   window.addEventListener('offline',()=>{try{window.dispatchEvent(new CustomEvent('squadzync:sync-state',{detail:{state:'offline',count:window.__pendingMutationCount()}}))}catch(e){}});
   window.fbGet = async (path) => {
     if (!db) throw new Error('Firebase not connected');
@@ -163,6 +208,9 @@
   --amber:#FBBF24;
   --red:#F87171;
   --grey:#9CA3AF;
+  --cyan:#38DBE0;
+  --purple:#B388FF;
+  --pink:#FF8FC7;
   --radius-lg:26px;
   --radius-md:18px;
   --radius-sm:12px;
@@ -367,6 +415,13 @@ p{margin:0;}
 .ring-soon{border-color:var(--amber); box-shadow:0 0 12px rgba(251,191,36,0.4);}
 .ring-dnd{border-color:var(--red); box-shadow:0 0 12px rgba(248,113,113,0.4);}
 .ring-sleep{border-color:var(--grey);}
+.ring-gaming{border-color:var(--purple); box-shadow:0 0 12px rgba(179,136,255,0.45); animation:ring-breathe 3.2s ease-in-out infinite;}
+.ring-study{border-color:var(--cyan); box-shadow:0 0 12px rgba(56,219,224,0.4);}
+.ring-work{border-color:var(--amber); box-shadow:0 0 12px rgba(251,191,36,0.3);}
+.ring-eating{border-color:var(--pink); box-shadow:0 0 12px rgba(255,143,199,0.4);}
+.ring-travel{border-color:var(--cyan); box-shadow:0 0 12px rgba(56,219,224,0.35);}
+.ring-home{border-color:var(--green); box-shadow:0 0 10px rgba(74,222,128,0.35);}
+.ring-active{border-color:var(--pink); box-shadow:0 0 12px rgba(255,143,199,0.45); animation:ring-breathe 2.2s ease-in-out infinite;}
 @keyframes ring-breathe{0%,100%{box-shadow:0 0 12px rgba(74,222,128,0.5);} 50%{box-shadow:0 0 18px rgba(74,222,128,0.8);}}
 
 .layout-switch{display:flex; gap:6px; background:var(--glass); border:1px solid var(--glass-border); border-radius:14px; padding:4px; margin-bottom:20px; position:relative;}
@@ -552,6 +607,37 @@ body.reduce-motion-pref *, body.reduce-motion-pref *::before, body.reduce-motion
 @keyframes spin-pop{0%{transform:rotate(0) scale(1)}45%{transform:rotate(190deg) scale(1.08)}100%{transform:rotate(360deg) scale(1)}}
 .shop-card{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;}
 .shop-price{font-size:12px;font-weight:800;color:var(--accent);}
+
+/* ── Group switcher (homepage) ───────────────────────────────────────── */
+.group-switch-wrap{position:relative;min-width:0;}
+.group-switch-trigger{display:flex;align-items:center;gap:10px;min-width:0;cursor:pointer;background:transparent;border:none;padding:2px;border-radius:14px;transition:background .18s ease;}
+.group-switch-trigger:hover{background:var(--glass);}
+.group-switch-caret{flex:0 0 auto;width:18px;height:18px;display:flex;align-items:center;justify-content:center;color:var(--text-faint);transition:transform .25s var(--ease-spring);}
+.group-switch-wrap.open .group-switch-caret{transform:rotate(180deg);}
+.group-switch-panel{position:absolute;top:calc(100% + 10px);left:0;z-index:60;width:min(320px,88vw);max-height:min(420px,70vh);overflow-y:auto;border-radius:18px;background:var(--glass-strong);backdrop-filter:blur(26px);-webkit-backdrop-filter:blur(26px);border:1px solid var(--glass-border);box-shadow:0 24px 60px -20px rgba(0,0,0,.55);padding:10px;opacity:0;transform:translateY(-6px) scale(.98);pointer-events:none;transition:opacity .16s ease,transform .18s var(--ease-spring);}
+.group-switch-wrap.open .group-switch-panel{opacity:1;transform:translateY(0) scale(1);pointer-events:auto;}
+.group-switch-label{font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-faint);font-weight:800;padding:6px 8px 4px;}
+.group-switch-row{display:flex;align-items:center;gap:10px;padding:9px 8px;border-radius:12px;cursor:pointer;transition:background .15s ease;}
+.group-switch-row:hover{background:var(--glass);}
+.group-switch-row.active{background:linear-gradient(135deg,rgba(var(--group-accent-rgb,124,156,255),.20),rgba(255,255,255,.03));}
+.group-switch-name{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.group-switch-sub{font-size:10.5px;color:var(--text-faint);margin-top:1px;}
+.group-switch-add{display:flex;align-items:center;gap:10px;padding:9px 8px;border-radius:12px;cursor:pointer;margin-top:4px;border-top:1px solid var(--glass-border);padding-top:12px;color:var(--accent);font-weight:700;font-size:12.5px;}
+.group-switch-add:hover{background:var(--glass);}
+.group-switch-add .icon-btn{width:32px;height:32px;border-radius:10px;}
+
+/* ── Timezone matrix + overlap finder ────────────────────────────────── */
+.overlap-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;}
+.overlap-card{padding:14px 12px;border-radius:16px;}
+.overlap-card-label{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:800;color:var(--text-lo);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;}
+.overlap-card-time{font-size:16px;font-weight:800;letter-spacing:-.01em;}
+.overlap-card-sub{font-size:10.5px;color:var(--text-faint);margin-top:4px;}
+.overlap-card-empty{font-size:12px;color:var(--text-faint);padding:4px 0;}
+.heat-strip{display:flex;gap:2px;height:46px;align-items:flex-end;}
+.heat-cell{position:relative;flex:1;height:100%;display:flex;align-items:flex-end;justify-content:center;}
+.heat-cell-fill{width:100%;height:var(--pct);min-height:4px;border-radius:4px 4px 2px 2px;background:linear-gradient(180deg,var(--accent),rgba(var(--accent-rgb),.35));transition:height .4s var(--ease-spring);}
+.heat-cell-label{position:absolute;bottom:-18px;font-size:8.5px;color:var(--text-faint);white-space:nowrap;}
+.tz-row{display:flex;align-items:center;gap:12px;padding:12px 14px;margin-bottom:8px;}
 
 
 
@@ -865,6 +951,28 @@ input[type=email]::placeholder,input[type=password]::placeholder{color:rgba(155,
 .message-actions{display:flex;gap:5px;margin-top:6px;justify-content:flex-end}.message-action{border:1px solid var(--glass-border);background:rgba(255,255,255,.045);color:var(--text-lo);border-radius:9px;padding:4px 7px;font-size:10px;cursor:pointer;transition:transform .25s var(--ease-spring),background .2s ease,color .2s ease}.message-action:hover{transform:translateY(-1px);background:rgba(255,255,255,.075);color:var(--text-hi)}.reply-preview{margin-top:7px;padding:7px 9px;border-left:2px solid var(--accent);background:rgba(255,255,255,.04);border-radius:0 9px 9px 0;color:var(--text-lo);font-size:10.5px}.pin-mark{position:absolute;right:9px;top:9px;color:var(--amber);font-size:12px}
 .poll-card,.task-card{padding:15px 16px;margin-bottom:10px}.poll-option{position:relative;overflow:hidden;padding:10px 12px;border-radius:12px;border:1px solid var(--glass-border);background:rgba(255,255,255,.035);margin-top:7px;cursor:pointer}.poll-option-fill{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,rgba(var(--accent-rgb),.18),rgba(var(--accent-rgb),.05));pointer-events:none}.poll-option-inner{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:700}.poll-count{font-size:10px;color:var(--text-faint)}.task-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.055)}.task-check{width:22px;height:22px;border-radius:8px;border:1px solid var(--glass-border);display:flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 auto;color:transparent;background:rgba(255,255,255,.035)}.task-check.done{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}.task-title{flex:1;font-size:12.5px;font-weight:700;line-height:1.35}.task-meta{font-size:10px;color:var(--text-faint)}.social-compose-tools{display:flex;gap:6px;margin-top:7px}.social-mini-btn{border:1px solid var(--glass-border);background:rgba(255,255,255,.04);color:var(--text-lo);border-radius:10px;padding:6px 8px;font-size:10.5px;font-weight:800;cursor:pointer}.reaction-burst{position:fixed;z-index:400;pointer-events:none;font-size:28px;animation:reaction-burst .72s var(--ease-out-ios) both}@keyframes reaction-burst{0%{opacity:0;transform:translate(-50%,-20%) scale(.35)}28%{opacity:1;transform:translate(-50%,-65%) scale(1.25)}100%{opacity:0;transform:translate(-50%,-150%) scale(.9)}}
 
+/* ── Pin-board wiggle-to-delete (admin-only) ───────────────────────────── */
+.pin-board-hint{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:-4px 0 12px;padding:8px 12px;border-radius:12px;background:rgba(var(--accent-rgb),.10);border:1px solid rgba(var(--accent-rgb),.22);font-size:11px;font-weight:700;color:var(--accent);animation:rise-in .4s var(--ease-out-ios) both;}
+.pin-board-hint button{border:none;background:var(--accent);color:#0B0E1A;border-radius:999px;padding:5px 12px;font-size:10.5px;font-weight:800;cursor:pointer;}
+.task-card.wiggle-mode{animation:task-wiggle .26s ease-in-out infinite;transform-origin:50% 60%;}
+.task-card.wiggle-mode:nth-child(2n){animation-name:task-wiggle-alt;animation-delay:-.09s;}
+.task-card.wiggle-mode:nth-child(3n){animation-delay:-.16s;}
+@keyframes task-wiggle{0%,100%{transform:rotate(-1deg);}50%{transform:rotate(1deg);}}
+@keyframes task-wiggle-alt{0%,100%{transform:rotate(1deg);}50%{transform:rotate(-1deg);}}
+.task-card.shake-out{animation:task-shake-out .38s var(--ease-out-ios) both !important;}
+@keyframes task-shake-out{0%{transform:scale(1) rotate(0);opacity:1;}30%{transform:scale(1.03) rotate(-3deg);}60%{transform:scale(.9) rotate(4deg);opacity:.6;}100%{transform:scale(.4) rotate(10deg) translateY(10px);opacity:0;max-height:0;margin:0;padding:0;}}
+.task-pin-dot{position:absolute;top:-6px;left:-6px;width:16px;height:16px;border-radius:50%;background:radial-gradient(circle at 32% 28%,#fff,var(--accent) 60%,var(--accent-2));box-shadow:0 3px 8px rgba(0,0,0,.4);z-index:2;display:none;}
+.task-card.wiggle-mode .task-pin-dot{display:block;animation:pin-glint 1.6s ease-in-out infinite;}
+@keyframes pin-glint{0%,100%{box-shadow:0 3px 8px rgba(0,0,0,.4);}50%{box-shadow:0 3px 14px rgba(var(--accent-rgb),.7);}}
+.task-delete-x{position:absolute;top:-7px;right:-7px;width:22px;height:22px;border-radius:50%;background:var(--red);color:#1a0000;border:2px solid var(--bg-0);display:none;align-items:center;justify-content:center;font-size:13px;font-weight:900;line-height:1;cursor:pointer;z-index:3;box-shadow:0 4px 10px rgba(0,0,0,.35);animation:pop-badge .3s var(--ease-spring) both;}
+.task-card.wiggle-mode .task-delete-x{display:flex;}
+@keyframes pop-badge{from{opacity:0;transform:scale(.4);}to{opacity:1;transform:scale(1);}}
+.task-card{transition:box-shadow .25s ease;}
+.task-card.wiggle-mode{box-shadow:0 0 0 1px rgba(var(--accent-rgb),.28),0 14px 30px -18px rgba(0,0,0,.5);}
+.task-check-tick{animation:check-pop .32s var(--ease-spring) both;}
+@keyframes check-pop{0%{transform:scale(.4) rotate(-15deg);opacity:0;}60%{transform:scale(1.25) rotate(5deg);opacity:1;}100%{transform:scale(1) rotate(0);}}
+.wiggle-done-fab{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:120;background:var(--accent);color:#0B0E1A;border:none;border-radius:999px;padding:11px 22px;font-weight:800;font-size:12.5px;box-shadow:0 14px 30px -12px var(--accent-glow);animation:rise-in .32s var(--ease-out-ios) both;cursor:pointer;}
+
 
 /* ── XP progression / Part 3 ───────────────────────────────────────────── */
 .xp-level-card{padding:18px;background:linear-gradient(145deg,rgba(var(--accent-rgb),.18),rgba(255,255,255,.035));border:1px solid rgba(var(--accent-rgb),.25);}
@@ -925,6 +1033,12 @@ const ICONS = {
   'briefcase': '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M3 13h18"/>',
   'check': '<path d="M5 12.5 10 17.5 19 6.5"/>',
   'chevron-right': '<path d="m9 6 6 6-6 6"/>',
+  'chevron-down': '<path d="m6 9 6 6 6-6"/>',
+  'headphones': '<path d="M4 14v-3a8 8 0 0 1 16 0v3"/><rect x="2" y="14" width="5" height="7" rx="2"/><rect x="17" y="14" width="5" height="7" rx="2"/>',
+  'calendar-event': '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18"/><path d="M8 3v4M16 3v4"/><path d="M8 15h.01M12 15h.01M16 15h.01"/>',
+  'home-2': '<path d="M5 12H3l9-9 9 9h-2"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/>',
+  'run': '<circle cx="14" cy="4" r="1.6"/><path d="M6 20 9 15l3-1.5V10L9 8"/><path d="m10.5 13.5 3 1 2.5 5"/><path d="M6 12.5 9 10l4 .5"/>',
+  'arrows-shuffle': '<path d="M18 4h3v3"/><path d="M4 20 21 4"/><path d="M18 20h3v-3"/><path d="M15.5 15.5 21 20"/><path d="M4 4c2 0 4.5 1.2 6.4 3.4"/>',
   'circle-check': '<circle cx="12" cy="12" r="9"/><path d="m9 12 2 2 4-4"/>',
   'circle-dot': '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none"/>',
   'clock': '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>',
@@ -1075,6 +1189,14 @@ const AVAIL_STATES = [
   { id:'soon', label:'Busy soon', icon:'ti-clock', color:'var(--amber)', ring:'ring-soon' },
   { id:'dnd', label:'Do not disturb', icon:'ti-moon-2', color:'var(--red)', ring:'ring-dnd' },
   { id:'sleep', label:'Sleeping', icon:'ti-zzz', color:'var(--grey)', ring:'ring-sleep' },
+  { id:'gaming', label:'Gaming', icon:'ti-device-gamepad-2', color:'var(--purple)', ring:'ring-gaming' },
+  { id:'study', label:'Studying', icon:'ti-book', color:'var(--cyan)', ring:'ring-study' },
+  { id:'work', label:'Working', icon:'ti-briefcase', color:'var(--amber)', ring:'ring-work' },
+  { id:'eating', label:'Eating', icon:'ti-coffee', color:'var(--pink)', ring:'ring-eating' },
+  { id:'travel', label:'Traveling', icon:'ti-plane', color:'var(--cyan)', ring:'ring-travel' },
+  { id:'home', label:'At home', icon:'ti-home-2', color:'var(--green)', ring:'ring-home' },
+  { id:'listening', label:'In the zone', icon:'ti-headphones', color:'var(--purple)', ring:'ring-gaming' },
+  { id:'active', label:'Active', icon:'ti-run', color:'var(--pink)', ring:'ring-active' },
 ];
 
 const THEMES = [
@@ -1480,11 +1602,63 @@ async function switchSquad(id){
   const s=await loadSquad(id);
   if(!s || !s.members?.some(m=>m.id===ME.id)){ showToast('That group is no longer available','ti-alert-triangle'); return; }
   SQUAD=s; SQUAD_ID=id;
+  GROUP_SWITCH_CACHE[id]={name:s.name,groupStyle:s.groupStyle};
   ensureAccountState();
   if(!ME.groupIds.includes(id)){ ME.groupIds.push(id); await saveMe(); }
   await saveMySquadId();
   attachSquadListener();
-  applyTheme(); renderAll();
+  applyTheme();
+  GROUP_SWITCH_OPEN=false;
+  renderAll();
+  showToast(`Switched to ${s.name}`, 'ti-arrows-shuffle');
+}
+async function refreshGroupSwitchCache(){
+  if(!ME) return;
+  const ids=getGroupIds();
+  if(SQUAD_ID && SQUAD) GROUP_SWITCH_CACHE[SQUAD_ID]={name:SQUAD.name,groupStyle:SQUAD.groupStyle};
+  let changed=false;
+  for(const id of ids){
+    if(id===SQUAD_ID || GROUP_SWITCH_CACHE[id]) continue;
+    try{
+      const s=await window.fbGet('squads/'+id);
+      if(s && s.members?.some(m=>m.id===ME.id)) GROUP_SWITCH_CACHE[id]={name:s.name,groupStyle:s.groupStyle};
+      else { ME.groupIds=(ME.groupIds||[]).filter(gid=>gid!==id); changed=true; }
+    }catch(e){ GROUP_SWITCH_CACHE[id]=GROUP_SWITCH_CACHE[id]||{name:'Saved group'}; }
+  }
+  if(changed){ await saveMe(); }
+  if(['home','xp'].includes(currentScreen)) softUpdate();
+}
+function renderGroupSwitcher(){
+  const ids=getGroupIds();
+  const rows=ids.map(id=>{
+    const active=id===SQUAD_ID;
+    const cached=active?{name:SQUAD.name,groupStyle:SQUAD.groupStyle}:GROUP_SWITCH_CACHE[id];
+    const name=cached?.name || 'Loading…';
+    const gs=Object.assign(defaultGroupStyle(),cached?.groupStyle||{});
+    return `<div class="group-switch-row ${active?'active':''}" data-switch-group="${escapeHtml(id)}" style="--group-accent:${escapeHtml(gs.accent)};--group-accent-2:${escapeHtml(gs.accent2)};">
+      ${groupMarkHtml(gs,34)}
+      <div style="min-width:0;flex:1;">
+        <div class="group-switch-name">${escapeHtml(name)}</div>
+        <div class="group-switch-sub">${active?'Currently viewing':'Tap to switch'}</div>
+      </div>
+      ${active?`<span class="ti" style="color:var(--accent);">${icon('ti-circle-check')}</span>`:`<span class="ti" style="color:var(--text-faint);">${icon('ti-chevron-right')}</span>`}
+    </div>`;
+  }).join('');
+  return `<div class="group-switch-wrap ${GROUP_SWITCH_OPEN?'open':''}" id="group-switch-wrap">
+    <button class="group-switch-trigger" id="group-switch-trigger" aria-haspopup="true" aria-expanded="${GROUP_SWITCH_OPEN?'true':'false'}">
+      ${groupMarkHtml(Object.assign(defaultGroupStyle(),SQUAD.groupStyle||{}),38)}
+      <div style="min-width:0;">
+        <div class="brand-name">${escapeHtml(SQUAD.name)}</div>
+        <div class="sync-badge ${window.__fbReady?'':'offline'}"><span class="ti">${icon(window.__fbReady?'ti-refresh':'ti-cloud-off')}</span> ${window.__fbReady?'Connected live':'Offline — cached view'}</div>
+      </div>
+      <span class="group-switch-caret ti">${icon('ti-chevron-down')}</span>
+    </button>
+    <div class="group-switch-panel" id="group-switch-panel">
+      <div class="group-switch-label">${ids.length>1?`Your groups (${ids.length})`:'Your group'}</div>
+      ${rows || '<div class="small-note" style="padding:6px 8px;">No groups yet.</div>'}
+      <div class="group-switch-add" id="group-switch-add"><div class="icon-btn">${icon('ti-plus')}</div>Join or create a group</div>
+    </div>
+  </div>`;
 }
 async function initXpOnBoot(){
   if(!ME) return;
@@ -1553,6 +1727,8 @@ async function loadSquad(id){
   return null;
 }
 let SQUAD_SYNC_BASE=null;
+let GROUP_SWITCH_CACHE={};
+let GROUP_SWITCH_OPEN=false;
 function deepCloneSafe(v){try{return JSON.parse(JSON.stringify(v))}catch(e){return v}}
 function buildDeepPatch(base,current,prefix=''){const out={};const obj=v=>v&&typeof v==='object'&&!Array.isArray(v);if(!obj(base)||!obj(current)){out[prefix]=deepCloneSafe(current);return out}const keys=new Set([...Object.keys(base||{}),...Object.keys(current||{})]);for(const k of keys){const path=prefix?prefix+'/'+k:k;if(!(k in current)){out[path]=null;continue}if(!(k in base)){out[path]=deepCloneSafe(current[k]);continue}const a=base[k],b=current[k];if(obj(a)&&obj(b))Object.assign(out,buildDeepPatch(a,b,path));else if(JSON.stringify(a)!==JSON.stringify(b))out[path]=deepCloneSafe(b)}return out}
 function recordSquadSyncBase(){SQUAD_SYNC_BASE=deepCloneSafe(SQUAD)}
@@ -1730,11 +1906,122 @@ async function enableNotifications(){
     if(permission==='granted'){
       LOCAL.notifications = true; await saveLocal(); showToast('Desktop/mobile notifications enabled','ti-bell');
       try{ navigator.setAppBadge?.(1); }catch(e){}
+      // Background push (Web Push via FCM) is a separate opt-in from the
+      // foreground Notification permission above — it needs its own service
+      // worker registration and a device token. See registerPushNotifications().
+      registerPushNotifications().catch(()=>{});
       return true;
     }
     showToast('Notification permission was not granted','ti-alert-triangle');
   }catch(e){ showToast('Could not enable notifications','ti-alert-triangle'); }
   return false;
+}
+
+// ── Web Push (FCM) registration ─────────────────────────────────────────
+// IMPORTANT CAVEAT: this wires up the client half of real background push —
+// service worker + FCM device token, saved to the user's profile — but
+// *delivering* a push while the app is closed requires a server-side sender
+// (Cloud Function, cron job, etc.) that calls the FCM Admin SDK with that
+// token whenever a nudge/message/task event happens. That backend piece is
+// out of scope for a static client file and is NOT included here. Until a
+// server sends pushes, notifications only appear while the tab is open
+// (handled by notifyUser() above) or via this device's own foreground
+// FCM 'message' handler.
+const VAPID_PUBLIC_KEY = 'REPLACE_WITH_YOUR_FCM_VAPID_PUBLIC_KEY';
+let __fcmMessaging = null;
+let __swRegistration = null;
+
+function buildServiceWorkerBlobUrl(){
+  // Firebase Messaging's background handler must live in a real service
+  // worker file. Since this app ships as a single HTML file with no server,
+  // we generate that file at runtime as a Blob and register it — the same
+  // trick already used below for the web manifest.
+  const swSource = `
+    importScripts('https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js');
+    importScripts('https://www.gstatic.com/firebasejs/10.13.0/firebase-messaging-compat.js');
+    firebase.initializeApp(${JSON.stringify({
+      apiKey: "AIzaSyAqJw7ROh1nNU9lPhcU_Rwojbx6XQhcpW8",
+      authDomain: "squadsyncmd.firebaseapp.com",
+      databaseURL: "https://squadsyncmd-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "squadsyncmd",
+      storageBucket: "squadsyncmd.firebasestorage.app",
+      messagingSenderId: "790712054751",
+      appId: "1:790712054751:web:3befeca96a3c336b5e0a6a"
+    })});
+    const messaging = firebase.messaging();
+    // Background messages (app closed / tab not focused) land here. The
+    // payload shape (notification.title/body) matches what a server sends
+    // via the FCM Admin SDK's "notification" field.
+    messaging.onBackgroundMessage((payload) => {
+      const title = payload?.notification?.title || 'SquadZync';
+      const body = payload?.notification?.body || '';
+      self.registration.showNotification(title, {
+        body,
+        icon: '${document.querySelector('link[rel="icon"]')?.href || ''}',
+        badge: '${document.querySelector('link[rel="icon"]')?.href || ''}',
+        data: payload?.data || {}
+      });
+    });
+    self.addEventListener('notificationclick', (event) => {
+      event.notification.close();
+      event.waitUntil(clients.matchAll({ type: 'window' }).then((all) => {
+        if (all.length) return all[0].focus();
+        return clients.openWindow('./');
+      }));
+    });
+  `;
+  const blob = new Blob([swSource], { type: 'application/javascript' });
+  return URL.createObjectURL(blob);
+}
+
+async function registerPushNotifications(){
+  if(!('serviceWorker' in navigator) || !('PushManager' in window)){
+    console.warn('Web Push is not supported in this browser.');
+    return null;
+  }
+  if(Notification.permission !== 'granted'){
+    console.warn('Cannot register for push before notification permission is granted.');
+    return null;
+  }
+  if(VAPID_PUBLIC_KEY.startsWith('REPLACE_WITH')){
+    // Deliberately silent (no toast) — this is a setup-time caveat for the
+    // developer, not something the end user should see as an error.
+    console.warn('SquadZync push: set VAPID_PUBLIC_KEY (from Firebase Console → Cloud Messaging) to enable background push.');
+    return null;
+  }
+  try{
+    const { getMessaging, getToken, onMessage } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-messaging.js');
+    if(!__swRegistration){
+      __swRegistration = await navigator.serviceWorker.register(buildServiceWorkerBlobUrl());
+    }
+    if(!__fcmMessaging) __fcmMessaging = getMessaging();
+    const token = await getToken(__fcmMessaging, {
+      vapidKey: VAPID_PUBLIC_KEY,
+      serviceWorkerRegistration: __swRegistration
+    });
+    if(!token) return null;
+    // Foreground messages (tab open, app focused) are handled here instead
+    // of the service worker, so they can reuse the in-app toast + XP-style
+    // UI rather than a raw OS notification popping over an active session.
+    onMessage(__fcmMessaging, (payload) => {
+      const title = payload?.notification?.title || 'SquadZync';
+      const body = payload?.notification?.body || '';
+      showToast(`${title}${body ? ' — ' + body : ''}`, 'ti-bell');
+    });
+    if(ME){
+      ME.pushTokens = ME.pushTokens || {};
+      ME.pushTokens[token] = { platform: navigator.userAgent.slice(0,120), updatedAt: Date.now() };
+      await saveMe();
+      // Mirror under a top-level index too, so a future server-side sender
+      // can look up "which tokens belong to squad X" without scanning every
+      // user record.
+      if(SQUAD_ID) fbSetSafe(`pushTokens/${SQUAD_ID}/${ME.id}/${token}`, true);
+    }
+    return token;
+  }catch(e){
+    console.warn('Push registration failed:', e);
+    return null;
+  }
 }
 function notifyUser(title, body){
   if(!LOCAL.notifications || !('Notification' in window) || Notification.permission!=='granted') return;
@@ -1905,6 +2192,151 @@ function timeUntil(ts){
   if(mins < 60) return `free in ${mins}m`;
   const hrs = Math.floor(mins / 60);
   return `free in ${hrs}h ${mins%60}m`;
+}
+
+// ── Timezone matrix + overlap availability finder ──────────────────────
+// Uses each member's stored IANA tz to compute their local hour for any
+// UTC instant, then scores "waking hours" (8am–11pm local) as a proxy for
+// realistic availability since the app has no calendar data to draw on.
+// Live avail state (dnd/sleep) further discounts the current hour only,
+// since we only know *current* status, not future.
+function localHourInTz(tzStr, date){
+  try{
+    return parseInt(new Intl.DateTimeFormat('en-US',{timeZone:tzStr,hour:'numeric',hour12:false}).format(date),10);
+  }catch(e){ return date.getUTCHours(); }
+}
+function isWakingHour(hour){ return hour>=8 && hour<23; }
+function computeOverlapSlots(members, hoursAhead=24){
+  const now=Date.now();
+  const slots=[];
+  for(let h=0; h<hoursAhead; h++){
+    const t=new Date(now + h*3600000);
+    let awakeCount=0;
+    const awakeMembers=[];
+    members.forEach(m=>{
+      const localHour=localHourInTz(m.tz||'UTC', t);
+      const awake=isWakingHour(localHour);
+      if(awake){ awakeCount++; awakeMembers.push(m); }
+    });
+    slots.push({ hourOffset:h, ts:t.getTime(), awakeCount, awakeMembers, total:members.length });
+  }
+  return slots;
+}
+function bestOverlapWindow(slots, minMembers){
+  // Find the earliest contiguous run of slots meeting the threshold, prefer longer runs.
+  let best=null, run=null;
+  for(const s of slots){
+    if(s.awakeCount>=minMembers){
+      if(!run) run={start:s,end:s,len:1};
+      else { run.end=s; run.len++; }
+    }else{
+      if(run && (!best || run.len>best.len)) best=run;
+      run=null;
+    }
+  }
+  if(run && (!best || run.len>best.len)) best=run;
+  return best;
+}
+function icsEscape(s){ return String(s||'').replace(/\\/g,'\\\\').replace(/;/g,'\\;').replace(/,/g,'\\,').replace(/\n/g,'\\n'); }
+function icsDate(d){ return d.toISOString().replace(/[-:]/g,'').split('.')[0]+'Z'; }
+function downloadIcs(filename, events){
+  const lines=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//SquadZync//EN','CALSCALE:GREGORIAN'];
+  events.forEach(ev=>{
+    lines.push('BEGIN:VEVENT');
+    lines.push('UID:'+(ev.uid||('sz-'+Date.now()+'-'+Math.random().toString(36).slice(2,8)))+'@squadzync');
+    lines.push('DTSTAMP:'+icsDate(new Date()));
+    lines.push('DTSTART:'+icsDate(new Date(ev.start)));
+    lines.push('DTEND:'+icsDate(new Date(ev.end)));
+    lines.push('SUMMARY:'+icsEscape(ev.title));
+    if(ev.description) lines.push('DESCRIPTION:'+icsEscape(ev.description));
+    lines.push('END:VEVENT');
+  });
+  lines.push('END:VCALENDAR');
+  const blob=new Blob([lines.join('\r\n')], {type:'text/calendar;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 4000);
+}
+function exportOverlapToIcs(){
+  const members=SQUAD?.members||[];
+  const slots=computeOverlapSlots(members,24);
+  const full=bestOverlapWindow(slots, members.length);
+  const majority=bestOverlapWindow(slots, Math.max(2,Math.ceil(members.length*0.6)));
+  const events=[];
+  const pushWindow=(win,label)=>{
+    if(!win) return;
+    const start=win.start.ts, end=win.end.ts+3600000;
+    events.push({ uid:'overlap-'+SQUAD.id+'-'+win.start.hourOffset, title:`${label} — ${SQUAD.name}`, start, end, description:`Suggested by SquadZync: ${win.start.awakeCount}/${win.start.total} of your squad likely awake.` });
+  };
+  pushWindow(full,'Everyone free (squad overlap)');
+  pushWindow(majority,'Most of squad free');
+  if(!events.length) return showToast('No overlap window to export yet','ti-alert-circle');
+  downloadIcs(`${(SQUAD.name||'squad').replace(/[^a-z0-9]+/gi,'-')}-overlap.ics`, events);
+  showToast('Calendar file downloaded — import it into Google or Apple Calendar','ti-calendar-event');
+}
+function exportMyStatusToIcs(){
+  const st=friendState(ME);
+  if(!st.freeAt) return showToast('Set a "free in" time on your status first','ti-alert-circle');
+  const now=Date.now();
+  downloadIcs('my-busy-status.ics', [{ uid:'busy-'+ME.id+'-'+now, title:`Busy — ${ME.name}`, start:now, end:st.freeAt, description:st.text||'Busy via SquadZync' }]);
+  showToast('Calendar file downloaded','ti-calendar-event');
+}
+function renderTimezones(){
+  const members=SQUAD?.members||[];
+  const slots=computeOverlapSlots(members, 24);
+  const fullOverlap=bestOverlapWindow(slots, members.length);
+  const majorityOverlap=bestOverlapWindow(slots, Math.max(2,Math.ceil(members.length*0.6)));
+  const fmtSlot=(s)=>new Intl.DateTimeFormat('en-US',{weekday:'short',hour:'numeric',hour12:true}).format(new Date(s.ts));
+  const overlapCard=(label,win,icon_)=>{
+    if(!win) return `<div class="overlap-card glass liquid-interactive motion-card"><div class="overlap-card-label">${escapeHtml(label)}</div><div class="overlap-card-empty">No clean overlap in the next 24h.</div></div>`;
+    const startLabel=fmtSlot(win.start), endLabel=fmtSlot(win.end);
+    const span=win.len===1?startLabel:`${startLabel} – ${endLabel}`;
+    return `<div class="overlap-card glass liquid-interactive motion-card"><div class="overlap-card-label"><span class="ti">${icon(icon_)}</span>${escapeHtml(label)}</div><div class="overlap-card-time">${span}</div><div class="overlap-card-sub">${win.start.awakeCount}/${win.start.total} members likely awake${win.hourOffset===0?'':''}</div></div>`;
+  };
+  const heatCells=slots.slice(0,24).map(s=>{
+    const pct=s.total?Math.round(s.awakeCount/s.total*100):0;
+    const t=new Date(s.ts);
+    const hourLabel=new Intl.DateTimeFormat('en-US',{hour:'numeric',hour12:true}).format(t).replace(' ','');
+    return `<div class="heat-cell" style="--pct:${pct}%" title="${pct}% likely awake"><div class="heat-cell-fill"></div>${s.hourOffset%3===0?`<span class="heat-cell-label">${hourLabel}</span>`:''}</div>`;
+  }).join('');
+  const rows=members.slice().sort((a,b)=>(a.tz||'').localeCompare(b.tz||'')).map(m=>{
+    const st=friendState(m);
+    const a=AVAIL_STATES.find(x=>x.id===st.avail)||AVAIL_STATES[0];
+    const localHour=localHourInTz(m.tz||'UTC', new Date());
+    const awake=isWakingHour(localHour);
+    const offsetLabel=(()=>{ try{ const parts=new Intl.DateTimeFormat('en-US',{timeZone:m.tz||'UTC',timeZoneName:'shortOffset'}).formatToParts(new Date()); const tz=parts.find(p=>p.type==='timeZoneName'); return tz?tz.value:''; }catch(e){ return ''; } })();
+    return `<div class="tz-row glass liquid-interactive motion-card">
+      ${renderAvatarMarkup(m,38)}
+      <div style="min-width:0;flex:1;">
+        <div style="font-weight:700;font-size:13px;">${escapeHtml(m.name)}${m.id===ME.id?' (You)':''}</div>
+        <div style="font-size:10.5px;color:var(--text-faint);">${escapeHtml((m.tz||'UTC').replace(/_/g,' '))} ${offsetLabel?`· ${escapeHtml(offsetLabel)}`:''}</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-weight:800;font-size:15px;font-variant-numeric:tabular-nums;">${escapeHtml(getTimeInTz(m.tz))}</div>
+        <div style="font-size:10px;display:flex;align-items:center;gap:4px;justify-content:flex-end;color:${a.color};"><span class="ti">${icon(a.icon)}</span>${awake?'Awake hours':'Likely asleep'}</div>
+      </div>
+    </div>`;
+  }).join('');
+  return `<div class="screen">
+    <div class="page-title-row">${backBtn('timezones-back')}<h2>Times &amp; overlap</h2></div>
+    <p class="small-note" style="margin:8px 0 14px 48px;">Local times, live status, and the best windows to catch everyone.</p>
+    <div style="display:flex;gap:7px;margin:0 0 18px;">
+      <button class="social-mini-btn" id="tz-export-overlap"><span class="ti">${icon('ti-calendar-event')}</span> Export overlap to calendar</button>
+      <button class="social-mini-btn" id="tz-export-mine"><span class="ti">${icon('ti-calendar-event')}</span> Export my busy time</button>
+    </div>
+    <div class="section-label">Best overlap windows</div>
+    <div class="overlap-grid">
+      ${overlapCard('Everyone awake', fullOverlap, 'ti-users-group')}
+      ${overlapCard('Most of squad awake', majorityOverlap, 'ti-users')}
+    </div>
+    <div class="section-label">Next 24 hours</div>
+    <div class="glass liquid-interactive motion-card" style="padding:14px 12px 10px;margin-bottom:18px;">
+      <div class="heat-strip">${heatCells}</div>
+      <div class="small-note" style="margin-top:10px;">Darker = more of your squad is in waking hours (8am–11pm local).</div>
+    </div>
+    <div class="section-label">Squad clocks</div>
+    <div class="stack">${rows || '<div class="empty-hint glass">No members yet.</div>'}</div>
+  </div>${renderNav('home')}`;
 }
 function genCode(){ return Math.floor(100000 + Math.random() * 900000).toString(); }
 
@@ -2129,6 +2561,7 @@ function currentScreenHtml(){
   if(currentScreen === 'xp') return renderXp();
   if(currentScreen === 'shop') return renderShop();
   if(currentScreen === 'notifications') return renderNotifications();
+  if(currentScreen === 'timezones') return renderTimezones();
   return renderHome();
 }
 
@@ -2192,7 +2625,7 @@ function initLiquidInteractions(){
     '.theme-swatch', '.color-swatch-custom', '.nudge-btn', '.wheel-center', '.spin-wheel', '.motion-card',
     '.empty-hint', '.login-email-card', '.viewer-banner', '.viewer-exit', '.nav-item', '.fab',
     '.control-select', 'input[type=email]', 'input[type=password]', 'input[type=text]', 'input[type=tel]',
-    'input[type=url]', 'input[type=search]', 'textarea'
+    'input[type=url]', 'input[type=search]', 'textarea', '.task-check', '.social-tab', '.social-mini-btn'
   ].join(',');
 
   document.querySelectorAll(selector).forEach(el=>{
@@ -2544,7 +2977,7 @@ function renderHome(){
           <div class="group-hero-actions"><button class="btn btn-primary liquid-interactive motion-card" id="group-invite-btn">${icon('ti-share-3')} Invite</button><button class="btn btn-ghost liquid-interactive motion-card" id="group-manage-btn">${icon('ti-settings')} Manage</button></div>
         </div>
       </div>
-      <div class="top-row" style="margin-top:14px;"><div class="brand">${groupMarkHtml(g,38)}<div><div class="brand-name">${escapeHtml(SQUAD.name)}</div><div class="sync-badge ${online?'':'offline'}"><span class="ti">${icon(online?'ti-refresh':'ti-cloud-off')}</span> ${online?'Connected live':'Offline — cached view'}</div></div></div>${renderAvatarGroup(others)}<div style="display:flex;align-items:center;gap:7px;margin-left:auto;"><div class="sync-badge" id="home-sync-badge" style="cursor:pointer;">${icon(online?'ti-refresh':'ti-cloud-off')} ${online?'Live':'Offline'}</div>${renderNotificationBell()}<div class="icon-btn liquid-interactive motion-card" id="my-status-btn">${icon('ti-mood-smile')}</div><div class="icon-btn liquid-interactive motion-card" id="go-messages-btn">${icon('ti-message')}</div></div></div>
+      <div class="top-row" style="margin-top:14px;">${renderGroupSwitcher()}${renderAvatarGroup(others)}<div style="display:flex;align-items:center;gap:7px;margin-left:auto;"><div class="sync-badge" id="home-sync-badge" style="cursor:pointer;">${icon(online?'ti-refresh':'ti-cloud-off')} ${online?'Live':'Offline'}</div>${renderNotificationBell()}<div class="icon-btn liquid-interactive motion-card" id="go-timezones-btn" title="Times &amp; overlap">${icon('ti-world')}</div><div class="icon-btn liquid-interactive motion-card" id="my-status-btn">${icon('ti-mood-smile')}</div><div class="icon-btn liquid-interactive motion-card" id="go-messages-btn">${icon('ti-message')}</div></div></div>
       <div class="xp-hero glass liquid-sheen liquid-interactive motion-card" id="open-xp" style="margin-bottom:14px;cursor:pointer;"><div style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><div><div style="font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-lo);font-weight:800;">Your XP</div><div class="xp-number">${Math.floor(ME.xp||0)} <span style="font-size:14px;color:var(--text-lo);font-weight:700;">XP</span></div></div><div style="text-align:right;"><div class="xp-badge">${icon('ti-flame')} Daily +10</div><div style="font-size:10.5px;color:var(--text-faint);margin-top:6px;">Tap for XP &amp; shop</div></div></div></div>
       <div class="layout-switch" id="layout-switch"><div class="layout-pill" id="layout-pill"></div><div class="layout-opt liquid-interactive motion-card ${layout==='grid'?'active':''}" data-layout="grid">Grid</div><div class="layout-opt liquid-interactive motion-card ${layout==='list'?'active':''}" data-layout="list">List</div><div class="layout-opt liquid-interactive motion-card ${layout==='wheel'?'active':''}" data-layout="wheel">Wheel</div></div>
       ${body}
@@ -3531,8 +3964,10 @@ function renderBoard(){
  const notes=(BOARD||[]).slice().sort((a,b)=>b.ts-a.ts);
  const noteHtml=notes.map(n=>{const r=n.reactions||{},tally={};Object.entries(r).forEach(([u,e])=>(tally[e]??=[]).push(u));const chips=Object.entries(tally).map(([e,u])=>`<button class="reaction-chip ${u.includes(ME.id)?'mine':''}" data-note="${n.id}" data-emoji="${e}">${e} ${u.length}</button>`).join('');return `<div class="board-note glass liquid-interactive motion-card" style="position:relative">${n.pinned?'<span class="pin-mark">'+icon('ti-pin')+'</span>':''}<div class="board-note-text">${socialText(n.text)}</div><div class="board-note-meta"><div class="avatar">${getInitials(n.authorName)}</div><span>${escapeHtml(n.authorName.split(' ')[0])} · ${timeAgo(n.ts)}</span></div><div class="reaction-row">${chips}<button class="reaction-add" data-note-picker="${n.id}">${icon('ti-mood-plus')}</button></div><div style="display:flex;gap:6px;margin-top:8px"><button class="message-action" data-note-pin="${n.id}">${n.pinned?'Unpin':'Pin'}</button><button class="message-action" data-note-thread="${n.id}">Reply</button></div></div>`}).join('');
  const polls=(POLLS||[]).map(p=>{const v=p.votes||{},cnt={};Object.values(v).forEach(x=>cnt[x]=(cnt[x]||0)+1);const total=Object.keys(v).length;return `<div class="poll-card glass liquid-interactive motion-card"><b>${escapeHtml(p.question)}</b>${(p.options||[]).map((o,i)=>{const c=cnt[i]||0,pct=total?Math.round(c/total*100):0;return `<div class="poll-option" data-poll="${p.id}" data-poll-option="${i}"><div class="poll-option-fill" style="width:${pct}%"></div><div class="poll-option-inner"><span>${escapeHtml(o)}</span><span class="poll-count">${pct}% · ${c}</span></div></div>`}).join('')}</div>`}).join('')||'<div class="empty-hint glass">No polls yet.</div>';
- const tasks=(TASKS||[]).map(t=>`<div class="task-card glass liquid-interactive motion-card"><div class="task-row"><button class="task-check ${t.done?'done':''}" data-task-toggle="${t.id}">${t.done?icon('ti-check'):''}</button><div class="task-title" style="${t.done?'text-decoration:line-through;color:var(--text-faint)':''}">${escapeHtml(t.title)}<div class="task-meta">${t.xp?`+${t.xp} XP`:''}</div></div></div></div>`).join('')||'<div class="empty-hint glass">No shared tasks yet.</div>';
- return `<div class="screen"><div class="page-title-row"><h2>Team board</h2></div><p class="small-note" style="margin-bottom:18px">Notes, polls and shared tasks for ${escapeHtml(SQUAD.name)}.</p><div class="social-tabs"><div class="social-tab-pill" id="board-tab-pill"></div><button class="social-tab active" data-board-tab="notes">Notes</button><button class="social-tab" data-board-tab="polls">Polls</button><button class="social-tab" data-board-tab="tasks">Tasks</button></div><div style="display:flex;gap:7px;margin:-4px 0 14px"><button class="social-mini-btn" id="board-add-poll">+ Poll</button><button class="social-mini-btn" id="board-add-task">+ Task</button></div><div id="board-panel-notes">${noteHtml||'<div class="empty-hint glass">Your board is quiet.</div>'}</div><div id="board-panel-polls" class="hidden">${polls}</div><div id="board-panel-tasks" class="hidden">${tasks}</div></div><div class="fab liquid-interactive motion-card" id="add-board-note">${icon('ti-plus')}</div>${renderNav('board')}`;
+ const canRemoveTasks = roleOf(ME.id)==='owner' || roleOf(ME.id)==='admin';
+ const tasks=(TASKS||[]).map(t=>`<div class="task-card glass liquid-interactive motion-card" data-task-card="${t.id}">${canRemoveTasks?`<span class="task-pin-dot"></span><button class="task-delete-x" data-task-remove="${t.id}" aria-label="Delete task">${icon('ti-x')}</button>`:''}<div class="task-row"><button class="task-check ${t.done?'done':''}" data-task-toggle="${t.id}">${t.done?`<span class="task-check-tick">${icon('ti-check')}</span>`:''}</button><div class="task-title" style="${t.done?'text-decoration:line-through;color:var(--text-faint)':''}">${escapeHtml(t.title)}<div class="task-meta">${t.xp?`+${t.xp} XP`:''}</div></div></div></div>`).join('')||'<div class="empty-hint glass">No shared tasks yet.</div>';
+ const wiggleHint = canRemoveTasks && (TASKS||[]).length ? `<div class="pin-board-hint"><span><span class="ti">${icon('ti-pin')}</span> Long-press a task to remove it — or shake your device</span></div>` : '';
+ return `<div class="screen"><div class="page-title-row"><h2>Team board</h2></div><p class="small-note" style="margin-bottom:18px">Notes, polls and shared tasks for ${escapeHtml(SQUAD.name)}.</p><div class="social-tabs"><div class="social-tab-pill" id="board-tab-pill"></div><button class="social-tab active" data-board-tab="notes">Notes</button><button class="social-tab" data-board-tab="polls">Polls</button><button class="social-tab" data-board-tab="tasks">Tasks</button></div><div style="display:flex;gap:7px;margin:-4px 0 14px"><button class="social-mini-btn" id="board-add-poll">+ Poll</button><button class="social-mini-btn" id="board-add-task">+ Task</button></div><div id="board-panel-notes">${noteHtml||'<div class="empty-hint glass">Your board is quiet.</div>'}</div><div id="board-panel-polls" class="hidden">${polls}</div><div id="board-panel-tasks" class="hidden">${wiggleHint}<div id="task-pin-board">${tasks}</div></div></div><div class="fab liquid-interactive motion-card" id="add-board-note">${icon('ti-plus')}</div>${renderNav('board')}`;
 }
 function escapeHtml(s){
   const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML;
@@ -3569,6 +4004,122 @@ async function votePoll(id,i){
   if(viewerBlocked('Sign in to vote in polls')) return;let p=(POLLS||[]).find(x=>x.id===id);if(!p)return;p.votes=p.votes||{};p.votes[ME.id]===i?delete p.votes[ME.id]:p.votes[ME.id]=i;await window.fbUpdate('polls/'+SQUAD.id+'/'+id,{votes:p.votes})}
 async function toggleTask(id){
   if(viewerBlocked('Sign in to update shared tasks')) return;let t=(TASKS||[]).find(x=>x.id===id);if(!t)return;t.done=!t.done;await window.fbUpdate('tasks/'+SQUAD.id+'/'+id,{done:t.done,completedBy:t.done?ME.id:null,completedAt:t.done?Date.now():null})}
+
+// ── Pin-board wiggle-to-delete (admin-only) ────────────────────────────────
+// Long-press a task to enter "wiggle mode" (iOS-style jiggling pins with a
+// delete X badge). While in wiggle mode, shaking the device (via
+// devicemotion) removes the task nearest the top of the list as a bonus
+// gesture — handy on mobile where a long-press-then-precise-tap can be
+// fiddly. Tapping "Done" or tapping outside exits wiggle mode.
+let __wiggleActive = false;
+let __wiggleLongPressTimer = null;
+let __shakeListenerBound = false;
+let __lastShakeTs = 0;
+
+function canWiggleTasks(){
+  return !!(ME && SQUAD && (roleOf(ME.id)==='owner' || roleOf(ME.id)==='admin'));
+}
+
+function enterWiggleMode(){
+  if(!canWiggleTasks() || __wiggleActive) return;
+  __wiggleActive = true;
+  const board = byId('task-pin-board');
+  if(board) board.querySelectorAll('.task-card').forEach(c=>c.classList.add('wiggle-mode'));
+  if(navigator.vibrate) try{ navigator.vibrate(12); }catch(e){}
+  showWiggleDoneFab();
+  bindShakeToDelete();
+  document.addEventListener('pointerdown', wiggleOutsideDismiss, true);
+}
+
+function exitWiggleMode(){
+  if(!__wiggleActive) return;
+  __wiggleActive = false;
+  document.querySelectorAll('.task-card.wiggle-mode').forEach(c=>c.classList.remove('wiggle-mode'));
+  const fab = byId('wiggle-done-fab'); if(fab) fab.remove();
+  document.removeEventListener('pointerdown', wiggleOutsideDismiss, true);
+}
+
+function wiggleOutsideDismiss(e){
+  if(e.target.closest('#task-pin-board') || e.target.closest('#wiggle-done-fab')) return;
+  exitWiggleMode();
+}
+
+function showWiggleDoneFab(){
+  if(byId('wiggle-done-fab')) return;
+  const btn = document.createElement('button');
+  btn.id = 'wiggle-done-fab';
+  btn.className = 'wiggle-done-fab';
+  btn.textContent = 'Done';
+  btn.onclick = (e) => { e.stopPropagation(); exitWiggleMode(); };
+  document.body.appendChild(btn);
+}
+
+function bindTaskLongPress(cardEl){
+  if(cardEl.dataset.wiggleBound === '1') return;
+  cardEl.dataset.wiggleBound = '1';
+  const start = (e) => {
+    if(!canWiggleTasks() || __wiggleActive) return;
+    if(e.target.closest('.task-check') || e.target.closest('.task-delete-x')) return;
+    clearTimeout(__wiggleLongPressTimer);
+    __wiggleLongPressTimer = setTimeout(() => enterWiggleMode(), 480);
+  };
+  const cancel = () => clearTimeout(__wiggleLongPressTimer);
+  cardEl.addEventListener('pointerdown', start);
+  cardEl.addEventListener('pointerup', cancel);
+  cardEl.addEventListener('pointerleave', cancel);
+  cardEl.addEventListener('pointercancel', cancel);
+}
+
+async function removeTaskWithAnimation(id){
+  const card = document.querySelector(`.task-card[data-task-card="${id}"]`);
+  if(card){
+    card.classList.add('shake-out');
+    await new Promise(res => setTimeout(res, 340));
+  }
+  try{
+    await window.fbSet('tasks/' + SQUAD.id + '/' + id, null);
+    showToast('Task removed', 'ti-trash');
+  }catch(e){
+    showToast('Could not remove task', 'ti-alert-triangle');
+    if(card) card.classList.remove('shake-out');
+  }
+  if(!(TASKS||[]).some(t=>t.id!==id)) exitWiggleMode();
+}
+
+async function deleteTask(id){
+  if(viewerBlocked('Sign in to remove tasks')) return;
+  if(!canWiggleTasks()) return showToast('Only admins can remove tasks', 'ti-ban');
+  await removeTaskWithAnimation(id);
+}
+
+function bindShakeToDelete(){
+  if(__shakeListenerBound) return;
+  if(typeof DeviceMotionEvent === 'undefined') return;
+  const attach = () => { window.addEventListener('devicemotion', onDeviceShake); __shakeListenerBound = true; };
+  if(typeof DeviceMotionEvent.requestPermission === 'function'){
+    // iOS 13+ requires an explicit user-gesture permission prompt. We're
+    // already inside one (the long-press that triggered wiggle mode).
+    DeviceMotionEvent.requestPermission().then(state => { if(state === 'granted') attach(); }).catch(()=>{});
+  } else {
+    attach();
+  }
+}
+
+function onDeviceShake(e){
+  if(!__wiggleActive) return;
+  const a = e.accelerationIncludingGravity || e.acceleration;
+  if(!a) return;
+  const magnitude = Math.abs(a.x||0) + Math.abs(a.y||0) + Math.abs(a.z||0);
+  const now = Date.now();
+  if(magnitude > 32 && now - __lastShakeTs > 900){
+    __lastShakeTs = now;
+    const nextCard = document.querySelector('#task-pin-board .task-card.wiggle-mode:not(.shake-out)');
+    if(nextCard){
+      if(navigator.vibrate) try{ navigator.vibrate([10,40,10]); }catch(err){}
+      removeTaskWithAnimation(nextCard.dataset.taskCard);
+    }
+  }
+}
 async function toggleChatPin(id){
   if(viewerBlocked('Sign in to pin messages')) return;let m=(CHAT||[]).find(x=>x.id===id);if(!m)return;m.pinned=!m.pinned;await window.fbUpdate('chats/'+SQUAD.id+'/'+id,{pinned:m.pinned})}
 async function reactToChat(id,e){
@@ -3887,8 +4438,39 @@ function bindEvents(){
   if(byId('me-join-group')) byId('me-join-group').onclick = async () => { await reconcileUserXpBalance(); goTo('join-squad'); };
   if(byId('shop-back')) byId('shop-back').onclick = () => goBack('xp');
   document.querySelectorAll('[data-switch-group]').forEach(el=>{
-    el.onclick = async ()=>{ await switchSquad(el.dataset.switchGroup); if(currentScreen!=='home') goTo('home',{replace:true}); };
+    el.onclick = async ()=>{ GROUP_SWITCH_OPEN=false; await switchSquad(el.dataset.switchGroup); if(currentScreen!=='home') goTo('home',{replace:true}); };
   });
+  if(byId('group-switch-trigger')){
+    byId('group-switch-trigger').onclick = (e) => {
+      e.stopPropagation();
+      GROUP_SWITCH_OPEN=!GROUP_SWITCH_OPEN;
+      const wrap=byId('group-switch-wrap');
+      if(wrap) wrap.classList.toggle('open', GROUP_SWITCH_OPEN);
+      const trigger=byId('group-switch-trigger'); if(trigger) trigger.setAttribute('aria-expanded', GROUP_SWITCH_OPEN?'true':'false');
+      if(GROUP_SWITCH_OPEN) refreshGroupSwitchCache();
+    };
+  }
+  if(byId('group-switch-add')){
+    byId('group-switch-add').onclick = async () => { GROUP_SWITCH_OPEN=false; await reconcileUserXpBalance(); goTo('squad-choice'); };
+  }
+  if(!window.__groupSwitchOutsideBound){
+    window.__groupSwitchOutsideBound = true;
+    document.addEventListener('click', (e) => {
+      if(!GROUP_SWITCH_OPEN) return;
+      const wrap=byId('group-switch-wrap');
+      if(wrap && !wrap.contains(e.target)){
+        GROUP_SWITCH_OPEN=false;
+        wrap.classList.remove('open');
+        const trigger=byId('group-switch-trigger'); if(trigger) trigger.setAttribute('aria-expanded','false');
+      }
+    });
+    document.addEventListener('keydown', (e) => {
+      if(e.key==='Escape' && GROUP_SWITCH_OPEN){
+        GROUP_SWITCH_OPEN=false;
+        const wrap=byId('group-switch-wrap'); if(wrap) wrap.classList.remove('open');
+      }
+    });
+  }
   if(byId('daily-spin-btn')) byId('daily-spin-btn').onclick = async ()=>{
     const btn=byId('daily-spin-btn'), wheel=byId('daily-spin-wheel');
     btn.setAttribute('disabled','true'); if(wheel) wheel.classList.add('spinning');
@@ -4116,6 +4698,10 @@ function bindEvents(){
   if(byId('group-manage-btn')) byId('group-manage-btn').onclick = () => goTo('manage');
   if(byId('group-invite-btn')) byId('group-invite-btn').onclick = () => openGroupInviteDialog();
   if(byId('go-messages-btn')) byId('go-messages-btn').onclick = () => goTo('messages');
+  if(byId('go-timezones-btn')) byId('go-timezones-btn').onclick = () => goTo('timezones');
+  if(byId('timezones-back')) byId('timezones-back').onclick = () => goBack('home');
+  if(byId('tz-export-overlap')) byId('tz-export-overlap').onclick = exportOverlapToIcs;
+  if(byId('tz-export-mine')) byId('tz-export-mine').onclick = exportMyStatusToIcs;
   if(byId('home-avatar-group')) byId('home-avatar-group').onclick = openHomeMemberDialog;
   if(byId('home-sync-badge')) byId('home-sync-badge').onclick = e => { e.stopPropagation(); openSyncPopover(byId('home-sync-badge')); };
   if(byId('me-avatar-btn')) byId('me-avatar-btn').onclick = () => openEmojiPicker();
@@ -4158,6 +4744,12 @@ function bindEvents(){
   document.querySelectorAll('[data-note-pin]').forEach(b=>b.onclick=()=>toggleBoardPin(b.dataset.notePin));
   document.querySelectorAll('[data-poll-option]').forEach(b=>b.onclick=()=>votePoll(b.dataset.poll,Number(b.dataset.pollOption)));
   document.querySelectorAll('[data-task-toggle]').forEach(b=>b.onclick=()=>toggleTask(b.dataset.taskToggle));
+  document.querySelectorAll('[data-task-remove]').forEach(b=>b.onclick=(e)=>{e.stopPropagation();deleteTask(b.dataset.taskRemove);});
+  document.querySelectorAll('#task-pin-board .task-card').forEach(c=>{
+    bindTaskLongPress(c);
+    if(__wiggleActive) c.classList.add('wiggle-mode');
+  });
+  if(__wiggleActive && !byId('wiggle-done-fab')) showWiggleDoneFab();
   document.querySelectorAll('[data-board-tab]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-board-tab]').forEach(x=>x.classList.toggle('active',x===b));['notes','polls','tasks'].forEach(k=>document.getElementById('board-panel-'+k)?.classList.toggle('hidden',b.dataset.boardTab!==k));const p=byId('board-tab-pill');if(p){p.style.left=b.offsetLeft+'px';p.style.width=b.offsetWidth+'px'}});
   if(byId('board-add-poll'))byId('board-add-poll').onclick=()=>openSocialPrompt('poll');
   if(byId('board-add-task'))byId('board-add-task').onclick=()=>openSocialPrompt('task');
@@ -4527,6 +5119,7 @@ async function bootForUser(user){
   renderAll();
   attachSquadListener();
   initBatteryTracking();
+  refreshGroupSwitchCache();
 }
 
 function waitForFbBridge(timeoutMs = 4000){
