@@ -1272,134 +1272,155 @@ input,select,textarea,button,.btn{max-width:100%;box-sizing:border-box;}
 @media(max-width:520px){.media-upload-grid{grid-template-columns:1fr!important;gap:8px!important}.media-upload-card{min-height:58px;padding:11px 12px;}.media-upload-wide{grid-column:auto!important;}}
 
 @media(max-width:520px){
-  /* Mobile group header: use an explicit 3-column layout so the text column
-     always gets real width instead of collapsing into character-by-character
-     wrapping on narrow/flex-constrained screens. */
-  .home .top-row,.home-screen .top-row{
-    display:flex;
-    flex-wrap:wrap;
-    align-items:center;
-    width:100%;
-    min-width:0;
-    max-width:100%;
+  /* Mobile home header: keep the group switcher in its own full-width row.
+     The controls get their own row, preventing the group name column from
+     being squeezed to a few pixels and wrapping one character per line. */
+  .home-top-row{
+    display:grid !important;
+    grid-template-columns:minmax(0,1fr) !important;
+    grid-template-rows:auto auto !important;
+    align-items:start !important;
+    justify-content:stretch !important;
+    width:100% !important;
+    max-width:100% !important;
+    min-width:0 !important;
+    gap:8px !important;
+    overflow:visible !important;
   }
   .home-group-head{
-    flex:1 1 100%;
-    width:100%;
-    max-width:100%;
-    min-width:0;
-    margin-bottom:9px;
-    overflow:visible;
+    grid-column:1;
+    grid-row:1;
+    display:block !important;
+    width:100% !important;
+    max-width:100% !important;
+    min-width:0 !important;
+    flex:none !important;
+    margin:0 !important;
+    overflow:visible !important;
   }
   .group-switch-wrap{
-    width:100%;
-    max-width:100%;
-    min-width:0;
-    overflow:visible;
+    display:block !important;
+    width:100% !important;
+    max-width:100% !important;
+    min-width:0 !important;
+    overflow:visible !important;
+    position:relative !important;
   }
   .group-switch-trigger{
-    display:grid;
-    grid-template-columns:38px minmax(0,1fr) 18px;
-    align-items:center;
-    column-gap:10px;
-    width:100%;
-    max-width:100%;
-    min-width:0;
-    box-sizing:border-box;
-    padding:5px 6px;
-    text-align:left;
-    overflow:hidden;
+    display:grid !important;
+    grid-template-columns:38px minmax(0,1fr) 20px !important;
+    align-items:center !important;
+    column-gap:10px !important;
+    width:100% !important;
+    max-width:100% !important;
+    min-width:0 !important;
+    box-sizing:border-box !important;
+    padding:7px 8px !important;
+    text-align:left !important;
+    overflow:hidden !important;
+    border-radius:14px !important;
   }
   .group-switch-trigger>.group-mark{
     grid-column:1;
-    flex:none;
-    width:38px;
-    max-width:38px;
+    grid-row:1;
+    width:38px !important;
+    max-width:38px !important;
+    min-width:38px !important;
+    flex:none !important;
   }
   .group-switch-trigger>div:not(.group-mark){
     grid-column:2;
-    min-width:0;
-    width:100%;
-    max-width:100%;
-    overflow:hidden;
+    grid-row:1;
+    min-width:0 !important;
+    width:100% !important;
+    max-width:100% !important;
+    overflow:hidden !important;
   }
   .group-switch-trigger .brand-name{
-    display:block;
-    width:100%;
-    max-width:100%;
-    min-width:0;
-    white-space:normal;
-    word-break:normal;
-    overflow-wrap:anywhere;
-    line-height:1.18;
-    overflow:visible;
-    text-overflow:clip;
+    display:block !important;
+    width:100% !important;
+    max-width:100% !important;
+    min-width:0 !important;
+    white-space:normal !important;
+    word-break:normal !important;
+    overflow-wrap:break-word !important;
+    line-height:1.2 !important;
+    overflow:visible !important;
+    text-overflow:clip !important;
   }
   .group-switch-trigger .sync-badge{
-    display:flex;
-    width:100%;
-    max-width:100%;
-    min-width:0;
-    white-space:normal;
-    overflow-wrap:anywhere;
-    word-break:normal;
-    line-height:1.15;
-    margin-top:3px;
+    display:flex !important;
+    align-items:center !important;
+    gap:5px !important;
+    width:100% !important;
+    max-width:100% !important;
+    min-width:0 !important;
+    white-space:normal !important;
+    overflow-wrap:break-word !important;
+    word-break:normal !important;
+    line-height:1.2 !important;
+    margin-top:3px !important;
   }
   .group-switch-caret{
     grid-column:3;
-    margin-top:0;
-    align-self:center;
-    justify-self:end;
-    width:18px;
-    min-width:18px;
+    grid-row:1;
+    align-self:center !important;
+    justify-self:end !important;
+    width:20px !important;
+    min-width:20px !important;
+    margin:0 !important;
   }
   .group-switch-panel{
-    width:min(320px,calc(100vw - 28px));
-    max-width:calc(100vw - 28px);
-    min-width:0;
-    box-sizing:border-box;
-    left:0;
-    right:auto;
-    overflow-x:hidden;
+    width:min(320px,calc(100vw - 28px)) !important;
+    max-width:calc(100vw - 28px) !important;
+    min-width:0 !important;
+    box-sizing:border-box !important;
+    left:0 !important;
+    right:auto !important;
+    overflow-x:hidden !important;
   }
   .group-switch-panel .group-switch-row{
-    min-width:0;
-    max-width:100%;
+    min-width:0 !important;
+    max-width:100% !important;
   }
   .group-switch-panel .group-switch-row > div:nth-child(2){
-    min-width:0;
-    width:100%;
-    max-width:100%;
-    overflow:hidden;
+    min-width:0 !important;
+    width:100% !important;
+    max-width:100% !important;
+    overflow:hidden !important;
   }
   .group-switch-name{
-    min-width:0;
-    max-width:100%;
-    white-space:normal;
-    word-break:normal;
-    overflow-wrap:anywhere;
-    line-height:1.22;
+    min-width:0 !important;
+    max-width:100% !important;
+    white-space:normal !important;
+    word-break:normal !important;
+    overflow-wrap:break-word !important;
+    line-height:1.22 !important;
   }
   .group-switch-sub{
-    min-width:0;
-    max-width:100%;
-    white-space:normal;
-    overflow-wrap:anywhere;
+    min-width:0 !important;
+    max-width:100% !important;
+    white-space:normal !important;
+    overflow-wrap:break-word !important;
   }
-
   .home-header-controls{
-    width:100%;
-    min-width:0;
-    max-width:100%;
-    margin-left:0;
-    justify-content:flex-end;
-    flex:0 0 auto;
-    gap:6px;
-    overflow-x:auto;
-    scrollbar-width:none;
+    grid-column:1;
+    grid-row:2;
+    width:100% !important;
+    min-width:0 !important;
+    max-width:100% !important;
+    margin:0 !important;
+    justify-content:flex-end !important;
+    align-items:center !important;
+    flex:0 0 auto !important;
+    gap:6px !important;
+    overflow-x:auto !important;
+    overflow-y:hidden !important;
+    scrollbar-width:none !important;
+    padding:1px 0 2px !important;
   }
   .home-header-controls::-webkit-scrollbar{display:none;}
+  .home-header-controls > *{flex:0 0 auto;}
 }
 
 @media(max-width:520px){
@@ -1428,6 +1449,9 @@ input,select,textarea,button,.btn{max-width:100%;box-sizing:border-box;}
 @media(max-width:520px){.school-picker-panel{position:absolute;left:0;right:0;top:calc(100% + 8px);max-height:62vh;z-index:1500;}.school-picker-suggestions,.school-picker-list{max-height:50vh;}}
 @media(max-width:520px){
   html,body,#app,.screen{max-width:100vw;min-width:0;overflow-x:hidden;}
+  .home-top-row,.home-top-row > *, .home-top-row .group-switch-wrap, .home-top-row .group-switch-trigger{
+    box-sizing:border-box;min-width:0;max-width:100%;
+  }
   .screen > *{min-width:0;max-width:100%;}
   .top-row,.home-group-head,.group-switch-wrap,.group-switch-trigger{box-sizing:border-box;}
   .group-switch-trigger *{max-width:100%;}
@@ -3692,7 +3716,7 @@ function renderHome(){
           <div class="group-hero-actions"><button class="btn btn-primary liquid-interactive motion-card" id="group-invite-btn">${icon('ti-share-3')} Invite</button><button class="btn btn-ghost liquid-interactive motion-card" id="group-manage-btn">${icon('ti-settings')} Manage</button></div>
         </div>
       </div>
-      <div class="top-row" style="margin-top:14px;"><div class="home-group-head">${renderGroupSwitcher()}</div><div class="home-header-controls"><div class="sync-badge" id="home-sync-badge" style="cursor:pointer;">${icon(online?'ti-refresh':'ti-cloud-off')} ${online?'Live':'Offline'}</div>${renderNotificationBell()}<div class="icon-btn liquid-interactive motion-card" id="go-timezones-btn" title="Times &amp; overlap">${icon('ti-world')}</div><div class="icon-btn liquid-interactive motion-card" id="my-status-btn">${icon('ti-mood-smile')}</div><div class="icon-btn liquid-interactive motion-card" id="go-messages-btn">${icon('ti-message')}</div></div></div><div class="home-member-strip"><div class="home-member-label">Members</div>${renderAvatarGroup(others)}</div>
+      <div class="top-row home-top-row" style="margin-top:14px;"><div class="home-group-head">${renderGroupSwitcher()}</div><div class="home-header-controls"><div class="sync-badge" id="home-sync-badge" style="cursor:pointer;">${icon(online?'ti-refresh':'ti-cloud-off')} ${online?'Live':'Offline'}</div>${renderNotificationBell()}<div class="icon-btn liquid-interactive motion-card" id="go-timezones-btn" title="Times &amp; overlap">${icon('ti-world')}</div><div class="icon-btn liquid-interactive motion-card" id="my-status-btn">${icon('ti-mood-smile')}</div><div class="icon-btn liquid-interactive motion-card" id="go-messages-btn">${icon('ti-message')}</div></div></div><div class="home-member-strip"><div class="home-member-label">Members</div>${renderAvatarGroup(others)}</div>
       <div class="xp-hero glass liquid-sheen liquid-interactive motion-card" id="open-xp" style="margin-bottom:14px;cursor:pointer;"><div style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><div><div style="font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-lo);font-weight:800;">Your XP</div><div class="xp-number">${Math.floor(ME.xp||0)} <span style="font-size:14px;color:var(--text-lo);font-weight:700;">XP</span></div></div><div style="text-align:right;"><div class="xp-badge">${icon('ti-flame')} Daily +10</div><div style="font-size:10.5px;color:var(--text-faint);margin-top:6px;">Tap for XP &amp; shop</div></div></div></div>
       <div class="home-view-menu-row"><button class="btn btn-ghost home-view-menu-btn liquid-interactive motion-card" id="home-view-menu">${icon(layout==='grid'?'ti-layout-grid':layout==='list'?'ti-list':'ti-circle-dot')} <span>View: ${layout==='grid'?'Grid':layout==='list'?'List':'Wheel'}</span><span class="ti" style="margin-left:auto;">${icon('ti-chevron-down')}</span></button></div>
       ${body}
